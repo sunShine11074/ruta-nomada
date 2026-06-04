@@ -1,0 +1,52 @@
+:root {
+  /* BARLEY SCALE - Cream / Sand backgrounds */
+  --barley-100: #595243;
+  --barley-200: #998D77;
+  --barley-300: #D1C8A7;
+  --barley-400: #FFF5D0;
+  /* Base */
+  --barley-500: #FFF8DE;
+  --barley-600: #FFFBEC;
+  --barley-700: #FFFDF7;
+
+  /* NAPLES SCALE - Warm Accent / Action Buttons */
+  --naples-100: #573E11;
+  --naples-200: #996F2A;
+  --naples-300: #CCAB46;
+  --naples-400: #FAD564;
+  /* Base */
+  --naples-500: #FBE191;
+  --naples-600: #FDEEC0;
+  --naples-700: #FEF8E7;
+
+  /* LIGHT OLIVE SCALE - Badges and secondary statuses */
+  --olive-100: #3E421F;
+  --olive-200: #6B7135;
+  --olive-300: #929A48;
+  --olive-400: #B4BD62;
+  /* Base */
+  --olive-500: #C9D08A;
+  --olive-600: #E0E4B8;
+  --olive-700: #F3F5E3;
+
+  /* NEPTUNE SCALE - Soft UI elements / Alternative Hovers */
+  --neptune-100: #304235;
+  --neptune-200: #52715C;
+  --neptune-300: #709A7E;
+  --neptune-400: #8EBD9D;
+  /* Base */
+  --neptune-500: #ACD0B8;
+  --neptune-600: #CDE4D5;
+  --neptune-700: #EBF5EE;
+
+  /* RINO SCALE - Headers, Navbar, Typography and Layout structure */
+  --rino-100: #071820;
+  /* Perfect for main body text */
+  --rino-200: #0C2937;
+  --rino-300: #10384C;
+  --rino-400: #1B475D;
+  /* Base Navbar & Footer */
+  --rino-500: #47768D;
+  --rino-600: #88ACBE;
+  --rino-700: #CEDEE6;
+}
