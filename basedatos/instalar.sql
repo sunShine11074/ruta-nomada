@@ -19,11 +19,21 @@
 --        · o en terminal:
 --            mysql -u root ruta_nomada < basedatos/instalar.sql
 --
---   Dos detalles que parecen menores y no lo son:
+--   Tres detalles que parecen menores y no lo son:
+--
+--   · CREA LA BASE CON utf8mb4_unicode_ci, tal cual dice arriba. Todas
+--     las tablas de este archivo usan esa colación, y el procedimiento
+--     almacenado hereda la de la BASE para sus parámetros. Si creas la
+--     base con otra (utf8mb4_general_ci, por ejemplo), el parámetro y
+--     la columna usuarios.email quedan en colaciones distintas y el
+--     registro truena con
+--         "Illegal mix of collations ... for operation '='".
+--     Es un error confuso porque parece un problema del PHP y no lo es.
+--
 --   · La columna emoji de plan_item_reacciones va en utf8mb4_bin. Con
---     la colación normal MySQL considera IGUALES a todos los emojis y
---     '🐙' = '🌮' devuelve verdadero, así que todas las reacciones se
---     fundirían en una sola.
+--     la colación normal MySQL considera IGUALES a todos los emojis, así
+--     que el GROUP BY de las reacciones los fundiría todos en uno solo.
+--
 --   · El procedimiento va SIN "DEFINER": con él, el import falla en
 --     cualquier servidor donde no exista el usuario root@localhost.
 --     register.php lo necesita, así que sin él nadie puede registrarse.
@@ -47,7 +57,7 @@ CREATE TABLE `ai_uso` (
   KEY `fk_aiuso_plan` (`plan_id`),
   CONSTRAINT `fk_aiuso_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_aiuso_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `destinos`;
 CREATE TABLE `destinos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -61,7 +71,7 @@ CREATE TABLE `destinos` (
   `imagen_url` varchar(500) DEFAULT NULL,
   `estado` enum('activo','inactivo','pendiente') NOT NULL DEFAULT 'activo',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `favoritos`;
 CREATE TABLE `favoritos` (
   `usuario_id` int(11) NOT NULL,
@@ -70,7 +80,7 @@ CREATE TABLE `favoritos` (
   KEY `destino_id` (`destino_id`),
   CONSTRAINT `favoritos_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE,
   CONSTRAINT `favoritos_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `password_resets`;
 CREATE TABLE `password_resets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -83,7 +93,7 @@ CREATE TABLE `password_resets` (
   KEY `token_hash` (`token_hash`),
   KEY `usuario_id` (`usuario_id`),
   CONSTRAINT `password_resets_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_destinos`;
 CREATE TABLE `plan_destinos` (
   `plan_id` int(11) NOT NULL,
@@ -92,7 +102,7 @@ CREATE TABLE `plan_destinos` (
   KEY `destino_id` (`destino_id`),
   CONSTRAINT `plan_destinos_ibfk_1` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `plan_destinos_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_gastos`;
 CREATE TABLE `plan_gastos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -106,7 +116,7 @@ CREATE TABLE `plan_gastos` (
   PRIMARY KEY (`id`),
   KEY `idx_plan_gastos` (`plan_id`),
   CONSTRAINT `fk_plangastos_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_invitaciones`;
 CREATE TABLE `plan_invitaciones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -121,7 +131,7 @@ CREATE TABLE `plan_invitaciones` (
   UNIQUE KEY `idx_token` (`token_hash`),
   KEY `idx_plan` (`plan_id`),
   CONSTRAINT `fk_planinv_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_item_reacciones`;
 CREATE TABLE `plan_item_reacciones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -135,7 +145,7 @@ CREATE TABLE `plan_item_reacciones` (
   KEY `fk_react_user` (`usuario_id`),
   CONSTRAINT `fk_react_item` FOREIGN KEY (`item_id`) REFERENCES `plan_items` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_react_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_items`;
 CREATE TABLE `plan_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -158,7 +168,7 @@ CREATE TABLE `plan_items` (
   PRIMARY KEY (`id`),
   KEY `idx_plan_dia` (`plan_id`,`dia`,`orden`),
   CONSTRAINT `fk_planitems_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_lista_items`;
 CREATE TABLE `plan_lista_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -169,7 +179,7 @@ CREATE TABLE `plan_lista_items` (
   PRIMARY KEY (`id`),
   KEY `fk_planlistaitems` (`lista_id`),
   CONSTRAINT `fk_planlistaitems` FOREIGN KEY (`lista_id`) REFERENCES `plan_listas` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_listas`;
 CREATE TABLE `plan_listas` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -181,7 +191,7 @@ CREATE TABLE `plan_listas` (
   PRIMARY KEY (`id`),
   KEY `fk_planlistas` (`plan_id`),
   CONSTRAINT `fk_planlistas` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_miembros`;
 CREATE TABLE `plan_miembros` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -194,7 +204,7 @@ CREATE TABLE `plan_miembros` (
   KEY `fk_planmiembros_user` (`usuario_id`),
   CONSTRAINT `fk_planmiembros_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_planmiembros_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `planes`;
 CREATE TABLE `planes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -215,7 +225,7 @@ CREATE TABLE `planes` (
   PRIMARY KEY (`id`),
   KEY `usuario_id` (`usuario_id`),
   CONSTRAINT `planes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `usuarios`;
 CREATE TABLE `usuarios` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -240,7 +250,7 @@ CREATE TABLE `usuarios` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `idx_usuarios_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `viajes_usuario`;
 CREATE TABLE `viajes_usuario` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -255,7 +265,7 @@ CREATE TABLE `viajes_usuario` (
   CONSTRAINT `viajes_usuario_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `viajes_usuario_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`),
   CONSTRAINT `viajes_usuario_ibfk_3` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 SET FOREIGN_KEY_CHECKS = 1;
