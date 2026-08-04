@@ -1,0 +1,333 @@
+/* ============================================================
+   asistente.css — Chatbot flotante global | Ruta Nómada
+
+   Panel anclado a la izquierda, debajo de la barra superior, tal
+   como el frame de Figma. El desplazamiento superior lo calcula
+   js/asistente.js midiendo la topbar real: hay dos variantes
+   (con y sin buscador) y así ninguna se descuadra.
+   ============================================================ */
+
+.rnas {
+    --rnas-top: 74px;              /* lo recalcula el JS con la topbar real */
+    --rnas-ancho: 550px;
+    --rnas-borde: #E4EBEF;
+    --rnas-tinta: #0D1F27;
+    --rnas-suave: #4a5b64;
+    font-family: var(--font-body, 'Poppins', sans-serif);
+}
+
+/* ── Burbuja flotante ─────────────────────────────────────── */
+.rnas__bubble {
+    position: fixed;
+    bottom: 20px;
+    left: 13px;
+    z-index: 180;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 1px solid var(--rnas-borde);
+    background: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 22px rgba(13, 31, 39, .26);
+    transition: transform .16s ease, box-shadow .16s ease;
+}
+.rnas__bubble:hover { transform: scale(1.06); box-shadow: 0 9px 26px rgba(13, 31, 39, .32); }
+.rnas__bubble:focus-visible { outline: 3px solid rgba(14, 42, 51, .45); outline-offset: 3px; }
+.rnas__bubble img { pointer-events: none; }
+
+/* Etiqueta que aparece al pasar el cursor: la burbuja sola no dice
+   qué hace, y un icono sin nombre obliga a adivinar. */
+.rnas__bubbleTip {
+    position: absolute;
+    left: calc(100% + 10px);
+    white-space: nowrap;
+    background: var(--rnas-tinta);
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 11px;
+    border-radius: 8px;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity .16s ease, transform .16s ease;
+    pointer-events: none;
+}
+.rnas__bubble:hover .rnas__bubbleTip,
+.rnas__bubble:focus-visible .rnas__bubbleTip { opacity: 1; transform: translateX(0); }
+
+/* Con el panel abierto la burbuja estorba y duplica el control de cierre. */
+.rnas.is-open .rnas__bubble { opacity: 0; pointer-events: none; transform: scale(.85); }
+
+/* ── Panel ────────────────────────────────────────────────── */
+.rnas__panel {
+    position: fixed;
+    left: 13px;
+    top: var(--rnas-top);
+    bottom: 16px;
+    z-index: 190;
+    width: var(--rnas-ancho);
+    max-width: calc(100vw - 26px);
+    background: #ffffff;
+    border-radius: 18px;
+    /* Sombra marcada: el panel flota sobre mapas e imágenes y sin ella
+       los bordes se pierden contra un fondo claro. */
+    box-shadow: 0 22px 60px rgba(13, 31, 39, .28), 0 2px 10px rgba(13, 31, 39, .10);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;              /* recorta la elipse del fondo */
+    animation: rnasIn .2s ease both;
+}
+.rnas__panel[hidden] { display: none; }
+
+@keyframes rnasIn {
+    from { opacity: 0; transform: translateY(10px) scale(.985); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Elipse #C5F9FF de 615x463 con desenfoque de capa, abajo a la derecha */
+.rnas__glow {
+    position: absolute;
+    right: -85px;
+    bottom: -165px;
+    width: 615px;
+    height: 463px;
+    border-radius: 50%;
+    background: #C5F9FF;
+    filter: blur(95px);
+    opacity: .85;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Todo el contenido va por encima del resplandor */
+.rnas__head,
+.rnas__body,
+.rnas__foot { position: relative; z-index: 1; }
+
+/* ── Cabecera ─────────────────────────────────────────────── */
+.rnas__head {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 15px 17px 13px;
+    border-bottom: 1px solid var(--rnas-borde);
+    flex-shrink: 0;
+}
+.rnas__logo { flex-shrink: 0; object-fit: contain; }
+.rnas__title {
+    margin: 0;
+    font-family: var(--font-display, var(--font-body, inherit));
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--rnas-tinta);
+    letter-spacing: -.01em;
+}
+.rnas__new {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #33454e;
+    padding: 6px 9px;
+    border-radius: 8px;
+    transition: background .15s ease;
+}
+.rnas__new:hover { background: #F1F5F8; }
+.rnas__min {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #33454e;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s ease;
+}
+.rnas__min:hover { background: #F1F5F8; }
+.rnas__new:focus-visible,
+.rnas__min:focus-visible { outline: 2px solid rgba(14, 42, 51, .5); outline-offset: 1px; }
+
+/* ── Cuerpo ───────────────────────────────────────────────── */
+.rnas__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;  /* no arrastra el scroll de la página */
+    padding: 14px 17px 4px;
+}
+.rnas__body::-webkit-scrollbar { width: 9px; }
+.rnas__body::-webkit-scrollbar-thumb { background: #cfd9e0; border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+.rnas__body::-webkit-scrollbar-thumb:hover { background: #b6c4ce; background-clip: content-box; }
+
+.rnas__note {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    background: #EFF3F6;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-size: 12.4px;
+    line-height: 1.45;
+    color: var(--rnas-suave);
+}
+.rnas__note svg { flex-shrink: 0; color: #6b7d87; }
+
+/* ── Bienvenida ───────────────────────────────────────────── */
+.rnas__hello {
+    margin: 30px 4px 0;
+    font-family: var(--font-display, var(--font-body, inherit));
+    font-size: 27px;
+    font-weight: 700;
+    line-height: 1.28;
+    text-align: center;
+    color: var(--rnas-tinta);
+    letter-spacing: -.015em;
+}
+.rnas__sugsTitle {
+    margin: 30px 0 0;
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--rnas-tinta);
+}
+.rnas__sugs { list-style: none; margin: 8px 0 0; padding: 0; }
+.rnas__sug {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--rnas-borde);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14.4px;
+    line-height: 1.45;
+    color: #33454e;
+    text-align: left;
+    padding: 13px 4px;
+    transition: color .15s ease, background .15s ease;
+}
+.rnas__sug:hover { color: var(--rnas-tinta); background: rgba(241, 245, 248, .75); }
+.rnas__sug:focus-visible { outline: 2px solid rgba(14, 42, 51, .5); outline-offset: -2px; }
+/* "arrow-turn-up" girada queda como "↳", que es la del diseño */
+.rnas__sugIcon { flex-shrink: 0; color: #8698a3; transform: rotate(90deg); }
+.rnas__sug:hover .rnas__sugIcon { color: #33454e; }
+
+.rnas__intro[hidden] { display: none; }
+
+/* ── Conversación ─────────────────────────────────────────── */
+.rnas__log { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.rnas__log:empty { margin-top: 0; }
+
+.rnas__msg { display: flex; align-items: flex-start; gap: 9px; }
+.rnas__msg--user { justify-content: flex-end; }
+.rnas__burbuja {
+    background: #EEF2F5;
+    border-radius: 16px;
+    padding: 9px 14px;
+    font-size: 13.4px;
+    line-height: 1.55;
+    color: var(--rnas-tinta);
+    max-width: 82%;
+    word-wrap: break-word;
+}
+.rnas__avatar {
+    width: 27px; height: 27px;
+    border-radius: 50%;
+    background: #F5B93F;
+    color: #0E2A33;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+}
+.rnas__msgLogo { width: 23px; height: 23px; object-fit: contain; flex-shrink: 0; margin-top: 2px; }
+.rnas__texto { flex: 1; min-width: 0; font-size: 13.4px; line-height: 1.7; color: #33454e; }
+.rnas__texto b { color: var(--rnas-tinta); font-weight: 700; }
+.rnas__vineta { display: flex; gap: 8px; margin: 3px 0 3px 2px; }
+.rnas__vineta > span:first-child { flex-shrink: 0; }
+.rnas__hueco { height: 8px; }
+
+.rnas__caret {
+    display: inline-block;
+    width: 7px; height: 13px;
+    background: #1E86D8;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: rnasBlink .85s steps(1, end) infinite;
+}
+@keyframes rnasBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* ── Pie ──────────────────────────────────────────────────── */
+.rnas__foot { padding: 11px 17px 17px; flex-shrink: 0; }
+.rnas__form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1.5px solid #DCE5EA;
+    border-radius: 26px;
+    padding: 5px 5px 5px 17px;
+    background: #ffffff;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.rnas__form:focus-within { border-color: #b9c9d4; box-shadow: 0 0 0 3px rgba(30, 134, 216, .13); }
+.rnas__input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font-family: inherit;
+    font-size: 13.5px;
+    color: #16262e;
+}
+.rnas__input::placeholder { color: #8a97a0; }
+.rnas__send {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: #0E2A33;
+    color: #ffffff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: transform .15s ease, opacity .15s ease;
+}
+.rnas__send:hover:not(:disabled) { transform: scale(1.07); }
+.rnas__send:disabled { opacity: .4; cursor: default; }
+.rnas__send:focus-visible { outline: 3px solid rgba(14, 42, 51, .45); outline-offset: 2px; }
+
+/* ── Pantallas chicas ─────────────────────────────────────── */
+@media (max-width: 620px) {
+    .rnas__panel {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        width: auto;
+        max-width: none;
+        border-radius: 15px;
+    }
+    .rnas__hello { font-size: 23px; margin-top: 24px; }
+    .rnas__bubble { width: 50px; height: 50px; bottom: 14px; left: 10px; }
+    .rnas__bubbleTip { display: none; }
+}
+
+/* ── Menos movimiento ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .rnas__panel { animation: none; }
+    .rnas__bubble, .rnas__send, .rnas__bubbleTip { transition: none; }
+    .rnas__bubble:hover, .rnas__send:hover:not(:disabled) { transform: none; }
+    .rnas__caret { animation: none; }
+}

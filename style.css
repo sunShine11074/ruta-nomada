@@ -1,0 +1,1228 @@
+/* ============================================================
+   style.css — Ruta Nómada
+   Paleta: verde petróleo oscuro / crema pálido / amarillo dorado
+============================================================ */
+
+/* ── Tokens ────────────────────────────────────────────────── */
+:root {
+    --teal-900:  #062738;
+    --teal-800:  #2b5760;
+    --teal-700:  #3e7986;
+    --cream:     #EAF0F6;
+    --cream-100: #dbe0e5;
+    --gold:      #f0b429;
+    --gold-dark: #d49e1f;
+    --white:     #ffffff;
+    --gray-100:  #ffffff;
+    --gray-300:  #ffffff;
+    --gray-500:  #6b7280;
+    --gray-700:  #374151;
+    --text-dark: #1a2e35;
+    --text-link: #2d7d9a;
+    --text-link-hover: #1c5f78;
+    --error:     #e53e3e;
+    --error-bg:  #ffffff;
+    --error-border: #fc8181;
+    --db-error:  #7b341e;
+    --db-error-bg: #d4d8db;
+    --db-error-border: #f6ad55;
+    --success:   #276749;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.10);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.12);
+    /* Usar 'Poppins' desde Google Fonts como fuente principal */
+    --font-display:  'Poppins', 'Avenir Next', Avenir, 'Helvetica Neue', Arial, sans-serif;
+    --font-body:     'Poppins', 'Avenir Next', Avenir, 'Helvetica Neue', Arial, system-ui, sans-serif;
+}
+
+/* ── Reset / Base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 15px; }
+
+body {
+    font-family: var(--font-body);
+    color: var(--text-dark);
+    background: var(--cream);
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding-top: 56px;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ════════════════════════════════════════════════════════════
+   PÁGINAS DE AUTH (login / register)
+════════════════════════════════════════════════════════════ */
+.auth-page {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ── Panel izquierdo (teal oscuro) ─────────────────────────── */
+.hero-panel {
+    width: 52%;
+    background: var(--teal-900);
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 3rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 60% 50% at 30% 70%, rgba(240,180,41,.07) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 80% 20%, rgba(255,255,255,.03) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* Logo */
+.hero-logo {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    color: var(--gold);
+}
+
+.logo-icon {
+    display: inline-block;
+    width: 40px; height: 40px;
+    background: url('img/logo.png') center / contain no-repeat;
+    font-size: 0;            /* oculta el glifo ✦ de respaldo */
+    flex-shrink: 0;
+}
+
+.logo-text {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--gold);
+}
+
+/* Contenido central */
+.hero-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem 0;
+}
+
+.hero-heading {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1.25;
+    max-width: 420px;
+    margin-bottom: 1.25rem;
+}
+
+.hero-subtext {
+    font-size: .9rem;
+    color: rgba(255,255,255,.65);
+    line-height: 1.7;
+}
+
+/* Stats */
+.hero-stats {
+    display: flex;
+    gap: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255,255,255,.1);
+}
+
+.stat { display: flex; flex-direction: column; }
+
+.stat-value {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.stat-label {
+    font-size: .65rem;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.5);
+    font-weight: 600;
+}
+
+/* ── Panel derecho (crema) ─────────────────────────────────── */
+.form-panel {
+    flex: 1;
+    background: var(--cream);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+}
+
+.form-wrapper {
+    width: 100%;
+    max-width: 380px;
+}
+
+/* Títulos del formulario */
+.form-title {
+    font-family: var(--font-display);
+    font-size: 1.85rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: .4rem;
+}
+
+.form-subtitle {
+    font-size: .88rem;
+    color: var(--text-link);
+    margin-bottom: 1.75rem;
+    line-height: 1.5;
+}
+
+/* ── Campos ─────────────────────────────────────────────────── */
+.field { margin-bottom: 1.1rem; }
+
+.field__label {
+    display: block;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: .35rem;
+}
+
+.field__input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.field__icon {
+    position: absolute;
+    left: .85rem;
+    font-size: .85rem;
+    color: var(--gray-500);
+    pointer-events: none;
+    line-height: 1;
+}
+
+.field__input {
+    width: 100%;
+    padding: .72rem .75rem .72rem 2.4rem;
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    font-family: var(--font-body);
+    font-size: .88rem;
+    color: var(--text-dark);
+    transition: border-color .18s, box-shadow .18s;
+    outline: none;
+}
+
+.field__input:focus {
+    border-color: var(--teal-700);
+    box-shadow: 0 0 0 3px rgba(27,58,64,.1);
+}
+
+.field__input::placeholder { color: var(--gray-500); }
+
+.field__input:disabled {
+    background: var(--gray-100);
+    cursor: not-allowed;
+    opacity: .6;
+}
+
+/* Toggle contraseña */
+.field__toggle-pw {
+    position: absolute;
+    right: .75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: .25rem;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+}
+
+.field__toggle-pw svg { width: 18px; height: 18px; }
+
+.field__toggle-pw.active { color: var(--teal-700); }
+
+/* Campo con error */
+.field--error .field__input,
+.field__input--error {
+    border-color: var(--error-border);
+    background: var(--error-bg);
+}
+
+.field__error {
+    display: block;
+    font-size: .76rem;
+    color: var(--error);
+    margin-top: .3rem;
+}
+
+/* ── Opciones (recordar / olvidé) ──────────────────────────── */
+.form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: .75rem 0 1.25rem;
+    font-size: .82rem;
+}
+
+/* ── Checkbox personalizado ─────────────────────────────────── */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    cursor: pointer;
+    font-size: .82rem;
+    color: var(--gray-700);
+    user-select: none;
+}
+
+.checkbox-input { display: none; }
+
+.checkbox-custom {
+    width: 17px; height: 17px;
+    border: 2px solid var(--gray-300);
+    border-radius: 4px;
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    flex-shrink: 0;
+}
+
+.checkbox-input:checked + .checkbox-custom {
+    background: var(--gold);
+    border-color: var(--gold);
+}
+
+.checkbox-input:checked + .checkbox-custom::after {
+    content: '✓';
+    font-size: .65rem;
+    font-weight: 700;
+    color: var(--white);
+}
+
+/* Términos */
+.field-terms {
+    margin: .65rem 0 1.25rem;
+}
+
+/* ── Links ──────────────────────────────────────────────────── */
+.link-primary {
+    color: var(--text-dark);
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--gold);
+    text-underline-offset: 2px;
+}
+
+.link-primary:hover { color: var(--text-link); }
+
+.link-secondary {
+    color: var(--text-link);
+    font-size: .82rem;
+}
+
+.link-secondary:hover { color: var(--text-link-hover); text-decoration: underline; }
+
+/* Enlace "Volver" (estilo del mockup de recuperación) */
+.form-back {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    color: var(--gray-500);
+    font-size: .9rem;
+    margin-bottom: 1.1rem;
+    transition: color .15s;
+}
+.form-back:hover { color: var(--text-dark); }
+.form-back svg { width: 16px; height: 16px; }
+
+/* ── Botón primario ─────────────────────────────────────────── */
+.btn-primary {
+    display: block;
+    width: 50%;
+    padding: .85rem 1.5rem;
+    background: linear-gradient(135deg, #f5b900 0%, #ef8f00 100%);
+    color: var(--text-dark);
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: .95rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    transition: background .15s, transform .1s, box-shadow .15s;
+    box-shadow: 0 2px 8px rgba(239, 143, 0, .35);
+    letter-spacing: .01em;
+    margin-top: .15rem;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ee9500 0%, #d97706 100%);
+    box-shadow: 0 4px 14px rgba(239, 143, 0, .45);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+
+.btn-primary:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+/* Footer del form */
+.form-footer {
+    text-align: center;
+    font-size: .84rem;
+    color: var(--gray-500);
+    margin-top: 1.25rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ALERTAS DE ERROR
+════════════════════════════════════════════════════════════ */
+.alert {
+    display: flex;
+    align-items: flex-start;
+    gap: .85rem;
+    border-radius: var(--radius-md);
+    padding: .9rem 1rem;
+    margin-bottom: 1.4rem;
+    font-size: .84rem;
+    line-height: 1.5;
+}
+
+/* Error de BD — ámbar/naranja (crítico) */
+.alert--db {
+    background: var(--db-error-bg);
+    border: 1.5px solid var(--db-error-border);
+    color: var(--db-error);
+}
+
+.alert--db .alert__icon {
+    font-size: 1.2rem;
+    margin-top: .05rem;
+    flex-shrink: 0;
+}
+
+.alert--db strong { display: block; margin-bottom: .2rem; font-size: .88rem; }
+
+/* Error de formulario — rojo */
+.alert--form {
+    background: var(--error-bg);
+    border: 1.5px solid var(--error-border);
+    color: var(--error);
+    align-items: center;
+}
+
+.alert--form .alert__icon {
+    font-size: .9rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Variante inline (dentro del dashboard) */
+.alert--inline {
+    margin: 0 0 1.5rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   DASHBOARD
+════════════════════════════════════════════════════════════ */
+.dashboard-page {
+    background: var(--cream);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ── Topbar ─────────────────────────────────────────────────── */
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--teal-900);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+.topbar__left {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-width: 155px;
+}
+
+.topbar__left .logo-icon,
+.topbar__left .logo-text { color: var(--gold); }
+
+.topbar__nav {
+    display: flex;
+    gap: .25rem;
+    flex: 1;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .85rem;
+    border-radius: var(--radius-sm);
+    font-size: .83rem;
+    font-weight: 500;
+    color: rgba(255,255,255,.7);
+    transition: background .15s, color .15s;
+}
+
+.nav-link:hover { background: rgba(255,255,255,.08); color: var(--white); }
+.nav-link--active { color: var(--white); background: rgba(255,255,255,.1); font-weight: 600; }
+.nav-link--active .nav-link__icon { color: var(--gold); }
+
+/* Buscador mini (topbar) */
+.search-bar-mini {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 20px;
+    padding: .35rem .9rem;
+    width: 300px;
+}
+
+.search-bar-mini .search-icon { font-size: .82rem; color: rgba(255,255,255,.6); }
+
+.search-bar-mini input {
+    background: none;
+    border: none;
+    outline: none;
+    font-family: var(--font-body);
+    font-size: .8rem;
+    color: rgba(255,255,255,.85);
+    width: 100%;
+}
+
+.search-bar-mini input::placeholder { color: rgba(255,255,255,.5); }
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: rgba(255,255,255,.75);
+    padding: .25rem;
+    transition: color .15s;
+}
+
+.btn-icon:hover { color: var(--gold); }
+
+/* Chip de usuario */
+.user-chip {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.user-chip__name {
+    font-size: .82rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.user-chip__greeting {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--white);
+    line-height: 1.2;
+}
+
+.user-chip__role {
+    display: none;
+}
+
+.topbar__right {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-left: auto;
+}
+
+/* Avatares */
+.avatar {
+    width: 34px; height: 34px;
+    background: var(--gold);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: .85rem;
+    color: var(--teal-900);
+    flex-shrink: 0;
+}
+
+img.avatar {
+    object-fit: cover;
+}
+
+.avatar--lg { width: 42px; height: 42px; font-size: 1rem; }
+
+/* ── Layout (sidebar + main) ─────────────────────────────────── */
+.layout {
+    display: flex;
+    flex: 1;
+    min-height: calc(100vh - 56px);
+    padding-left: 220px;                 /* deja espacio para el sidebar fijo */
+    transition: padding-left .28s ease;
+}
+body.sidebar-collapsed .layout { padding-left: 0; }
+/* Al colapsar, deja sitio para el botón flotante (no se encima ni queda pegado al círculo) */
+body.sidebar-collapsed .main-content { padding-left: 5.5rem; }
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+/* Fijo y de la altura del viewport: la navegación y "Cerrar sesión"
+   quedan visibles siempre, sin importar cuánto se haga scroll. */
+.sidebar {
+    position: fixed;
+    top: 56px;                           /* debajo de la topbar */
+    left: 0;
+    z-index: 150;
+    width: 220px;
+    min-width: 220px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+    background: linear-gradient(180deg, #13476a 0%, #082232 100%);
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem 1rem;
+    gap: .25rem;
+    transform: translateX(0);
+    transition: transform .28s ease;
+}
+/* Colapsado: el sidebar se desliza hacia afuera por la izquierda */
+body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+
+.sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: rgba(255,255,255,.6);
+    font-size: 1.1rem;
+    cursor: pointer;
+    align-self: flex-start;
+    margin-bottom: .5rem;
+    transition: background .15s, color .15s;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,.08); color: var(--white); }
+
+/* Botón flotante (FAB): aparece SOLO cuando el sidebar está colapsado,
+   como un círculo en la esquina superior izquierda. */
+.sidebar-fab {
+    position: fixed;
+    top: 66px;
+    left: 14px;
+    z-index: 160;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #0c8bd7 0%, #0b5f8e 100%);
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,.28);
+    transition: transform .15s, background .15s;
+}
+.sidebar-fab:hover { background: linear-gradient(135deg, #0b5f8e 0%, #08466d 100%); transform: scale(1.06); }
+body.sidebar-collapsed .sidebar-fab { display: flex; }
+
+/* Scrim oscuro detrás del sidebar cuando se superpone (móvil) */
+.sidebar-scrim {
+    position: fixed;
+    inset: 56px 0 0 0;
+    background: rgba(0,0,0,.35);
+    z-index: 140;
+    display: none;
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem 0 1.25rem;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    margin-bottom: .75rem;
+}
+
+.sidebar-user__name {
+    font-size: .87rem;
+    font-weight: 600;
+    color: var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.sidebar-user__email {
+    font-size: .72rem;
+    color: rgba(255,255,255,.45);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.sidebar-section-label {
+    font-size: .64rem;
+    letter-spacing: .1em;
+    font-weight: 600;
+    color: rgba(255,255,255,.35);
+    padding: .5rem .5rem .25rem;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    flex: 1;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .6rem .75rem;
+    border-radius: var(--radius-sm);
+    font-size: .85rem;
+    color: rgba(255,255,255,.65);
+    transition: background .15s, color .15s;
+}
+
+.sidebar-link:hover { background: rgba(255,255,255,.07); color: var(--white); }
+
+.sidebar-footer {
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding-top: .75rem;
+    margin-top: .5rem;
+}
+
+.sidebar-link--logout { color: rgba(255,255,255,.5); }
+.sidebar-link--logout:hover { color: #fc8181; background: rgba(252,129,129,.08); }
+
+/* ── Main content ────────────────────────────────────────────── */
+.main-content {
+    flex: 1;
+    padding: 1.75rem 2rem 3rem;
+    overflow-x: hidden;
+    transition: padding-left .28s ease;
+}
+
+.dashboard-header { margin-bottom: 1.4rem; }
+
+.dashboard-title {
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: .3rem;
+}
+
+.dashboard-subtitle {
+    font-size: .86rem;
+    color: var(--gray-500);
+}
+
+/* Buscador grande */
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    background: var(--white);
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    padding: .7rem 1rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.search-bar .search-icon { color: var(--gray-500); font-size: .9rem; }
+
+.search-bar input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-family: var(--font-body);
+    font-size: .88rem;
+    color: var(--text-dark);
+    background: none;
+}
+
+.search-bar input::placeholder { color: var(--gray-500); }
+
+.btn-filter {
+    background: linear-gradient(135deg, #f5b900 0%, #ef8f00 100%);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: .45rem 1rem;
+    font-family: var(--font-body);
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s;
+}
+
+.btn-filter:hover { background: linear-gradient(135deg, #ee9500 0%, #d97706 100%); }
+
+.stats-panel {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+}
+
+.stats-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.35rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.stats-card__label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    margin-bottom: .6rem;
+}
+
+.stats-card__value {
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.admin-action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.15rem;
+}
+
+.admin-action-bar .btn-secondary,
+.admin-action-bar .btn-primary {
+    width: auto;
+}
+
+.table-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 920px;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 1rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #ececec;
+    font-size: .92rem;
+}
+
+.admin-table th {
+    font-size: .75rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    background: var(--gray-100);
+}
+
+.admin-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.table-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--white);
+}
+
+.badge--cultura { background: #4a7c6b; }
+.badge--romance { background: #ba7c8f; }
+.badge--aventura { background: #7a8c5a; }
+.badge--descubrimiento { background: #8a7a5a; }
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .25rem .7rem;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+}
+
+.status-pill--active { background: #d4eed8; color: #2d6a34; }
+.status-pill--inactive { background: #f5e6e6; color: #9f3a3a; }
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    border: 1.5px solid rgba(55,65,81,.15);
+    background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);
+    color: var(--text-dark);
+    padding: .7rem 1rem;
+    font-size: .82rem;
+    font-weight: 700;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+.btn-secondary:hover { background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-color: rgba(55,65,81,.25); }
+
+.btn-small {
+    padding: .45rem .85rem;
+    font-size: .78rem;
+}
+
+.table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+
+.admin-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--gray-500);
+}
+
+/* ── Secciones ──────────────────────────────────────────────── */
+.section { margin-bottom: 2.5rem; }
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.section-link {
+    font-size: .82rem;
+    color: var(--text-link);
+    font-weight: 500;
+}
+
+.section-link:hover { text-decoration: underline; }
+
+/* Contenedor 'Ver todos los destinos' — separa visualmente secciones */
+.see-all-wrap {
+    text-align: center;
+    margin: 2.25rem 0 3rem; /* espacio arriba y abajo entre secciones */
+}
+
+/* Centrar el botón dentro del contenedor */
+.see-all-wrap .btn-primary {
+    display: block; /* ya es block en .btn-primary, reafirmamos */
+    margin: 0 auto; /* centro horizontal */
+}
+
+/* Filtros de categoría */
+.category-filters {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.cat-btn {
+    padding: .4rem .95rem;
+    border: 1.5px solid var(--gray-300);
+    border-radius: 20px;
+    background: var(--white);
+    font-family: var(--font-body);
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all .15s;
+}
+
+.cat-btn:hover { border-color: #919b32; background: #919b32; color: var(--white); }
+.cat-btn--active { background: #919b32; color: var(--white); border-color: #919b32; }
+
+/* ── Tarjetas de destino ─────────────────────────────────────── */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.1rem;
+}
+
+.dest-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s, transform .2s;
+    cursor: pointer;
+}
+
+.dest-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.dest-card__img {
+    position: relative;
+    height: 145px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #d4e4d8 0%, #e8ead0 100%);
+}
+
+.dest-card__tag {
+    position: absolute;
+    top: .6rem;
+    left: .6rem;
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    padding: .25rem .55rem;
+    border-radius: 4px;
+    color: var(--white);
+}
+
+.tag--cultura        { background: #4a7c6b; }
+.tag--romance        { background: #c47a7a; }
+.tag--aventura       { background: #7a8c5a; }
+.tag--descubrimiento { background: #8a7a5a; }
+
+.dest-card__fav {
+    position: absolute;
+    top: .6rem;
+    right: .6rem;
+    width: 28px; height: 28px;
+    background: var(--white);
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .9rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    color: var(--gray-500);
+    transition: color .15s;
+}
+
+.dest-card__fav--active { color: #e05252; }
+.dest-card__fav:hover   { color: #e05252; }
+
+.dest-card__img-icon {
+    font-size: 2.5rem;
+    opacity: .5;
+}
+
+.dest-card__img-label {
+    position: absolute;
+    bottom: .5rem;
+    left: .6rem;
+    font-size: .7rem;
+    background: rgba(0,0,0,.35);
+    color: var(--white);
+    padding: .18rem .5rem;
+    border-radius: 4px;
+}
+
+.dest-card__body { padding: .85rem .9rem .9rem; }
+
+.dest-card__name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: .2rem;
+}
+
+.dest-card__country {
+    font-size: .75rem;
+    color: var(--text-link);
+    font-weight: 500;
+    margin-bottom: .4rem;
+}
+
+.dest-card__desc {
+    font-size: .78rem;
+    color: var(--gray-500);
+    line-height: 1.5;
+    margin-bottom: .7rem;
+}
+
+.dest-card__footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.dest-card__since {
+    display: block;
+    font-size: .68rem;
+    color: var(--gray-500);
+}
+
+.dest-card__price {
+    display: block;
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.dest-card__rating {
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+/* ── Recientes ──────────────────────────────────────────────── */
+.recents-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.recent-card {
+    background: #ffffff;
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s;
+    cursor: pointer;
+}
+
+.recent-card:hover { box-shadow: var(--shadow-md); }
+
+.recent-card__thumb {
+    width: 52px; height: 52px;
+    background: var(--cream);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.recent-card__time {
+    display: block;
+    font-size: .7rem;
+    color: var(--gray-500);
+    margin-bottom: .2rem;
+}
+
+.recent-card__title {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: .15rem;
+}
+
+.recent-card__author {
+    font-size: .75rem;
+    color: var(--text-link);
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+    .cards-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+    .hero-panel { display: none; }
+    .form-panel { background: var(--cream); }
+
+    .topbar__nav { display: none; }
+    .search-bar-mini { display: none; }
+}
+
+@media (max-width: 700px) {
+    /* En móvil el sidebar se superpone al contenido (no reserva espacio) */
+    .layout { padding-left: 0; }
+    .main-content { padding: 1.25rem; }
+    .cards-grid { grid-template-columns: 1fr; }
+    .recents-grid { grid-template-columns: 1fr; }
+    /* Mostrar el scrim cuando el sidebar está abierto */
+    body:not(.sidebar-collapsed) .sidebar-scrim { display: block; }
+}
+
+#map{
+    width:100%;
+    height:400px;
+    margin-bottom:30px;
+}

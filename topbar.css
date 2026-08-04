@@ -1,0 +1,160 @@
+/* ============================================================
+   topbar.css — Topbar global rediseñado + menú de usuario | Ruta Nómada
+   (Reemplaza al sidebar: la navegación de cuenta vive en el dropdown
+   del avatar. La burbuja flotante queda para el futuro chatbot.)
+============================================================ */
+
+/* El sidebar ya no existe: liberar el espacio que reservaba el layout */
+.layout { padding-left: 0 !important; }
+body.sidebar-collapsed .main-content { padding-left: 2rem !important; }
+.sidebar, .sidebar-fab, .sidebar-scrim { display: none !important; }
+
+/* ── Barra ─────────────────────────────────────────────────── */
+.topbar.tb {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 0 18px 0 14px;
+}
+
+.tb-brand { display: flex; align-items: center; gap: calc(.5rem + 3px); text-decoration: none; flex-shrink: 0; }
+.tb-brand__name { font-weight: 600; font-size: calc(1.05rem + 1px); color: var(--gold); white-space: nowrap; }
+
+/* ── Buscador (píldora blanca + categoría + lupa) ──────────── */
+.tb-search {
+    display: flex; align-items: center;
+    background: #ffffff; border-radius: 18px;
+    height: 36px;                 /* = altura del botón "Crear plan de viaje" */
+    padding: 0 4px 0 15px;
+    width: 340px; max-width: 34vw;
+    transition: box-shadow .18s;
+}
+.tb-search:hover, .tb-search:focus-within { box-shadow: 0 0 0 3px rgba(240,180,41,.35); }
+.tb-search input {
+    flex: 1; min-width: 0; border: none; outline: none; background: none;
+    font-family: var(--font-body); font-size: .84rem; color: #16262e;
+}
+.tb-search input::placeholder { color: #8a97a0; }
+
+.tb-search__cat { position: relative; flex-shrink: 0; }
+.tb-search__catbtn {
+    display: flex; align-items: center; gap: 5px;
+    background: none; border: none; border-left: 1px solid #dde4e9;
+    height: 22px;                 /* proporcional a la píldora de 36px */
+    padding: 0 9px 0 11px; margin-left: 8px;
+    font-family: var(--font-body); font-size: .78rem; font-weight: 500; color: #16262e;
+    cursor: pointer; white-space: nowrap;
+}
+.tb-search__catbtn:hover { color: #062738; }
+.tb-search__catbtn svg { transition: transform .2s; }
+.tb-search__cat.open .tb-search__catbtn svg { transform: rotate(180deg); }
+.tb-search__catlist {
+    position: absolute; top: calc(100% + 10px); right: 0; z-index: 300;
+    background: #ffffff; border-radius: 10px; min-width: 160px;
+    box-shadow: 0 8px 24px rgba(6,39,56,.25);
+    list-style: none; margin: 0; padding: 5px 0;
+    animation: tbFade .18s ease both;
+}
+.tb-search__catlist li {
+    padding: 8px 14px; font-size: .82rem; color: #16262e; cursor: pointer;
+    transition: background .12s;
+}
+.tb-search__catlist li:hover { background: #f1f4f6; }
+.tb-search__catlist li.on { font-weight: 600; color: #062738; }
+.tb-search__go {
+    width: 29px; height: 29px; border-radius: 50%; border: none; flex-shrink: 0;
+    background: #0d1f27; cursor: pointer; margin-left: 5px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, transform .12s;
+}
+.tb-search__go svg { width: 13px; height: 13px; }
+.tb-search__go:hover { background: #2b5760; transform: scale(1.05); }
+
+/* ── Navegación ────────────────────────────────────────────── */
+.tb-nav { display: flex; align-items: center; gap: 6px; }
+/* Variante Inicio (sin buscador): la nav se pega al grupo de la derecha.
+   Solo la nav lleva margin-left:auto (absorbe todo el espacio); el grupo
+   derecho pierde su auto para quedar justo al lado de la nav. */
+.tb--nosearch .tb-nav { margin-left: auto; }
+.tb--nosearch .tb-right { margin-left: 0; }
+.tb-nav__link {
+    padding: 8px 13px; border-radius: 8px;
+    font-size: calc(.9rem + 1px); font-weight: 500; color: rgba(255,255,255,.75);
+    text-decoration: none; white-space: nowrap;
+    transition: background .15s, color .15s;
+}
+.tb-nav__link:hover { background: rgba(255,255,255,.08); color: #ffffff; }
+.tb-nav__link--on { color: #ffffff; font-weight: 600; }
+
+/* ── Lado derecho ──────────────────────────────────────────── */
+.tb-right { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+
+.tb-crearplan {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 20px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.25);
+    font-size: .84rem; font-weight: 500; color: #ffffff;
+    text-decoration: none; white-space: nowrap;
+    transition: background .15s, border-color .15s, transform .12s;
+}
+.tb-crearplan:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.45); transform: translateY(-1px); }
+
+.tb-bell {
+    background: none; border: none; cursor: pointer; padding: 6px;
+    border-radius: 8px; display: flex; transition: background .15s;
+}
+.tb-bell:hover { background: rgba(255,255,255,.1); }
+
+/* ── Avatar + dropdown ─────────────────────────────────────── */
+.tb-user { position: relative; }
+.tb-user__btn {
+    position: relative;
+    display: flex; align-items: center;
+    background: none; border: none; cursor: pointer; padding: 2px;
+    border-radius: 50%;
+}
+.tb-user__btn .avatar { width: 38px; height: 38px; border: 2px solid rgba(255,255,255,.35); transition: border-color .15s; }
+.tb-user__btn:hover .avatar { border-color: var(--gold); }
+/* Indicador verde (como el mockup: círculo 7×7 abajo-derecha del avatar) */
+.tb-user__dot {
+    position: absolute; right: 2px; bottom: 2px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #4CEA95;
+}
+
+@keyframes tbFade { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+.tb-menu {
+    position: absolute; top: calc(100% + 12px); right: 0; z-index: 300;
+    width: 210px; background: #ffffff; border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(6,39,56,.28);
+    padding: 6px 0; animation: tbFade .18s ease both;
+}
+.tb-menu__item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 16px; font-size: .86rem; font-weight: 500; color: #0d1f27;
+    text-decoration: none; transition: background .13s, color .13s;
+    border-bottom: 1px solid #f0f3f5;
+}
+.tb-menu__item:last-child { border-bottom: none; }
+.tb-menu__item svg { flex-shrink: 0; color: #0d1f27; transition: color .13s; }
+.tb-menu__item:hover { background: #f1f4f6; }
+.tb-menu__item--danger:hover { background: #fde8e8; color: #e02424; }
+.tb-menu__item--danger:hover svg { color: #e02424; }
+
+/* La burbuja del chatbot vive ahora en asistente.css, junto con su
+   panel real (partial includes/asistente.php). */
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1240px) {
+    .tb-crearplan span { display: none; }
+    .tb-crearplan { padding: 8px 11px; }
+}
+@media (max-width: 1080px) {
+    .tb-nav { display: none; }
+    .tb-search { max-width: none; flex: 1; width: auto; }
+}
+@media (max-width: 640px) {
+    .tb-brand__name { display: none; }
+    .tb-search__catbtn span { display: none; }
+}

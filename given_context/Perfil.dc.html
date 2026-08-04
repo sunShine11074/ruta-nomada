@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Poppins', 'Avenir Next', Avenir, 'Helvetica Neue', Arial, sans-serif;
+    color: #1a2e35;
+    background: #e6ecf2;
+    padding-top: 56px;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+  input, select, button { font-family: inherit; }
+  a { color: inherit; text-decoration: none; }
+  @keyframes rn-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
+  @keyframes rn-pop { 0%{transform:scale(.96);opacity:0} 100%{transform:scale(1);opacity:1} }
+  @keyframes rn-fab-in { from{transform:scale(.6);opacity:0} to{transform:scale(1);opacity:1} }
+</style>
+</helmet>
+
+<!-- ══════════════════ TOPBAR (emoji kept, as in current app) ══════════════════ -->
+<header style="position:fixed;top:0;left:0;right:0;height:56px;background:#062738;display:flex;align-items:center;gap:1.5rem;padding:0 1.5rem;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+  <div style="display:flex;align-items:center;gap:.5rem;min-width:155px">
+    <img src="img/logo.png" alt="Ruta Nómada" style="width:34px;height:34px;object-fit:contain;flex-shrink:0">
+    <span style="font-weight:600;font-size:1.05rem;color:#f0b429;white-space:nowrap">Ruta Nómada</span>
+  </div>
+  <nav style="display:flex;gap:.25rem;flex:1">
+    <a href="dashboard.php" style="display:flex;align-items:center;padding:.45rem .85rem;border-radius:6px;font-size:.83rem;font-weight:500;white-space:nowrap;color:rgba(255,255,255,.7)" style-hover="background:rgba(255,255,255,.08);color:#fff">Inicio</a>
+    <a href="explore.php" style="display:flex;align-items:center;padding:.45rem .85rem;border-radius:6px;font-size:.83rem;font-weight:500;white-space:nowrap;color:rgba(255,255,255,.7)" style-hover="background:rgba(255,255,255,.08);color:#fff">Explorar</a>
+    <a href="mis_viajes.php" style="display:flex;align-items:center;padding:.45rem .85rem;border-radius:6px;font-size:.83rem;font-weight:500;white-space:nowrap;color:rgba(255,255,255,.7)" style-hover="background:rgba(255,255,255,.08);color:#fff">Mis viajes</a>
+    <a href="comunidad.php" style="display:flex;align-items:center;padding:.45rem .85rem;border-radius:6px;font-size:.83rem;font-weight:500;white-space:nowrap;color:rgba(255,255,255,.7)" style-hover="background:rgba(255,255,255,.08);color:#fff">Comunidad</a>
+  </nav>
+  <div style="display:flex;align-items:center;gap:.75rem;margin-left:auto">
+    <div style="display:flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:.35rem .9rem;width:260px">
+      <span style="font-size:.82rem;color:rgba(255,255,255,.6)">🔍︎</span>
+      <input type="text" placeholder="Buscar destinos, actividades, ho…" style="background:none;border:none;outline:none;font-size:.8rem;color:rgba(255,255,255,.85);width:100%">
+    </div>
+    <button style="background:none;border:none;cursor:pointer;font-size:1rem;color:rgba(255,255,255,.75);padding:.25rem" aria-label="Notificaciones">🔔</button>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <div style="display:flex;flex-direction:column;align-items:flex-end">
+        <span style="font-size:.78rem;font-weight:600;color:#fff;line-height:1.2;white-space:nowrap">¡Hola, {{ firstName }}!</span>
+        <span style="font-size:.68rem;color:rgba(255,255,255,.55);line-height:1">Viajera</span>
+      </div>
+      <div style="width:34px;height:34px;background:#f0b429;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:#062738">{{ initial }}</div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════ FAB (visible when sidebar collapsed) ══════════════════ -->
+<sc-if value="{{ collapsed }}" hint-placeholder-val="{{ true }}">
+  <button onClick="{{ toggleSidebar }}" aria-label="Mostrar menú" style="position:fixed;top:66px;left:14px;z-index:160;width:44px;height:44px;border-radius:50%;border:none;background:linear-gradient(135deg,#0c8bd7 0%,#0b5f8e 100%);color:#fff;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.28);animation:rn-fab-in .25s ease" style-hover="transform:scale(1.06)">☰</button>
+</sc-if>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside style="position:fixed;top:56px;left:0;z-index:150;width:220px;height:calc(100vh - 56px);overflow-y:auto;background:linear-gradient(180deg,#13476a 0%,#082232 100%);display:flex;flex-direction:column;padding:1.25rem 1rem;gap:.25rem;transition:transform .28s ease;transform:{{ sidebarTransform }}">
+  <button onClick="{{ toggleSidebar }}" aria-label="Ocultar menú" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:none;border:none;border-radius:6px;color:rgba(255,255,255,.6);font-size:1.1rem;cursor:pointer;align-self:flex-start;margin-bottom:.5rem" style-hover="background:rgba(255,255,255,.08);color:#fff">☰</button>
+  <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem 0 1.25rem;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:.75rem">
+    <div style="width:42px;height:42px;background:#f0b429;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;color:#062738;flex-shrink:0">{{ initial }}</div>
+    <div style="min-width:0">
+      <p style="font-size:.87rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;margin:0">{{ fullName }}</p>
+      <p style="font-size:.72rem;color:rgba(255,255,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;margin:0">{{ email }}</p>
+    </div>
+  </div>
+  <p style="font-size:.64rem;letter-spacing:.1em;font-weight:600;color:rgba(255,255,255,.35);padding:.5rem .5rem .25rem;margin:0">MI CUENTA</p>
+  <nav style="display:flex;flex-direction:column;gap:.15rem;flex:1">
+    <a href="profile.php" style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:6px;font-size:.85rem;color:#fff;background:rgba(255,255,255,.1);font-weight:600"><span></span> Perfil</a>
+    <a href="mis_viajes.php" style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:6px;font-size:.85rem;color:rgba(255,255,255,.65)" style-hover="background:rgba(255,255,255,.07);color:#fff"><span></span> Mis planes</a>
+    <a href="configuracion.php" style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:6px;font-size:.85rem;color:rgba(255,255,255,.65)" style-hover="background:rgba(255,255,255,.07);color:#fff"><span></span> Configuración</a>
+  </nav>
+  <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:.75rem;margin-top:.5rem">
+    <a href="dashboard.php?logout=1" style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:6px;font-size:.85rem;color:rgba(255,255,255,.5)" style-hover="color:#fc8181;background:rgba(252,129,129,.08)"><span>⟵</span> Cerrar sesión</a>
+  </div>
+</aside>
+
+<!-- ══════════════════ LAYOUT (padding-left adapts to sidebar) ══════════════════ -->
+<div style="display:flex;flex:1;min-height:calc(100vh - 56px);transition:padding-left .28s ease;padding-left:{{ layoutPad }}">
+  <main style="flex:1;min-width:0;padding:1.75rem 2rem 3rem;transition:padding-left .28s ease;padding-left:{{ mainPad }}">
+
+    <!-- ───────────── PROFILE CARD ───────────── -->
+    <div style="max-width:1090px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(6,39,56,.08),0 1px 3px rgba(0,0,0,.06);overflow:hidden">
+
+      <!-- Banner -->
+      <div ref="{{ bannerRef }}" style="height:150px;background-color:#fff8e7;background-image:radial-gradient(rgba(6,39,56,.10) 1.3px, transparent 1.3px);background-size:13px 13px;background-position:center;position:relative"></div>
+
+      <!-- Avatar + camera -->
+      <div style="display:flex;flex-direction:column;align-items:center;padding:0 1.5rem 1rem;position:relative">
+        <div style="position:relative;margin-top:-59px">
+          <div ref="{{ avatarRef }}" role="img" aria-label="Foto de perfil" style="width:118px;height:118px;border-radius:50%;border:4px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.18);background-color:#e2e6ea;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:#9aa3ad;overflow:hidden">
+            <sc-if value="{{ noProfileImg }}" hint-placeholder-val="{{ true }}">
+              <svg width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="4"></circle><path d="M4.5 20c0-4.2 3.4-7 7.5-7s7.5 2.8 7.5 7"></path></svg>
+            </sc-if>
+          </div>
+          <!-- camera button + menu -->
+          <div data-cam="1" style="position:absolute;right:-6px;bottom:6px">
+            <button onClick="{{ toggleCamMenu }}" aria-label="Cambiar imagen" style="width:34px;height:34px;border-radius:11px;border:3px solid #fff;background:#062738;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)" style-hover="background:#0b3a52">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.6A2 2 0 0 1 5 6.6h1.7l1-1.7A1 1 0 0 1 9.5 4.4h5a1 1 0 0 1 .87.5l1 1.7H18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path><circle cx="12" cy="12.4" r="3.2"></circle></svg>
+            </button>
+            <sc-if value="{{ camOpen }}">
+              <div style="position:absolute;top:42px;left:50%;transform:translateX(-50%);width:218px;background:#fff;border:1px solid #e6e9ee;border-radius:12px;box-shadow:0 12px 32px rgba(6,39,56,.18);padding:.4rem;z-index:50;animation:rn-pop .14s ease">
+                <button onClick="{{ chooseProfile }}" style="display:flex;align-items:center;gap:.6rem;width:100%;padding:.6rem .65rem;border:none;background:none;border-radius:8px;cursor:pointer;font-size:.85rem;color:#1a2e35;text-align:left" style-hover="background:#f1f4f7">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3e7986" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="4"></circle><path d="M4.5 20c0-4.2 3.4-7 7.5-7s7.5 2.8 7.5 7"></path></svg>
+                  Cambiar foto de perfil
+                </button>
+                <button onClick="{{ chooseBanner }}" style="display:flex;align-items:center;gap:.6rem;width:100%;padding:.6rem .65rem;border:none;background:none;border-radius:8px;cursor:pointer;font-size:.85rem;color:#1a2e35;text-align:left" style-hover="background:#f1f4f7">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3e7986" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><circle cx="8.5" cy="10" r="1.6"></circle><path d="m5 18 4.5-4.5 3 3L16 13l3 3"></path></svg>
+                  Cambiar foto de portada
+                </button>
+                <sc-if value="{{ hasAnyImg }}">
+                  <div style="height:1px;background:#eef1f4;margin:.35rem .3rem"></div>
+                  <button onClick="{{ removeImages }}" style="display:flex;align-items:center;gap:.6rem;width:100%;padding:.6rem .65rem;border:none;background:none;border-radius:8px;cursor:pointer;font-size:.85rem;color:#c0392b;text-align:left" style-hover="background:#fdecea">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"></path></svg>
+                    Restablecer imágenes
+                  </button>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <h1 style="font-size:1.9rem;font-weight:700;color:#1a2e35;margin:.7rem 0 .15rem;text-align:center">{{ displayName }}</h1>
+        <div style="display:flex;align-items:center;gap:1.4rem;color:#6b7280;font-size:.88rem;flex-wrap:wrap;justify-content:center">
+          <span style="display:inline-flex;align-items:center;gap:.4rem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>
+            {{ ubicacion }}
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:.4rem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"></rect><path d="M3 9h18M8 2.5v4M16 2.5v4"></path></svg>
+            {{ joined }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:1.6rem;padding:0 2rem;border-bottom:1px solid #e6e9ee;margin:.6rem 0 0">
+        <button onClick="{{ tabPerfil }}" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:.7rem .1rem;font-weight:{{ perfilWeight }};color:{{ perfilColor }};border-bottom:2.5px solid {{ perfilBorder }};margin-bottom:-1px">Editar perfil</button>
+        <button onClick="{{ tabFact }}" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:.7rem .1rem;font-weight:{{ factWeight }};color:{{ factColor }};border-bottom:2.5px solid {{ factBorder }};margin-bottom:-1px">Facturación</button>
+        <button onClick="{{ tabPass }}" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:.7rem .1rem;font-weight:{{ passWeight }};color:{{ passColor }};border-bottom:2.5px solid {{ passBorder }};margin-bottom:-1px">Cambiar Contraseña</button>
+      </div>
+
+      <!-- ───── TAB: EDITAR PERFIL ───── -->
+      <sc-if value="{{ isPerfil }}" hint-placeholder-val="{{ true }}">
+      <form method="post" action="profile.php" onSubmit="{{ preventSubmit }}" style="padding:1.6rem 2rem 2rem">
+        <input type="hidden" name="genero" value="{{ genero }}">
+        <!-- gender radios -->
+        <div style="display:flex;gap:1.6rem;margin-bottom:1.4rem">
+          <span onClick="{{ setHombre }}" style="display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;color:#374151">
+            <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ hombreRing }};display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:50%;background:{{ hombreDot }}"></span></span> Hombre
+          </span>
+          <span onClick="{{ setMujer }}" style="display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;color:#374151">
+            <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ mujerRing }};display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:50%;background:{{ mujerDot }}"></span></span> Mujer
+          </span>
+          <span onClick="{{ setOtro }}" style="display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;color:#374151">
+            <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ otroRing }};display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:50%;background:{{ otroDot }}"></span></span> Otro
+          </span>
+        </div>
+
+        <!-- Nombres / Apellidos -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.1rem">
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">Nombres</label>
+            <input name="nombres" value="{{ nombres }}" onChange="{{ onNombres }}" style="width:100%;padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">Apellidos</label>
+            <input name="apellidos" value="{{ apellidos }}" onChange="{{ onApellidos }}" style="width:100%;padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+          </div>
+        </div>
+
+        <!-- Correo -->
+        <div style="display:flex;flex-direction:column;margin-bottom:1.1rem">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="m3 7 9 6 9-6"></path></svg> Correo Electrónico
+          </label>
+          <input name="email" type="email" value="{{ email }}" onChange="{{ onEmail }}" onBlur="{{ onEmailBlur }}" style="width:100%;padding:.7rem .85rem;border:1.5px solid {{ emailBorder }};border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+          <sc-if value="{{ emailErr }}"><span style="font-size:.76rem;color:#e53e3e;margin-top:.35rem">{{ emailErr }}</span></sc-if>
+        </div>
+
+        <!-- Teléfono / Fecha -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.4rem">
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 21A14.5 14.5 0 0 1 3 7.5 2.5 2.5 0 0 1 5.5 5h2L9 9l-2 1.5a11 11 0 0 0 4.5 4.5L13 13l4 1.5v2A2.5 2.5 0 0 1 16.5 21Z"></path></svg> Teléfono
+            </label>
+            <input name="telefono" value="{{ telefono }}" onChange="{{ onTelefono }}" style="width:100%;padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+          </div>
+          <div data-cal="1" style="display:flex;flex-direction:column;min-width:0;position:relative">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"></rect><path d="M3 9h18M8 2.5v4M16 2.5v4"></path></svg> Fecha de Nacimiento
+            </label>
+            <input type="hidden" name="fecha_nacimiento" value="{{ birthISO }}">
+            <button type="button" onClick="{{ toggleCal }}" style="width:100%;padding:.7rem .85rem;border:1.5px solid {{ calBorder }};border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between" style-hover="background:#e7eaee">
+              <span>{{ birthDisplay }}</span>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"></rect><path d="M3 9h18M8 2.5v4M16 2.5v4"></path></svg>
+            </button>
+
+            <!-- Calendar popup -->
+            <sc-if value="{{ calOpen }}">
+              <div style="position:absolute;top:100%;left:0;margin-top:8px;width:290px;background:#fff;border:1px solid #e6e9ee;border-radius:14px;box-shadow:0 16px 40px rgba(6,39,56,.2);padding:.9rem;z-index:60;animation:rn-pop .14s ease">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem">
+                  <button type="button" onClick="{{ calPrev }}" aria-label="Anterior" style="width:30px;height:30px;border:none;border-radius:8px;background:#f1f4f7;color:#062738;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#e2e7ec"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"></path></svg></button>
+                  <button type="button" onClick="{{ calTitle }}" style="border:none;background:none;cursor:pointer;font-size:.92rem;font-weight:600;color:#062738;text-transform:capitalize">{{ calTitleText }}</button>
+                  <button type="button" onClick="{{ calNext }}" aria-label="Siguiente" style="width:30px;height:30px;border:none;border-radius:8px;background:#f1f4f7;color:#062738;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#e2e7ec"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                </div>
+
+                <sc-if value="{{ calDaysMode }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+                    <sc-for list="{{ weekLabels }}" as="wl" hint-placeholder-count="7"><div style="text-align:center;font-size:.7rem;font-weight:600;color:#9aa3ad;padding:4px 0;text-transform:uppercase">{{ wl }}</div></sc-for>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+                    <sc-for list="{{ calCells }}" as="cell" hint-placeholder-count="42">
+                      <div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center">
+                        <sc-if value="{{ cell.sel }}"><button type="button" data-day="{{ cell.d }}" onClick="{{ onPickDay }}" style="width:34px;height:34px;border:none;border-radius:9px;background:#062738;color:#fff;font-size:.85rem;font-weight:600;cursor:pointer">{{ cell.d }}</button></sc-if>
+                        <sc-if value="{{ cell.notSel }}"><button type="button" data-day="{{ cell.d }}" onClick="{{ onPickDay }}" style="width:34px;height:34px;border:none;border-radius:9px;background:none;color:#374151;font-size:.85rem;cursor:pointer" style-hover="background:#eaf0f2;color:#062738">{{ cell.d }}</button></sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ calYearsMode }}">
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+                    <sc-for list="{{ calYears }}" as="yr" hint-placeholder-count="12">
+                      <sc-if value="{{ yr.sel }}"><button type="button" data-year="{{ yr.y }}" onClick="{{ onPickYear }}" style="padding:.55rem 0;border:none;border-radius:9px;background:#062738;color:#fff;font-size:.85rem;font-weight:600;cursor:pointer">{{ yr.y }}</button></sc-if>
+                      <sc-if value="{{ yr.notSel }}"><button type="button" data-year="{{ yr.y }}" onClick="{{ onPickYear }}" style="padding:.55rem 0;border:none;border-radius:9px;background:#f1f4f7;color:#374151;font-size:.85rem;cursor:pointer" style-hover="background:#e2e7ec;color:#062738">{{ yr.y }}</button></sc-if>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- Nacionalidad / Estado / Ciudad -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.1rem;margin-bottom:1.1rem">
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z"></path></svg> Nacionalidad
+            </label>
+            <input type="hidden" name="nacionalidad" value="{{ nacionalidad }}">
+            <div title="Disponible próximamente" style="position:relative;cursor:default"><div style="padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35">{{ nacionalidad }}</div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa3ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none"><path d="m6 9 6 6 6-6"></path></svg></div>
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2-6-2Z"></path><path d="M9 4v14M15 6v14"></path></svg> Estado
+            </label>
+            <input name="estado" value="{{ estado }}" onChange="{{ onEstado }}" placeholder="Tu estado o provincia" style="width:100%;padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="7" height="18" rx="1"></rect><rect x="13" y="8" width="7" height="13" rx="1"></rect><path d="M7 7h.01M7 11h.01M7 15h.01M16 12h.01M16 16h.01"></path></svg> Ciudad
+            </label>
+            <input name="ciudad" value="{{ ciudad }}" onChange="{{ onCiudad }}" placeholder="Tu ciudad" style="width:100%;padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+          </div>
+        </div>
+
+        <!-- Lenguaje / Divisa (preferencias — APIs próximamente) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.8rem">
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7M8 4v2c0 3.2-2 6-5 7.2M6 9c0 2 2 4 5 5"></path><path d="m13 19 3.5-8 3.5 8M14.2 16h4.6"></path></svg> Lenguaje
+            </label>
+            <input type="hidden" name="lenguaje" value="{{ lenguaje }}">
+            <div title="Disponible próximamente" style="position:relative;cursor:default"><div style="padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35">{{ lenguaje }}</div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa3ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none"><path d="m6 9 6 6 6-6"></path></svg></div>
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v10M14.6 9.2c0-1.3-1.2-2-2.6-2s-2.6.6-2.6 1.9.9 1.6 2.6 1.9 2.6.8 2.6 1.9-1.2 1.9-2.6 1.9-2.6-.7-2.6-2"></path></svg> Divisa (moneda)
+            </label>
+            <input type="hidden" name="divisa" value="{{ divisa }}">
+            <div title="Disponible próximamente" style="position:relative;cursor:default"><div style="padding:.7rem .85rem;border:1.5px solid transparent;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35">{{ divisa }}</div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa3ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none"><path d="m6 9 6 6 6-6"></path></svg></div>
+          </div>
+        </div>
+
+        <!-- Save (hold-to-save) -->
+        <div style="display:flex;flex-direction:column;gap:.45rem;align-items:flex-start">
+          <sc-if value="{{ saveSuccess }}">
+            <div style="display:inline-flex;align-items:center;gap:.6rem;padding:.55rem .85rem .55rem 1.4rem;background:#1f8a5b;color:#fff;border-radius:12px;font-weight:600;font-size:.98rem">Guardado
+              <span style="width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5 9-11"></path></svg></span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ saveIdle }}" hint-placeholder-val="{{ true }}">
+            <button type="button" onPointerDown="{{ onSaveDown }}" onPointerUp="{{ onSaveUp }}" onPointerLeave="{{ onSaveUp }}" onPointerCancel="{{ onSaveUp }}" style="display:inline-flex;align-items:center;gap:.6rem;padding:.55rem .85rem .55rem 1.4rem;background:#062738;color:#fff;border:none;border-radius:12px;font-weight:600;font-size:.98rem;cursor:pointer;user-select:none;touch-action:none;box-shadow:0 3px 10px rgba(6,39,56,.25)" style-hover="background:#0b3a52">Guardar cambios
+              <span style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center">
+                <svg width="36" height="36" viewBox="0 0 36 36" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="3"></circle><circle data-fill="1" data-len="94.2" cx="18" cy="18" r="15" fill="none" stroke="#f0b429" stroke-width="3" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="94.2"></circle></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;z-index:1"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+              </span>
+            </button>
+            <span style="font-size:.75rem;color:#9aa3ad;padding-left:.2rem">Mantén pulsado para guardar</span>
+          </sc-if>
+        </div>
+      </form>
+      </sc-if>
+
+      <!-- ───── TAB: FACTURACIÓN ───── -->
+      <sc-if value="{{ isFact }}">
+        <div style="padding:3.5rem 2rem 4rem;display:flex;flex-direction:column;align-items:center;text-align:center">
+          <div style="width:74px;height:74px;border-radius:20px;background:#f1f4f7;display:flex;align-items:center;justify-content:center;color:#3e7986;margin-bottom:1.1rem">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-3 2-3-2-3 2V3Z"></path><path d="M9 8h6M9 12h4"></path></svg>
+          </div>
+          <h2 style="font-size:1.3rem;font-weight:700;color:#1a2e35;margin:0 0 .4rem">Próximamente</h2>
+          <p style="font-size:.92rem;color:#6b7280;max-width:420px;margin:0">Estamos preparando tu sección de facturación. Muy pronto podrás gestionar tus métodos de pago y descargar tus comprobantes desde aquí.</p>
+        </div>
+      </sc-if>
+
+      <!-- ───── TAB: CAMBIAR CONTRASEÑA ───── -->
+      <sc-if value="{{ isPass }}">
+      <form onSubmit="{{ preventSubmit }}" style="padding:1.6rem 2rem 2rem">
+        <div style="display:flex;flex-direction:column;margin-bottom:1.2rem;max-width:430px">
+          <label style="font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">Contraseña anterior</label>
+          <div style="position:relative;display:flex;align-items:center">
+            <input name="password_actual" type="{{ typeActual }}" value="{{ pwActual }}" onChange="{{ onPwActual }}" style="width:100%;padding:.7rem 2.6rem .7rem .85rem;border:1.5px solid #e2e6ea;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+            <button type="button" onClick="{{ toggleActual }}" aria-label="Mostrar contraseña" style="position:absolute;right:.7rem;background:none;border:none;cursor:pointer;color:#6b7280;display:flex;padding:.2rem">{{ eyeActual }}</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.4rem">
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">Nueva contraseña</label>
+            <div style="position:relative;display:flex;align-items:center">
+              <input name="password_nueva" type="{{ typeNueva }}" value="{{ pwNueva }}" onChange="{{ onPwNueva }}" style="width:100%;padding:.7rem 2.6rem .7rem .85rem;border:1.5px solid #e2e6ea;border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+              <button type="button" onClick="{{ toggleNueva }}" aria-label="Mostrar contraseña" style="position:absolute;right:.7rem;background:none;border:none;cursor:pointer;color:#6b7280;display:flex;padding:.2rem">{{ eyeNueva }}</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <label style="font-size:.8rem;font-weight:500;color:#6b7280;margin-bottom:7px">Repite la nueva contraseña</label>
+            <div style="position:relative;display:flex;align-items:center">
+              <input name="password_repetir" type="{{ typeRepetir }}" value="{{ pwRepetir }}" onChange="{{ onPwRepetir }}" style="width:100%;padding:.7rem 2.6rem .7rem .85rem;border:1.5px solid {{ repBorder }};border-radius:10px;background:#eceff2;font-size:.92rem;color:#1a2e35;outline:none;transition:border-color .15s,box-shadow .15s,background .15s" style-focus="border-color:#3e7986;box-shadow:0 0 0 3px rgba(62,121,134,.15);background:#fff">
+              <button type="button" onClick="{{ toggleRepetir }}" aria-label="Mostrar contraseña" style="position:absolute;right:.7rem;background:none;border:none;cursor:pointer;color:#6b7280;display:flex;padding:.2rem">{{ eyeRepetir }}</button>
+            </div>
+          </div>
+        </div>
+        <sc-if value="{{ pwErr }}"><div style="font-size:.78rem;color:#e53e3e;margin:-.7rem 0 1.2rem">{{ pwErr }}</div></sc-if>
+
+        <div style="display:flex;flex-direction:column;gap:.45rem;align-items:flex-start">
+          <sc-if value="{{ saveSuccess }}">
+            <div style="display:inline-flex;align-items:center;gap:.6rem;padding:.55rem .85rem .55rem 1.4rem;background:#1f8a5b;color:#fff;border-radius:12px;font-weight:600;font-size:.98rem">Guardado
+              <span style="width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5 9-11"></path></svg></span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ saveIdle }}" hint-placeholder-val="{{ true }}">
+            <button type="button" onPointerDown="{{ onSaveDown }}" onPointerUp="{{ onSaveUp }}" onPointerLeave="{{ onSaveUp }}" onPointerCancel="{{ onSaveUp }}" style="display:inline-flex;align-items:center;gap:.6rem;padding:.55rem .85rem .55rem 1.4rem;background:#062738;color:#fff;border:none;border-radius:12px;font-weight:600;font-size:.98rem;cursor:pointer;user-select:none;touch-action:none;box-shadow:0 3px 10px rgba(6,39,56,.25)" style-hover="background:#0b3a52">Guardar cambios
+              <span style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center">
+                <svg width="36" height="36" viewBox="0 0 36 36" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="3"></circle><circle data-fill="1" data-len="94.2" cx="18" cy="18" r="15" fill="none" stroke="#f0b429" stroke-width="3" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="94.2"></circle></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;z-index:1"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+              </span>
+            </button>
+            <span style="font-size:.75rem;color:#9aa3ad;padding-left:.2rem">Mantén pulsado para guardar</span>
+          </sc-if>
+        </div>
+      </form>
+      </sc-if>
+
+    </div><!-- /profile card -->
+
+  </main>
+</div>
+
+<!-- hidden file inputs -->
+<input type="file" accept="image/*" ref="{{ fileProfileRef }}" onChange="{{ onProfileFile }}" style="display:none">
+<input type="file" accept="image/*" ref="{{ fileBannerRef }}" onChange="{{ onBannerFile }}" style="display:none">
+
+<template id="__bundler_thumbnail" data-bg-color="#062738">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#062738"/>
+    <circle cx="600" cy="360" r="150" fill="#f0b429"/>
+    <path d="M540 360 L660 330 L640 360 L660 390 Z M600 330 L612 300 M600 390 L612 420" fill="#062738" stroke="#062738" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/>
+    <rect x="470" y="560" width="260" height="26" rx="13" fill="#ffffff" opacity="0.92"/>
+    <rect x="510" y="610" width="180" height="18" rx="9" fill="#ffffff" opacity="0.45"/>
+  </svg>
+</template></x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;holdSeconds&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2,&quot;min&quot;:1,&quot;max&quot;:6,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Guardar&quot;,&quot;label&quot;:&quot;Duración de pulsación&quot;},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;perfil&quot;,&quot;options&quot;:[&quot;perfil&quot;,&quot;facturacion&quot;,&quot;password&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vista&quot;,&quot;label&quot;:&quot;Pestaña inicial&quot;}}">
+class Component extends DCLogic {
+  MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  WEEK = ['lu','ma','mi','ju','vi','sá','do'];
+
+  state = {
+    tab: null,
+    collapsed: true,
+    genero: 'Mujer',
+    nombres: 'Leslie Guadalupe',
+    apellidos: 'Angulo Sánchez',
+    email: 'leaipy181204@gmail.com',
+    telefono: '+52 653 161 7997',
+    nacionalidad: 'Mexicana',
+    estado: 'Sonora',
+    ciudad: 'Hermosillo',
+    lenguaje: 'Español',
+    divisa: 'MXN',
+    birth: { y: 2004, m: 11, d: 18 },
+    calOpen: false,
+    calMode: 'days',
+    calView: { y: 2004, m: 11 },
+    camOpen: false,
+    profileImg: null,
+    bannerImg: null,
+    pwActual: '', pwNueva: '', pwRepetir: '',
+    showActual: false, showNueva: false, showRepetir: false,
+    emailErr: '', pwErr: '',
+    saveState: 'idle',
+  };
+
+  constructor(props) {
+    super(props);
+    this.fileProfileRef = React.createRef();
+    this.fileBannerRef = React.createRef();
+    this.avatarRef = React.createRef();
+    this.bannerRef = React.createRef();
+    this._onDoc = this._onDoc.bind(this);
+    // Seed initial state from localStorage in the constructor so restored values
+    // exist on first render (setState inside componentDidMount is dropped on first mount).
+    this.state = Object.assign({}, this.state, this._restore());
+  }
+
+  _restore() {
+    var patch = {};
+    try {
+      var img = localStorage.getItem('rn_profile_img');
+      var ban = localStorage.getItem('rn_banner_img');
+      var col = localStorage.getItem('rn_sidebar_collapsed');
+      var form = localStorage.getItem('rn_profile_form');
+      if (img) patch.profileImg = img;
+      if (ban) patch.bannerImg = ban;
+      if (col !== null) patch.collapsed = col === '1';
+      if (form) { try { var f = JSON.parse(form); Object.assign(patch, f); } catch (e) {} }
+    } catch (e) {}
+    return patch;
+  }
+
+  componentDidMount() {
+    document.addEventListener('pointerdown', this._onDoc, true);
+    this._applyImages();
+  }
+  componentDidUpdate() {
+    this._applyImages();
+  }
+  // Set image backgrounds imperatively: data URIs contain ';base64,' which the
+  // inline style-string parser would split on, so they can't go through a {{ }} hole.
+  _applyImages() {
+    var a = this.avatarRef && this.avatarRef.current;
+    var b = this.bannerRef && this.bannerRef.current;
+    if (a) a.style.backgroundImage = this.state.profileImg ? 'url("' + this.state.profileImg + '")' : 'none';
+    if (b) {
+      if (this.state.bannerImg) {
+        b.style.backgroundImage = 'url("' + this.state.bannerImg + '")';
+        b.style.backgroundSize = 'cover';
+      } else {
+        b.style.backgroundImage = 'radial-gradient(rgba(6,39,56,.10) 1.3px, transparent 1.3px)';
+        b.style.backgroundSize = '13px 13px';
+      }
+    }
+  }
+  componentWillUnmount() {
+    document.removeEventListener('pointerdown', this._onDoc, true);
+    if (this._engine && this._engine.raf) cancelAnimationFrame(this._engine.raf);
+    clearTimeout(this._succT);
+  }
+
+  _onDoc(e) {
+    if (this.state.camOpen && !e.target.closest('[data-cam]')) this.setState({ camOpen: false });
+    if (this.state.calOpen && !e.target.closest('[data-cal]')) this.setState({ calOpen: false });
+  }
+
+  _holdMs() { return (this.props.holdSeconds != null ? this.props.holdSeconds : 4) * 1000; }
+
+  // ── hold engine (ref-free; locates fill within pressed element) ──
+  _applyProgress(fill, mode, p) {
+    if (!fill) return;
+    if (mode === 'ring') {
+      var len = parseFloat(fill.getAttribute('data-len')) || 100;
+      fill.style.strokeDashoffset = String(len * (1 - p));
+    } else {
+      fill.style.width = (p * 100) + '%';
+    }
+  }
+  _press(el, fill, mode, dur, onDone) {
+    this._release(true);
+    var start = performance.now();
+    var self = this;
+    var eng = { el: el, fill: fill, mode: mode, p: 0, active: true, raf: null };
+    function step(now) {
+      if (!eng.active) return;
+      eng.p = Math.min((now - start) / dur, 1);
+      self._applyProgress(fill, mode, eng.p);
+      if (eng.p >= 1) { eng.active = false; self._engine = null; if (onDone) onDone(); return; }
+      eng.raf = requestAnimationFrame(step);
+    }
+    eng.raf = requestAnimationFrame(step);
+    this._engine = eng;
+  }
+  _release(silent) {
+    var eng = this._engine;
+    if (!eng) return;
+    if (eng.raf) cancelAnimationFrame(eng.raf);
+    eng.active = false;
+    this._engine = null;
+    if (silent) return;
+    var self = this, fill = eng.fill, mode = eng.mode, p = eng.p;
+    var t0 = performance.now(), dur = Math.max(160, p * 420);
+    function back(now) {
+      var k = Math.min((now - t0) / dur, 1);
+      self._applyProgress(fill, mode, p * (1 - k));
+      if (k < 1) requestAnimationFrame(back);
+    }
+    requestAnimationFrame(back);
+  }
+
+  // ── main save ──
+  _saveDown(e) {
+    e.preventDefault();
+    if (this.state.saveState === 'success') return;
+    var btn = e.currentTarget;
+    var fill = btn.querySelector('[data-fill]');
+    var self = this;
+    this._press(btn, fill, 'ring', this._holdMs(), function () { self._completeMain(); });
+  }
+  _completeMain() {
+    var v = this._validate();
+    if (!v.ok) {
+      this.setState({ saveState: 'idle', emailErr: v.emailErr, pwErr: v.pwErr });
+      return;
+    }
+    this._persist();
+    this.setState({ saveState: 'success', emailErr: '', pwErr: '' });
+    var self = this;
+    clearTimeout(this._succT);
+    this._succT = setTimeout(function () { self.setState({ saveState: 'idle' }); }, 1700);
+  }
+  _validate() {
+    var tab = this._tab();
+    var emailErr = '', pwErr = '', ok = true;
+    if (tab === 'perfil') {
+      var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!re.test((this.state.email || '').trim())) { emailErr = 'Introduce un correo electrónico válido.'; ok = false; }
+    } else if (tab === 'password') {
+      if (!this.state.pwActual) { pwErr = 'Introduce tu contraseña anterior.'; ok = false; }
+      else if ((this.state.pwNueva || '').length < 6) { pwErr = 'La nueva contraseña debe tener al menos 6 caracteres.'; ok = false; }
+      else if (this.state.pwNueva !== this.state.pwRepetir) { pwErr = 'Las contraseñas no coinciden.'; ok = false; }
+    }
+    return { ok: ok, emailErr: emailErr, pwErr: pwErr };
+  }
+  _persist() {
+    try {
+      var f = {
+        genero: this.state.genero, nombres: this.state.nombres, apellidos: this.state.apellidos,
+        email: this.state.email, telefono: this.state.telefono, nacionalidad: this.state.nacionalidad,
+        estado: this.state.estado, ciudad: this.state.ciudad,
+        lenguaje: this.state.lenguaje, divisa: this.state.divisa, birth: this.state.birth
+      };
+      localStorage.setItem('rn_profile_form', JSON.stringify(f));
+    } catch (e) {}
+  }
+
+  // ── demo holds (refinements) ──
+  startDemo(e, mode) {
+    e.preventDefault();
+    var btn = e.currentTarget;
+    if (btn.getAttribute('data-done') === '1') return;
+    var fill = btn.querySelector('[data-fill]');
+    var self = this;
+    this._press(btn, fill, mode, this._holdMs(), function () { self._demoComplete(btn, fill, mode); });
+  }
+  _demoComplete(btn, fill, mode) {
+    btn.setAttribute('data-done', '1');
+    var prevBg = btn.style.background;
+    btn.style.background = '#1f8a5b';
+    this._applyProgress(fill, mode, 1);
+    var self = this;
+    setTimeout(function () {
+      btn.style.background = prevBg || '';
+      self._applyProgress(fill, mode, 0);
+      btn.removeAttribute('data-done');
+    }, 1100);
+  }
+
+  // ── images ──
+  _readFile(file, key, stKey) {
+    if (!file) return;
+    var self = this;
+    var r = new FileReader();
+    r.onload = function () {
+      var data = r.result;
+      var patch = {}; patch[stKey] = data;
+      self.setState(patch);
+      try { localStorage.setItem(key, data); } catch (e) {}
+    };
+    r.readAsDataURL(file);
+  }
+  removeImages() {
+    this.setState({ profileImg: null, bannerImg: null, camOpen: false });
+    try { localStorage.removeItem('rn_profile_img'); localStorage.removeItem('rn_banner_img'); } catch (e) {}
+  }
+
+  // ── calendar ──
+  _cells() {
+    var y = this.state.calView.y, m = this.state.calView.m, b = this.state.birth;
+    var first = new Date(y, m, 1).getDay();
+    var off = (first + 6) % 7;
+    var dim = new Date(y, m + 1, 0).getDate();
+    var cells = [];
+    for (var i = 0; i < off; i++) cells.push({ k: 'b' + i, d: null, sel: false, notSel: false });
+    for (var d = 1; d <= dim; d++) {
+      var sel = b.y === y && b.m === m && b.d === d;
+      cells.push({ k: 'd' + d, d: d, sel: sel, notSel: !sel });
+    }
+    while (cells.length % 7 !== 0) cells.push({ k: 't' + cells.length, d: null, sel: false, notSel: false });
+    return cells;
+  }
+  _years() {
+    var base = this.state.calView.y - 6, out = [], cur = this.state.birth.y;
+    for (var i = 0; i < 12; i++) { var y = base + i; out.push({ k: 'y' + y, y: y, sel: y === cur, notSel: y !== cur }); }
+    return out;
+  }
+  _tab() { return this.state.tab || this.props.startTab || 'perfil'; }
+
+  // ── icons (returned as elements for password eye toggle) ──
+  _eye(open) {
+    if (open) {
+      return React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        React.createElement('path', { d: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z' }),
+        React.createElement('circle', { cx: 12, cy: 12, r: 3 }));
+    }
+    return React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' },
+      React.createElement('path', { d: 'M2 12s4-7 10-7c2 0 3.8.5 5.4 1.4M22 12s-1.4 2.4-3.9 4.3' }),
+      React.createElement('path', { d: 'M9.5 9.6a3 3 0 0 0 4.2 4.2' }),
+      React.createElement('path', { d: 'm3 3 18 18' }));
+  }
+
+  renderVals() {
+    var s = this.state;
+    var tab = this._tab();
+    var teal = '#062738', gray = '#9aa3ad';
+    var fullName = (s.nombres + ' ' + s.apellidos).trim();
+    var self = this;
+
+    var genSel = function (g) { return s.genero === g; };
+
+    return {
+      // identity
+      firstName: (s.nombres || '').split(' ')[0] || 'Viajera',
+      initial: ((s.nombres || 'U').charAt(0) || 'U').toUpperCase(),
+      fullName: fullName,
+      displayName: fullName,
+      email: s.email,
+      ubicacion: [s.ciudad, s.estado].filter(function (x) { return x && x.trim(); }).join(', ') || 'Ubicación no definida',
+      joined: 'Se unió en Junio 2026',
+
+      // sidebar / layout
+      collapsed: s.collapsed,
+      sidebarTransform: s.collapsed ? 'translateX(-100%)' : 'translateX(0)',
+      layoutPad: s.collapsed ? '0px' : '220px',
+      mainPad: s.collapsed ? '4.5rem' : '0px',
+      toggleSidebar: function () {
+        var nc = !s.collapsed;
+        self.setState({ collapsed: nc });
+        try { localStorage.setItem('rn_sidebar_collapsed', nc ? '1' : '0'); } catch (e) {}
+      },
+
+      // banner / avatar
+      avatarRef: this.avatarRef,
+      bannerRef: this.bannerRef,
+      noProfileImg: !s.profileImg,
+      hasAnyImg: !!(s.profileImg || s.bannerImg),
+      camOpen: s.camOpen,
+      toggleCamMenu: function () { self.setState({ camOpen: !s.camOpen }); },
+      chooseProfile: function () { self.setState({ camOpen: false }); if (self.fileProfileRef.current) self.fileProfileRef.current.click(); },
+      chooseBanner: function () { self.setState({ camOpen: false }); if (self.fileBannerRef.current) self.fileBannerRef.current.click(); },
+      removeImages: function () { self.removeImages(); },
+      fileProfileRef: this.fileProfileRef,
+      fileBannerRef: this.fileBannerRef,
+      onProfileFile: function (e) { self._readFile(e.target.files && e.target.files[0], 'rn_profile_img', 'profileImg'); e.target.value = ''; },
+      onBannerFile: function (e) { self._readFile(e.target.files && e.target.files[0], 'rn_banner_img', 'bannerImg'); e.target.value = ''; },
+
+      // tabs
+      isPerfil: tab === 'perfil',
+      isFact: tab === 'facturacion',
+      isPass: tab === 'password',
+      tabPerfil: function () { self.setState({ tab: 'perfil', emailErr: '', pwErr: '', saveState: 'idle' }); },
+      tabFact: function () { self.setState({ tab: 'facturacion', saveState: 'idle' }); },
+      tabPass: function () { self.setState({ tab: 'password', emailErr: '', pwErr: '', saveState: 'idle' }); },
+      perfilWeight: tab === 'perfil' ? 600 : 400, perfilColor: tab === 'perfil' ? teal : '#6b7280', perfilBorder: tab === 'perfil' ? teal : 'transparent',
+      factWeight: tab === 'facturacion' ? 600 : 400, factColor: tab === 'facturacion' ? teal : '#6b7280', factBorder: tab === 'facturacion' ? teal : 'transparent',
+      passWeight: tab === 'password' ? 600 : 400, passColor: tab === 'password' ? teal : '#6b7280', passBorder: tab === 'password' ? teal : 'transparent',
+
+      // gender
+      genero: s.genero,
+      setHombre: function () { self.setState({ genero: 'Hombre' }); },
+      setMujer: function () { self.setState({ genero: 'Mujer' }); },
+      setOtro: function () { self.setState({ genero: 'Otro' }); },
+      hombreRing: genSel('Hombre') ? teal : '#cbd2d8', hombreDot: genSel('Hombre') ? teal : 'transparent',
+      mujerRing: genSel('Mujer') ? teal : '#cbd2d8', mujerDot: genSel('Mujer') ? teal : 'transparent',
+      otroRing: genSel('Otro') ? teal : '#cbd2d8', otroDot: genSel('Otro') ? teal : 'transparent',
+
+      // text fields
+      nombres: s.nombres, apellidos: s.apellidos, telefono: s.telefono,
+      nacionalidad: s.nacionalidad, lenguaje: s.lenguaje, divisa: s.divisa,
+      estado: s.estado, ciudad: s.ciudad,
+      onNombres: function (e) { self.setState({ nombres: e.target.value }); },
+      onApellidos: function (e) { self.setState({ apellidos: e.target.value }); },
+      onTelefono: function (e) { self.setState({ telefono: e.target.value }); },
+      onEstado: function (e) { self.setState({ estado: e.target.value }); },
+      onCiudad: function (e) { self.setState({ ciudad: e.target.value }); },
+
+      // email + validation
+      email: s.email,
+      onEmail: function (e) { self.setState({ email: e.target.value, emailErr: '' }); },
+      onEmailBlur: function () {
+        var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        self.setState({ emailErr: re.test((s.email || '').trim()) || !s.email ? '' : 'Introduce un correo electrónico válido.' });
+      },
+      emailErr: s.emailErr,
+      emailBorder: s.emailErr ? '#fc8181' : 'transparent',
+
+      // birth date
+      birthDisplay: s.birth.d + ' de ' + this.MES[s.birth.m] + ' de ' + s.birth.y,
+      birthISO: s.birth.y + '-' + String(s.birth.m + 1).padStart(2, '0') + '-' + String(s.birth.d).padStart(2, '0'),
+      calBorder: s.calOpen ? '#3e7986' : 'transparent',
+      calOpen: s.calOpen,
+      toggleCal: function () { self.setState({ calOpen: !s.calOpen, calMode: 'days', calView: { y: s.birth.y, m: s.birth.m } }); },
+      calDaysMode: s.calMode === 'days',
+      calYearsMode: s.calMode === 'years',
+      calTitleText: this.MES[s.calView.m] + ' ' + s.calView.y,
+      calTitle: function () { self.setState({ calMode: s.calMode === 'years' ? 'days' : 'years' }); },
+      calPrev: function () {
+        if (s.calMode === 'years') { self.setState({ calView: { y: s.calView.y - 12, m: s.calView.m } }); return; }
+        var m = s.calView.m - 1, y = s.calView.y; if (m < 0) { m = 11; y--; }
+        self.setState({ calView: { y: y, m: m } });
+      },
+      calNext: function () {
+        if (s.calMode === 'years') { self.setState({ calView: { y: s.calView.y + 12, m: s.calView.m } }); return; }
+        var m = s.calView.m + 1, y = s.calView.y; if (m > 11) { m = 0; y++; }
+        self.setState({ calView: { y: y, m: m } });
+      },
+      weekLabels: this.WEEK,
+      calCells: this._cells(),
+      calYears: this._years(),
+      onPickDay: function (e) {
+        var d = parseInt(e.currentTarget.getAttribute('data-day'), 10);
+        self.setState({ birth: { y: s.calView.y, m: s.calView.m, d: d }, calOpen: false });
+      },
+      onPickYear: function (e) {
+        var y = parseInt(e.currentTarget.getAttribute('data-year'), 10);
+        self.setState({ calView: { y: y, m: s.calView.m }, calMode: 'days' });
+      },
+
+      // password
+      pwActual: s.pwActual, pwNueva: s.pwNueva, pwRepetir: s.pwRepetir,
+      onPwActual: function (e) { self.setState({ pwActual: e.target.value, pwErr: '' }); },
+      onPwNueva: function (e) { self.setState({ pwNueva: e.target.value, pwErr: '' }); },
+      onPwRepetir: function (e) { self.setState({ pwRepetir: e.target.value, pwErr: '' }); },
+      typeActual: s.showActual ? 'text' : 'password',
+      typeNueva: s.showNueva ? 'text' : 'password',
+      typeRepetir: s.showRepetir ? 'text' : 'password',
+      toggleActual: function () { self.setState({ showActual: !s.showActual }); },
+      toggleNueva: function () { self.setState({ showNueva: !s.showNueva }); },
+      toggleRepetir: function () { self.setState({ showRepetir: !s.showRepetir }); },
+      eyeActual: this._eye(s.showActual),
+      eyeNueva: this._eye(s.showNueva),
+      eyeRepetir: this._eye(s.showRepetir),
+      pwErr: s.pwErr,
+      repBorder: s.pwErr ? '#fc8181' : '#e2e6ea',
+
+      // save button
+      saveIdle: s.saveState !== 'success',
+      saveSuccess: s.saveState === 'success',
+      onSaveDown: function (e) { self._saveDown(e); },
+      onSaveUp: function () { self._release(false); },
+
+      // demos
+      onDemoBarDown: function (e) { self.startDemo(e, 'bar'); },
+      onDemoRingDown: function (e) { self.startDemo(e, 'ring'); },
+      onDemoFullDown: function (e) { self.startDemo(e, 'bar'); },
+      onDemoUp: function () { self._release(false); },
+
+      // misc
+      preventSubmit: function (e) { e.preventDefault(); },
+    };
+  }
+}
+</script>
+</body>
+</html>

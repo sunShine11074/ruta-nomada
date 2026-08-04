@@ -1,23 +1,33 @@
-# Sistema operativo
-.DS_Store
+# ── Credenciales / claves — NUNCA versionar ──────────────────
+# Cada archivo tiene su .sample versionado al lado, con instrucciones.
+includes/mail_config.php
+includes/geo_config.php
+includes/ai_config.php
+includes/maps_config.php
+
+# ── Caché generada en tiempo de ejecución ────────────────────
+cache/
+
+# ── Dependencias ─────────────────────────────────────────────
+# OJO: libs/ NO se ignora, y es a propósito.
+#   · libs/dc/support.js lo carga plan.php desde el navegador; sin él
+#     la vista del plan sale en blanco.
+#   · libs/PHPMailer es la librería de correo, copiada a mano porque
+#     el proyecto no usa Composer.
+# Como no hay "composer install" que las reponga, tienen que viajar
+# dentro del repo o quien lo clone recibe una app rota.
+vendor/
+node_modules/
+
+# ── Sistema operativo / editor ───────────────────────────────
 Thumbs.db
 desktop.ini
-
-# Editores / IDEs
+.DS_Store
 .vscode/
 .idea/
-*.swp
+.claude/
+
+# ── Archivos temporales de pruebas ───────────────────────────
+smoke_test.php
+*.bak
 *~
-
-# PHP / dependencias
-/vendor/
-composer.lock
-
-# Variables de entorno y secretos (NO subir credenciales)
-.env
-.env.*
-config.local.php
-
-# Logs y temporales
-*.log
-/tmp/

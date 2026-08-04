@@ -1,0 +1,297 @@
+/* ============================================================
+   resultados.css — Resultados de búsqueda (rediseño) | Ruta Nómada
+   Portado de design_handoff_resultados (valores hifi del prototipo).
+============================================================ */
+
+body.rz-results { background: #E6ECF2; }
+
+/* [hidden] debe ganar a cualquier display de las clases */
+body.rz-results [hidden] { display: none !important; }
+
+/* En esta página el sidebar actúa como overlay con scrim en todo ancho */
+body.rz-results:not(.sidebar-collapsed) .sidebar-scrim { display: block; }
+
+@keyframes rzShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+@keyframes rzPop { 0% { transform: scale(.4); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes rzFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes rzFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rnGust { from { stroke-dashoffset: 44; } to { stroke-dashoffset: 0; } }
+
+.rz-shimmer {
+    background: linear-gradient(90deg, #dfe6ec 25%, #eef3f7 37%, #dfe6ec 63%);
+    background-size: 420px 100%;
+    animation: rzShimmer 1.3s infinite linear;
+}
+
+/* ── Layout 2 columnas ─────────────────────────────────────── */
+.rz-layout { display: flex; align-items: stretch; min-height: calc(100vh - 56px); }
+/* Márgenes L/R iguales (74px) que libran la burbuja del chatbot (llega a 59px) */
+.rz-main { flex: 1 1 0%; min-width: 0; padding: 18px 74px 70px 74px; }
+.rz-mapcol { width: 29%; flex-shrink: 0; position: relative; }
+
+/* ── Breadcrumb ────────────────────────────────────────────── */
+.rz-crumbs { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: #5b6b74; padding: 8px 0 2px; }
+.rz-crumbs a { color: #5b6b74; text-decoration: none; }
+.rz-crumbs a:hover { text-decoration: underline; color: #16262e; }
+.rz-crumbs__sep { color: #93a2ab; font-size: 12px; }
+.rz-crumbs a.rz-crumbs__cur { color: #16262e; font-weight: 500; }
+
+/* ── Hero ──────────────────────────────────────────────────── */
+.rz-hero {
+    position: relative; border-radius: 16px; overflow: hidden;
+    aspect-ratio: 16/9; margin-top: 14px;
+    background: linear-gradient(90deg, #dfe6ec 25%, #eef3f7 37%, #dfe6ec 63%);
+    background-size: 420px 100%; animation: rzShimmer 1.3s infinite linear;
+    box-shadow: 0 1px 3px rgba(6,39,56,.10);
+}
+.rz-hero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .25s; }
+.rz-hero__logo { position: absolute; top: 14px; left: 16px; width: 46px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.rz-hero__attr {
+    position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 8px;
+    background: rgba(8,24,32,.62); backdrop-filter: blur(3px);
+    border-radius: 20px; padding: 5px 14px 5px 6px; font-size: 12px; color: #fff;
+}
+.rz-hero__attr-ico { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center; }
+.rz-hero__attr a { color: #fff; text-decoration: none; }
+.rz-hero__dots { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; }
+.rz-hero__dots span { width: 6.5px; height: 6.5px; border-radius: 50%; background: rgba(255,255,255,.55); transition: all .25s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.rz-hero__dots span.on { width: 9px; height: 9px; background: #fff; }
+.rz-hero__count {
+    position: absolute; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 7px;
+    background: rgba(8,24,32,.75); border-radius: 18px; padding: 6px 13px;
+    font-size: 12px; font-weight: 600; color: #fff;
+}
+.rz-hero__nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 38px; height: 38px; border-radius: 50%; border: none;
+    background: rgba(8,24,32,.85); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    animation: rzFadeIn .22s ease both;
+}
+.rz-hero__nav:hover { background: #062738; }
+.rz-hero__nav--prev { left: 14px; }
+.rz-hero__nav--next { right: 14px; }
+
+/* ── Título + Guardar ──────────────────────────────────────── */
+.rz-titlerow { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+.rz-titlerow h1 { margin: 0; font-size: 42px; font-weight: 700; color: #0d1f27; letter-spacing: -.5px; line-height: 1.15; }
+.rz-save {
+    display: flex; align-items: center; gap: 9px; padding: 10px 22px;
+    border-radius: 26px; border: 1.5px solid #16262e; background: #fff; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 500; color: #16262e;
+    transition: box-shadow .18s, transform .12s;
+}
+.rz-save:hover { box-shadow: 0 3px 10px rgba(6,39,56,.15); transform: translateY(-1px); }
+.rz-save.saved #saveHeartSvg { animation: rzPop .35s ease; }
+
+/* ── Descripción ───────────────────────────────────────────── */
+.rz-desc { margin-top: 10px; }
+.rz-desc__clip { max-height: 79px; overflow: hidden; transition: max-height .4s ease; }
+.rz-desc__clip.open { max-height: 600px; }
+.rz-desc__clip p { margin: 0; font-size: 14.5px; line-height: 1.75; color: #33454e; text-wrap: pretty; }
+.rz-desc__more {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600; color: #16262e;
+    text-decoration: underline; text-underline-offset: 3px;
+}
+.rz-desc__more svg { transition: transform .3s ease; }
+.rz-desc__more.open svg { transform: rotate(180deg); }
+
+/* ── Clima ─────────────────────────────────────────────────── */
+.rz-clima { margin-top: 26px; }
+.rz-clima h2 { margin: 0 0 12px; font-size: 22px; font-weight: 700; color: #0d1f27; }
+.rz-clima__card { position: relative; background: #fff; border-radius: 14px; box-shadow: 0 1px 3px rgba(6,39,56,.10); overflow: hidden; }
+.rz-clima__track { display: flex; width: 200%; transform: translateX(0); transition: transform .45s cubic-bezier(.22,.61,.36,1); }
+.rz-clima__track.p2 { transform: translateX(-50%); }
+.rz-clima__page { width: 50%; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; padding: 20px 56px; }
+.rz-metric { display: flex; align-items: center; gap: 12px; }
+.rz-metric__ico { flex-shrink: 0; }
+.rz-metric__lbl { margin: 0; font-size: 10.5px; color: #6b7a83; }
+.rz-metric__val { margin: 0; font-size: 17px; font-weight: 700; color: #0d1f27; }
+.rz-clima__nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border-radius: 50%; border: none;
+    background: #10222b; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, transform .15s;
+}
+.rz-clima__nav:hover { background: #062738; transform: translateY(-50%) scale(1.08); }
+.rz-clima__nav--next { right: 12px; }
+.rz-clima__nav--prev { left: 12px; }
+.rz-gust { animation: rnGust 2s linear infinite; }
+.rz-gust--d2 { animation-delay: -.4s; }
+.rz-gust--d3 { animation-delay: -.8s; }
+
+/* ── Tabs sticky + Filtros ─────────────────────────────────── */
+.rz-tabs {
+    position: sticky; top: 56px; z-index: 40; background: #E6ECF2;
+    margin-top: 26px; padding-top: 6px;
+    box-shadow: none; transition: box-shadow .25s;
+}
+.rz-tabs.stuck { box-shadow: 0 8px 14px -8px rgba(6,39,56,.22); }
+.rz-tabs__row { display: flex; align-items: center; gap: 26px; border-bottom: 1px solid #d3dce3; overflow-x: auto; }
+.rz-tab {
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    font-size: 15px; font-weight: 600; padding: 8px 2px 13px; white-space: nowrap;
+    color: #5b6b74; box-shadow: inset 0 -3px 0 rgba(0,0,0,0);
+    transition: color .2s, box-shadow .2s;
+}
+.rz-tab:hover { color: #062738; }
+.rz-tab.on { color: #062738; box-shadow: inset 0 -3px 0 #062738; }
+.rz-tabs__spacer { flex: 1; }
+.rz-filters {
+    display: flex; align-items: center; gap: 8px; background: #fff;
+    border: 1px solid #c8d3da; border-radius: 8px; padding: 7px 14px; margin-bottom: 8px;
+    cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; color: #16262e; white-space: nowrap;
+}
+.rz-filters:hover { box-shadow: 0 2px 8px rgba(6,39,56,.12); }
+
+/* ── Grid de tarjetas ──────────────────────────────────────── */
+.rz-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; margin-top: 18px; }
+.rz-card {
+    background: #fff; border-radius: 12px; overflow: hidden; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(6,39,56,.10);
+    transition: transform .18s ease, box-shadow .18s ease;
+    animation: rzFade .35s ease both; outline: none;
+}
+.rz-card:hover { transform: translateY(-3px); }
+.rz-card:focus-visible { box-shadow: 0 0 0 3px rgba(12,139,215,.55); }
+.rz-card.hl { box-shadow: 0 0 0 2px #2b5760, 0 10px 22px rgba(6,39,56,.20); }
+.rz-card.hl .rz-card__name { text-decoration: underline; text-underline-offset: 2px; }
+.rz-card__media { position: relative; height: 180px; }
+.rz-card__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rz-card__fav {
+    position: absolute; top: 10px; right: 10px; width: 34px; height: 34px;
+    border-radius: 50%; background: #fff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(6,39,56,.25); z-index: 3;
+    transition: transform .15s;
+}
+.rz-card__fav:hover { transform: scale(1.1); }
+.rz-card__fav.on svg { animation: rzPop .35s ease; }
+.rz-card__nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 30px; height: 30px; border-radius: 50%; border: none;
+    background: rgba(8,24,32,.85); cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    animation: rzFadeIn .2s ease both; z-index: 2;
+}
+.rz-card__nav:hover { background: #062738; }
+.rz-card__nav--prev { left: 8px; }
+.rz-card__nav--next { right: 8px; }
+.rz-card__dots { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: none; gap: 5px; z-index: 2; }
+.rz-card__dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.rz-card__dots span.on { background: #fff; }
+.rz-card:hover .rz-card__nav, .rz-card:hover .rz-card__dots { display: flex; }
+.rz-card__body { padding: 12px 14px 15px; display: flex; flex-direction: column; gap: 4px; }
+.rz-card__name { margin: 0; font-size: 15.5px; font-weight: 600; color: #16262e; line-height: 1.3; }
+.rz-card__rating { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #33454e; }
+.rz-card__rating b { font-weight: 600; }
+.rz-stars { position: relative; display: inline-block; font-size: 13px; line-height: 1; color: #d9dee3; letter-spacing: 1px; }
+.rz-stars > span { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: #f0b429; }
+.rz-card__reviews { color: #6b7a83; }
+.rz-card__meta { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #6b7a83; }
+.rz-card__acc { color: #2d7d9a; font-size: 13px; }
+
+/* Skeleton */
+.rz-skel { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(6,39,56,.10); }
+.rz-skel__media { height: 180px; }
+.rz-skel__body { padding: 13px 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+.rz-skel__line { height: 12px; border-radius: 6px; }
+.rz-skel__media, .rz-skel__line {
+    background: linear-gradient(90deg, #e8edf2 25%, #f6f8fa 37%, #e8edf2 63%);
+    background-size: 420px 100%; animation: rzShimmer 1.2s infinite linear;
+}
+
+/* ── Estados vacíos ────────────────────────────────────────── */
+.rz-empty-state {
+    text-align: center; padding: 3rem 1.5rem; margin-top: 18px;
+    color: #5b6b74; background: #fff; border-radius: 12px;
+    border: 1.5px dashed #c8d3da;
+}
+.rz-empty-state__icon { font-size: 2.4rem; margin-bottom: .5rem; }
+.rz-empty-state h2 { margin: 0 0 .4rem; color: #0d1f27; }
+.rz-empty-state p { margin: 0 auto; max-width: 48ch; }
+
+/* ── Mapa (panel fijo) ─────────────────────────────────────── */
+.rz-mappanel {
+    position: fixed; top: 68px; right: 14px; bottom: 14px;
+    /* left lo fija JS midiendo la columna (evita el desfase de la barra de scroll) */
+    z-index: 5; border-radius: 14px; background: #e8eef0; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(6,39,56,.12);
+    transition: top .45s cubic-bezier(.4,0,.2,1), left .45s cubic-bezier(.4,0,.2,1),
+                right .45s cubic-bezier(.4,0,.2,1), bottom .45s cubic-bezier(.4,0,.2,1),
+                border-radius .45s cubic-bezier(.4,0,.2,1);
+}
+.rz-mappanel.full { top: 108px !important; left: 86px !important; right: 30px; bottom: 14px; z-index: 160; }
+#map { width: 100%; height: 100%; }
+
+.rz-map-expand {
+    position: absolute; top: 12px; right: 12px; z-index: 70;
+    width: 42px; height: 42px; border: none; border-radius: 8px; background: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 5px rgba(6,39,56,.3);
+}
+.rz-map-expand:hover { background: #f4f7f9; }
+.rz-map-center {
+    position: absolute; right: 16px; top: 62%; z-index: 70;
+    width: 50px; height: 50px; border: none; border-radius: 50%; background: #fff; cursor: pointer;
+    box-shadow: 0 1px 5px rgba(6,39,56,.3);
+    display: flex; align-items: center; justify-content: center;
+}
+.rz-map-center:hover { background: #f4f7f9; }
+.rz-map-zoom {
+    position: absolute; right: 16px; bottom: 64px; z-index: 70;
+    width: 42px; background: #fff; border-radius: 8px;
+    box-shadow: 0 1px 5px rgba(6,39,56,.3);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.rz-map-zoom button { height: 42px; border: none; background: none; cursor: pointer; font-size: 20px; color: #3a4a52; font-family: inherit; }
+.rz-map-zoom button:hover { background: #f4f7f9; }
+.rz-map-zoom__sep { height: 1px; background: #e0e6ea; margin: 0 8px; }
+.rz-map-close {
+    position: absolute; top: 12px; left: 12px; z-index: 70;
+    display: flex; align-items: center; gap: 7px;
+    background: #fff; border: none; border-radius: 20px; padding: 9px 16px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600; color: #16262e;
+    box-shadow: 0 2px 8px rgba(6,39,56,.25);
+}
+
+/* Pin (marker HTML vía OverlayView no se usa: los pines son SVG data-URI en JS).
+   InfoWindow custom: ocultar chrome nativo de Google y estilizar contenido. */
+.gm-style .gm-style-iw-c { border-radius: 10px; box-shadow: 0 8px 24px rgba(6,39,56,.28); padding: 0 !important; }
+.gm-style .gm-style-iw-d { overflow: hidden !important; }
+.gm-style .gm-ui-hover-effect { display: none !important; }
+.rz-info { position: relative; padding: 11px 30px 11px 13px; min-width: 195px; max-width: 240px; font-family: 'Poppins', sans-serif; }
+.rz-info__name { margin: 0; font-size: 13.5px; font-weight: 600; color: #16262e; line-height: 1.3; }
+.rz-info__row { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 12px; color: #33454e; }
+.rz-info__row b { font-weight: 600; }
+.rz-info__meta { margin: 3px 0 0; font-size: 11.5px; color: #6b7a83; }
+.rz-info__close { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: #6b7a83; font-size: 13px; line-height: 1; }
+.rz-info__close:hover { color: #16262e; }
+
+/* Botón flotante Ver mapa */
+.rz-vermapa {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 150;
+    display: flex; align-items: center; gap: 9px;
+    background: #062738; color: #fff; border: none; border-radius: 26px;
+    padding: 13px 24px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600;
+    box-shadow: 0 6px 18px rgba(6,39,56,.4);
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1080px) {
+    .rz-mapcol { display: none; }
+    .rz-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .rz-main { padding: 18px 20px 90px 20px; }
+    body.rz-mapmodal .rz-mapcol { display: block; width: 0; }
+    body.rz-mapmodal .rz-mappanel { top: 56px !important; left: 0 !important; right: 0; bottom: 0; border-radius: 0; z-index: 160; }
+    body.rz-mapmodal .sidebar-fab { display: none !important; }
+}
+@media (max-width: 640px) {
+    .rz-grid { grid-template-columns: 1fr; }
+    .rz-titlerow h1 { font-size: 30px; }
+    .rz-clima__page { padding: 20px 44px; grid-template-columns: repeat(2, minmax(0,1fr)); row-gap: 18px; }
+    .rz-hero__nav, .rz-card__nav { display: none !important; }
+}
