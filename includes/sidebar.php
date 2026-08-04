@@ -1,14 +1,16 @@
-<?php /* Ruta Nómada — Sidebar navigation (translated from app.jsx Sidebar) */ ?>
+<?php /* Ruta Nómada — Sidebar navigation (translated from app.jsx Sidebar) */
+$avatarLetter = $user ? mb_strtoupper(mb_substr($user['nombre'], 0, 1)) : 'U';
+?>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar__top">
     <button class="sidebar__toggle" id="sidebar-toggle" aria-label="Mostrar/ocultar menú">
       <?= ico('menu_open') ?>
     </button>
     <div class="sidebar__profile">
-      <div class="avatar">A</div>
+      <div class="avatar"><?= $avatarLetter ?></div>
       <div class="sidebar__id">
-        <div class="nm">Ana López</div>
-        <div class="em">ana@rutanomada.mx</div>
+        <div class="nm"><?= e($user['nombre'] ?? 'Usuario') ?></div>
+        <div class="em"><?= e($user['email'] ?? '') ?></div>
       </div>
     </div>
   </div>

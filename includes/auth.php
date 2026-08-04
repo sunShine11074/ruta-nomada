@@ -1,5 +1,5 @@
 <?php /* Ruta Nómada — Auth flow: Login · Registro · Recuperación (translated from auth.jsx) */ ?>
-<div class="auth" id="auth-flow" style="display:none;">
+<div class="auth" id="auth-flow" style="<?= $user ? 'display:none;' : '' ?>">
 
   <!-- Brand Panel (left side) -->
   <div class="auth__brand">
@@ -25,19 +25,20 @@
     <div class="auth__card fade" id="auth-login">
       <h2>Iniciar sesión</h2>
       <p class="auth__sub">Bienvenida de vuelta. Continúa planeando tu próxima aventura.</p>
+      <div class="auth__error" id="login-error" style="display:none;"></div>
       <form class="auth__form" id="login-form">
         <div class="field">
           <label class="field__label">Email</label>
           <div class="field__control">
             <?= ico('mail') ?>
-            <input type="email" placeholder="Ingresa tu email" value="ana@rutanomada.mx" />
+            <input type="email" name="email" placeholder="Ingresa tu email" />
           </div>
         </div>
         <div class="field">
           <label class="field__label">Contraseña</label>
           <div class="field__control">
             <?= ico('lock') ?>
-            <input type="password" placeholder="Ingresa tu contraseña" data-pw-input />
+            <input type="password" name="password" placeholder="Ingresa tu contraseña" data-pw-input />
             <button type="button" class="field__toggle" data-pw-toggle aria-label="Mostrar contraseña">
               <?= ico('visibility') ?>
             </button>
@@ -60,26 +61,27 @@
     <div class="auth__card fade" id="auth-registro" style="display:none;">
       <h2>Crear cuenta</h2>
       <p class="auth__sub">Crea una cuenta para comenzar a planear tus rutas.</p>
+      <div class="auth__error" id="registro-error" style="display:none;"></div>
       <form class="auth__form" id="registro-form">
         <div class="field">
           <label class="field__label">Nombre</label>
           <div class="field__control">
             <?= ico('person') ?>
-            <input type="text" placeholder="Tu nombre completo" />
+            <input type="text" name="nombre" placeholder="Tu nombre completo" />
           </div>
         </div>
         <div class="field">
           <label class="field__label">Email</label>
           <div class="field__control">
             <?= ico('mail') ?>
-            <input type="email" placeholder="tu@email.com" />
+            <input type="email" name="email" placeholder="tu@email.com" />
           </div>
         </div>
         <div class="field">
           <label class="field__label">Contraseña</label>
           <div class="field__control">
             <?= ico('lock') ?>
-            <input type="password" placeholder="••••••••" data-pw-input />
+            <input type="password" name="password" placeholder="••••••••" data-pw-input />
             <button type="button" class="field__toggle" data-pw-toggle aria-label="Mostrar contraseña">
               <?= ico('visibility') ?>
             </button>
@@ -89,7 +91,7 @@
           <label class="field__label">Confirmar contraseña</label>
           <div class="field__control">
             <?= ico('lock') ?>
-            <input type="password" placeholder="••••••••" data-pw-input />
+            <input type="password" name="password_confirm" placeholder="••••••••" data-pw-input />
             <button type="button" class="field__toggle" data-pw-toggle aria-label="Mostrar contraseña">
               <?= ico('visibility') ?>
             </button>

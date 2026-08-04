@@ -1,4 +1,6 @@
-<?php /* Ruta Nómada — Top navigation bar (translated from app.jsx Topbar) */ ?>
+<?php /* Ruta Nómada — Top navigation bar (translated from app.jsx Topbar) */
+$avatarLetter = $user ? mb_strtoupper(mb_substr($user['nombre'], 0, 1)) : 'U';
+?>
 <header class="topbar">
   <div class="topbar__brand">
     <?= logoMark(34) ?>
@@ -18,9 +20,9 @@
   <div class="topbar__user">
     <button class="icon-btn" aria-label="Notificaciones"><?= ico('notifications') ?></button>
     <div class="topbar__greet">
-      <div class="hi">¡Hola, Ana!</div>
+      <div class="hi">¡Hola, <?= e($userFirstName ?: 'Usuario') ?>!</div>
       <div class="role">Viajera</div>
     </div>
-    <button class="avatar" data-route="side:perfil" aria-label="Perfil">A</button>
+    <button class="avatar" data-route="side:perfil" aria-label="Perfil"><?= $avatarLetter ?></button>
   </div>
 </header>

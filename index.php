@@ -1,3 +1,19 @@
+<?php
+/* ═══════════════════════════════════════════════════════════════
+   Ruta Nómada — Entry point
+   Session-based authentication: $user is null or an assoc array.
+   ═══════════════════════════════════════════════════════════════ */
+session_start();
+
+$user = $_SESSION['user'] ?? null;
+
+// Compute first name for greetings
+$userFirstName = '';
+if ($user) {
+    $parts = explode(' ', $user['nombre']);
+    $userFirstName = $parts[0];
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -37,7 +53,7 @@
   <?php include __DIR__ . '/includes/auth.php'; ?>
 
   <!-- APP SHELL (shown when authenticated) -->
-  <div class="app" id="app-shell" style="display:none;">
+  <div class="app" id="app-shell" style="<?= $user ? '' : 'display:none;' ?>">
     <?php include __DIR__ . '/includes/topbar.php'; ?>
     <div class="app__body">
       <?php include __DIR__ . '/includes/sidebar.php'; ?>
@@ -55,6 +71,11 @@
       </main>
     </div>
   </div>
+
+  <!-- Inject auth state for JS -->
+  <script>
+    window.__USER__ = <?= $user ? 'true' : 'false' ?>;
+  </script>
 
   <!-- Vanilla JS — replaces React + Babel -->
   <script src="js/app.js"></script>

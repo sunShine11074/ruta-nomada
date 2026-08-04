@@ -1,7 +1,7 @@
 <?php /* Ruta Nómada — Inicio screen (translated from screens.jsx Inicio) */ ?>
 <div class="screen fade" id="screen-inicio">
   <div class="page-head">
-    <h1>Hola Ana, ¿a dónde vamos?</h1>
+    <h1>Hola <?= e($userFirstName ?: 'Viajero') ?>, ¿a dónde vamos?</h1>
     <p>Explora destinos seleccionados para ti y retoma tus rutas guardadas.</p>
   </div>
 

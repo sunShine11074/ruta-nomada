@@ -2,7 +2,40 @@
   "permissions": {
     "allow": [
       "Bash(git --version)",
-      "Bash(gh --version)"
+      "Bash(gh --version)",
+      "Bash(git ls-remote *)",
+      "Bash(py --version)",
+      "Bash(pandoc --version)",
+      "Bash(python -c \"import markdown; print\\('markdown OK'\\)\")",
+      "Read(//c/Program Files \\(x86\\)/Microsoft/Edge/Application/**)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash(rm -f __sidebar_test.php)",
+      "Bash(ls __sidebar_test.php)",
+      "Bash(rm -f \"/c/Users/renm1/Documents/1. Neto's things/UT/5th quarter/Proyecto Integrador II/Ruta Nómada/.claude/launch.json\")",
+      "Bash(cd 'C:\\\\xampp\\\\htdocs\\\\intre proyecto_viajes \\(update-Natalia\\)' && rm -f __login_test.php && echo \"login_test eliminado\" && rm -f \"/c/Users/renm1/Documents/1. Neto's things/UT/5th quarter/Proyecto Integrador II/Ruta Nómada/.claude/launch.json\" && echo \"launch.json eliminado\")",
+      "Bash('C:\\\\xampp\\\\php\\\\php.exe' -l forgot-password.php)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(rm -f \"/c/Users/renm1/Documents/1. Neto's things/UT/5th quarter/Proyecto Integrador II/Ruta Nómada/.claude/launch.json\" && echo \"launch.json eliminado\")",
+      "Bash('C:\\\\xampp\\\\php\\\\php.exe' -l destino.php)",
+      "Bash(mkdir -p img)",
+      "Bash(cp \"our_context/LOGO PAGINA.PNG\" \"img/logo.png\")",
+      "Bash(file img/logo.png)",
+      "Bash('C:\\\\xampp\\\\php\\\\php.exe' -l mailer.php)",
+      "Bash(echo \"=== ¿Existe CORREGIDO? ===\" && ls -la 'C:\\\\xampp\\\\htdocs\\\\intre proyecto_viajes CORREGIDO' 2>/dev/null | head -40 || echo \"\\(NO existe esa carpeta\\)\")",
+      "Read(//c/xampp/mysql/data/mysql/**)",
+      "Bash('C:\\\\xampp\\\\mysql\\\\bin\\\\aria_chk.exe' --recover --sort_buffer_size=256M *.MAI)",
+      "Bash(ls *.TMD)",
+      "Bash(rm -f *.TMD)",
+      "Bash(ls 'C:\\\\xampp\\\\mysql\\\\backup\\\\mysql')",
+      "Bash(echo \"SÍ existe C:\\\\\\\\xampp\\\\\\\\mysql\\\\\\\\backup\\\\\\\\mysql \\(plan B disponible\\)\")",
+      "Bash(echo \"=== Contenido de backup\\\\\\\\mysql \\(¿tiene global_priv, db, tables_priv?\\) ===\")",
+      "Read(//c/xampp/mysql/backup/mysql/**)",
+      "Bash(grep -ciE \"\\\\.MAI$\")",
+      "Read(//c/xampp/mysql/backup/**)",
+      "Bash(echo \"=== Extensiones en data\\\\\\\\mysql \\(actual\\) ===\")",
+      "Bash(echo \"=== ¿Hay tablas InnoDB \\(.ibd\\) en data\\\\\\\\mysql? ===\")",
+      "Bash(echo \"=== Extensiones en backup\\\\\\\\mysql ===\")",
+      "Bash('C:\\\\xampp\\\\php\\\\php.exe' -r ' *)"
     ]
   }
 }

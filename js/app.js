@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    Ruta Nómada — Vanilla JS app logic
    Replaces all React components' state & interactivity.
+   Auth is now handled server-side (PHP sessions + MySQL).
    ═══════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -41,16 +42,24 @@
     return html;
   }
 
-  /* ───────── State (mirrors React's useState + localStorage) ───────── */
-  let route     = localStorage.getItem('rn_route') || 'top:inicio';
-  let collapsed = localStorage.getItem('rn_sidebar') === '1';
-  let authed    = localStorage.getItem('rn_authed') === '1';
+  /* ───────── State ───────── */
+  // Auth state comes from the server (window.__USER__ injected by PHP)
+  let authed      = window.__USER__ === true;
+  let route       = localStorage.getItem('rn_route') || 'top:inicio';
+  let collapsed   = localStorage.getItem('rn_sidebar') === '1';
   let currentDest = null;  // the destination object for detail view
 
   function saveState() {
     localStorage.setItem('rn_route', route);
     localStorage.setItem('rn_sidebar', collapsed ? '1' : '0');
-    localStorage.setItem('rn_authed', authed ? '1' : '0');
+  }
+
+  /* ───────── Auth error helper ───────── */
+  function showError(id, message) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = message;
+    el.style.display = message ? '' : 'none';
   }
 
   /* ───────── Auth flow ───────── */
@@ -66,19 +75,9 @@
       authCards[k].style.display = (k === mode) ? '' : 'none';
       if (k === mode) reanimate(authCards[k]);
     });
-  }
-
-  function enterApp() {
-    authed = true;
-    route = 'top:inicio';
-    saveState();
-    render();
-  }
-
-  function logout() {
-    authed = false;
-    saveState();
-    render();
+    // Clear errors when switching cards
+    showError('login-error', '');
+    showError('registro-error', '');
   }
 
   // Auth navigation
@@ -90,19 +89,58 @@
     }
   });
 
-  // Login form
+  // ── Login form (POST to api/login.php) ──────────────────
   const loginForm = $('#login-form');
-  if (loginForm) loginForm.addEventListener('submit', function (e) { e.preventDefault(); enterApp(); });
+  if (loginForm) loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    showError('login-error', '');
 
-  // Registro form
+    const formData = new FormData(loginForm);
+
+    fetch('api/login.php', { method: 'POST', body: formData })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          // Reload so PHP renders the app shell with real user data
+          location.reload();
+        } else {
+          showError('login-error', data.error || 'Error al iniciar sesión.');
+        }
+      })
+      .catch(() => {
+        showError('login-error', 'Error de conexión. Verifica que MySQL esté activo.');
+      });
+  });
+
+  // ── Registro form (POST to api/registro.php) ─────────────
   const regForm = $('#registro-form');
   if (regForm) regForm.addEventListener('submit', function (e) {
     e.preventDefault();
+    showError('registro-error', '');
+
     const terms = $('#terms-check');
-    if (terms && terms.checked) enterApp();
+    if (terms && !terms.checked) {
+      showError('registro-error', 'Debes aceptar los Términos de Servicio.');
+      return;
+    }
+
+    const formData = new FormData(regForm);
+
+    fetch('api/registro.php', { method: 'POST', body: formData })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          location.reload();
+        } else {
+          showError('registro-error', data.error || 'Error al registrar.');
+        }
+      })
+      .catch(() => {
+        showError('registro-error', 'Error de conexión. Verifica que MySQL esté activo.');
+      });
   });
 
-  // Recuperación form
+  // ── Recuperación form (unchanged — still client-side mock) ─
   const recForm = $('#recuperacion-form');
   if (recForm) recForm.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -112,9 +150,16 @@
     showAuthCard('recuperacion-ok');
   });
 
-  // Logout
+  // ── Logout (POST to api/logout.php, then reload) ──────────
   const logoutBtn = $('#logout-btn');
-  if (logoutBtn) logoutBtn.addEventListener('click', logout);
+  if (logoutBtn) logoutBtn.addEventListener('click', function () {
+    fetch('api/logout.php', { method: 'POST' })
+      .then(() => {
+        localStorage.removeItem('rn_route');
+        location.reload();
+      })
+      .catch(() => location.reload());
+  });
 
   /* ───────── Password visibility toggle ───────── */
   document.addEventListener('click', function (e) {
@@ -290,15 +335,15 @@
   function render() {
     if (!authed) {
       // Show auth, hide app
-      authFlow.style.display = '';
-      appShell.style.display = 'none';
+      if (authFlow) authFlow.style.display = '';
+      if (appShell) appShell.style.display = 'none';
       showAuthCard('login');
       return;
     }
 
     // Show app, hide auth
-    authFlow.style.display = 'none';
-    appShell.style.display = '';
+    if (authFlow) authFlow.style.display = 'none';
+    if (appShell) appShell.style.display = '';
 
     // Resolve screen ID from route
     const routeToScreen = {
