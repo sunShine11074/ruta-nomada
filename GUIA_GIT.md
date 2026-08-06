@@ -105,15 +105,32 @@ diciendo qué falta y qué comando escribir. Repite hasta que salga
 
 ### 6. La base de datos
 
-Si todavía no la tienes, o el diagnóstico se queja de tablas que faltan:
+Hay dos casos. Elige el tuyo:
+
+**a) Ya tienes la base `ruta_nomada` de antes y quieres conservar tus
+usuarios y tus planes.** Ponla al día con un solo comando:
+
+```bash
+/c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
+```
+
+Añade lo que falta y **no borra nada**. Se puede ejecutar dos veces sin
+problema. Al terminar imprime `5` y `1`: son las columnas y la tabla
+que añadió.
+
+**b) Empiezas de cero (o el diagnóstico dice que faltan tablas):**
 
 ```bash
 /c/xampp/mysql/bin/mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS ruta_nomada CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-/c/xampp/mysql/bin/mysql.exe -u root ruta_nomada < basedatos/instalar.sql
+/c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/instalar.sql"
 ```
 
-`instalar.sql` crea **todo**: no necesitas ningún archivo `migrate_*.sql`
-(ésos son sólo para bases de datos que ya existían antes).
+`instalar.sql` crea **todo**: no necesitas ningún `migrate_*.sql` ni
+`actualizar_bd.sql` (ésos son sólo para bases que ya existían).
+
+> **Por qué `-e "source ..."` y no `< archivo`:** la terminal de VS Code
+> en Windows suele ser PowerShell, y PowerShell no admite el operador
+> `<`. Con `source` funciona igual en PowerShell, en CMD y en Git Bash.
 
 Listo. Abre <http://localhost/ruta-nomada/>
 
