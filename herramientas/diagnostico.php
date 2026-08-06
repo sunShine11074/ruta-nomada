@@ -111,6 +111,6 @@ foreach (['libs/dc/support.js' => 'Sin esto la vista del plan sale en blanco.',
 echo PHP_EOL . str_repeat('=', 52) . PHP_EOL;
 printf('  %d correctos · %d avisos · %d fallos%s', $ok, $avisos, $fallos, PHP_EOL);
 echo $fallos === 0
-    ? '  Todo listo. Abre  http://localhost/Ruta Nómada (v1)/' . PHP_EOL
+    ? '  Todo listo. Abre  http://localhost/' . basename($raiz) . '/' . PHP_EOL
     : '  Corrige los [X] y vuelve a ejecutar esta herramienta.' . PHP_EOL;
 echo PHP_EOL;

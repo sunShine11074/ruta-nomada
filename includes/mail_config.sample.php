@@ -38,4 +38,10 @@ return [
     'password'  => 'PON_AQUI_TU_APP_PASSWORD', // las 16 letras, sin espacios
     'from_addr' => 'tucorreo@gmail.com',
     'from_name' => 'Ruta Nómada',
+
+    // Dirección base para los enlaces de los correos (invitaciones y
+    // recuperación de contraseña). Déjalo vacío y se deduce solo de la
+    // petición, que es lo correcto en XAMPP se llame como se llame tu
+    // carpeta. Sólo hace falta ponerlo si el sitio vive en un dominio.
+    'base_url'  => '',
 ];

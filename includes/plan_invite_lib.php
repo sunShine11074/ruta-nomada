@@ -27,11 +27,24 @@ function planInviteCreate(int $planId, string $rol, ?string $email = null): ?str
         return null;
     }
 
-    // Enlace absoluto con el base_url del proyecto
-    $base = 'http://localhost/Ruta%20N%C3%B3mada%20(v1)';
+    // Enlace absoluto. Se deduce de la petición para que funcione se
+    // llame como se llame la carpeta del proyecto: antes iba escrita a
+    // mano y quien clonaba el repositorio en otra carpeta recibía las
+    // invitaciones con un enlace roto. mail_config.php puede imponer
+    // otra dirección con 'base_url', que es lo que haría falta el día
+    // que esto viva en un dominio de verdad.
+    $base = 'http://localhost';
+    if (!empty($_SERVER['HTTP_HOST'])) {
+        $esq  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $raiz = str_replace('\\', '/', dirname(__DIR__));
+        $doc  = str_replace('\\', '/', rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/'));
+        $sub  = ($doc !== '' && strpos($raiz, $doc) === 0) ? trim(substr($raiz, strlen($doc)), '/') : '';
+        $ruta = $sub === '' ? '' : '/' . implode('/', array_map('rawurlencode', explode('/', $sub)));
+        $base = $esq . '://' . $_SERVER['HTTP_HOST'] . $ruta;
+    }
     if (is_file(__DIR__ . '/mail_config.php')) {
-        $cfg = require __DIR__ . '/mail_config.php';
-        if (!empty($cfg['base_url'])) $base = rtrim($cfg['base_url'], '/');
+        $cfg = @include __DIR__ . '/mail_config.php';
+        if (is_array($cfg) && !empty($cfg['base_url'])) $base = rtrim($cfg['base_url'], '/');
     }
     $link = $base . '/plan_invitacion.php?token=' . $token;
 
