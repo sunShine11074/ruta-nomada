@@ -19,7 +19,12 @@ if (!function_exists('mailConfig')) {
     {
         static $cfg;
         if ($cfg === null) {
-            $cfg = require __DIR__ . '/includes/mail_config.php';
+            // @include y no require: quien clona el repo NO tiene este
+            // archivo (está en .gitignore), y con require la página
+            // entera moría con un error fatal de PHP. Así sólo falla el
+            // envío, que es lo único que depende del correo.
+            $c = @include __DIR__ . '/includes/mail_config.php';
+            $cfg = is_array($c) ? $c : [];
         }
         return $cfg;
     }
@@ -33,6 +38,10 @@ if (!function_exists('enviarCorreo')) {
     function enviarCorreo(string $toEmail, string $subject, string $htmlInner, string $altBody = ''): bool
     {
         $cfg = mailConfig();
+        if (empty($cfg['username']) || empty($cfg['password'])) {
+            error_log('Ruta Nomada: falta includes/mail_config.php; copia includes/mail_config.sample.php. Correo no enviado a ' . $toEmail);
+            return false;
+        }
 
         $mail = new PHPMailer(true);
         try {
@@ -87,6 +96,10 @@ if (!function_exists('enviarCorreoRecuperacion')) {
     function enviarCorreoRecuperacion(string $toEmail, string $toName, string $resetLink): bool
     {
         $cfg = mailConfig();
+        if (empty($cfg['username']) || empty($cfg['password'])) {
+            error_log('Ruta Nomada: falta includes/mail_config.php; copia includes/mail_config.sample.php. Correo no enviado a ' . $toEmail);
+            return false;
+        }
 
         $mail = new PHPMailer(true);
         try {

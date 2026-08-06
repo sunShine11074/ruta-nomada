@@ -19,7 +19,19 @@ if (empty($_SESSION['user'])) {
     exit;
 }
 
-$planId = (int)($_GET['id'] ?? 0);
+$user = $_SESSION['user'];
+
+// Sin ?id= la página es el punto de partida de un viaje nuevo: pide
+// destino y fechas, crea el plan y vuelve aquí con su id. Con ?id=
+// inválido no: ese enlace apuntaba a un plan concreto, y ofrecer
+// "crea uno nuevo" en su lugar confunde. Ahí seguimos yendo a la lista.
+if (!isset($_GET['id'])) {
+    $plan_csrf = csrfToken();
+    include __DIR__ . '/includes/plan_nuevo.php';
+    exit;
+}
+
+$planId = (int)$_GET['id'];
 
 $db = getDB();
 $stmt = $db->prepare(
@@ -39,7 +51,6 @@ $acc  = ['rol' => $rol, 'plan' => $row, 'user_id' => (int)$_SESSION['user']['id'
 $boot = planFullJson($planId, $acc);
 $csrf = csrfToken();
 
-$user = $_SESSION['user'];
 $tituloPagina = htmlspecialchars($row['nombre'], ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>

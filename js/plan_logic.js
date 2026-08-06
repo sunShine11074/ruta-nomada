@@ -40,9 +40,13 @@ class Component extends DCLogic {
       grpRes: true, grpIt: true, grpPres: true,
       userMenu: false, catOpen: false, catLabel: 'Ciudad',
       added: { mercado: true }, addMenu: null, justAdded: null,
-      hoverPlace: null, detail: null, detailTab: 'about', detailLoading: false,
+      hoverPlace: null, detail: null, detailFrom: null, detailTab: 'about', detailLoading: false,
       layersOpen: false, mapSearchOpen: false, mapSearchQ: '',
-      layerChecks: {}, routeLines: false,
+      // routeLines arranca encendido: si hay que descubrir un enlace escondido
+      // en el menú de capas para ver las rutas, para el usuario no existen.
+      // rutaSolo aísla la ruta de UN día sin ocultar los pines de los demás
+      // (layerChecks sí oculta pines, ver _pinList).
+      layerChecks: {}, routeLines: true, rutaSolo: null, modoMenu: null,
       chatMode: null, chatLog: [], chatInput: '', streaming: false, streamTxt: '',
       dayOpen: { 0: true, 1: true }, daySubs: ['', ''], dayMenu: null,
       gastos: [
@@ -112,12 +116,19 @@ class Component extends DCLogic {
       // Listas del Resumen (Wanderlog): menú de nueva lista, nota en
       // edición, arrastre de artículos y foco del buscador de lugar
       newListMenu: false, noteEdit: null, ckDrag: null, ckDragOver: null, placeFocusId: null,
+      // Tarjeta del itinerario desplegada (muestra "Añadir" y "Añadir costo")
+      itemOpen: null,
+      // Horario y gasto de un lugar (borradores hasta pulsar Guardar)
+      horaMenu: null, hIni: '', hFin: '', hCual: 'ini',
+      gastoMenu: null, gMonto: '', gMoneda: 'MXN', gCat: '', gDesc: '', gModo: 'no',
+      gRep: {}, gMonOpen: false, gCatOpen: false, gModoOpen: false, gDonaOpen: true, gColorUid: null,
       // Título editable, horarios desplegables y autocompletado de lugares
       titleEdit: false, detHoursOpen: false, acKey: null, acItems: [],
       // Reseñas: cuáles están expandidas y cuántas se muestran
       rvwOpen: {}, rvwShown: 5,
-      // Selector de emojis: búsqueda y categoría activa
-      emoQ: '', emoCat: 0
+      // Selector de emojis: búsqueda, categoría activa, en qué día
+      // está el lugar al que se reacciona y dónde colocar el panel
+      emoQ: '', emoCat: 0, emoDi: null, emoPos: null
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -127,7 +138,7 @@ class Component extends DCLogic {
     const B = window.PLAN_BOOT;
     this.CSRF = window.PLAN_CSRF || '';
     this.USER = window.PLAN_USER || { inicial: 'R', nombre: 'Ramon' };
-    this.MIEMBROS = [{ inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: null }];
+    this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: null }];
     this.puedeEditar = true;   // por defecto (modo demo sin servidor)
     this.META = { titulo: 'Nuestro viaje a Ensenada', destino: 'Ensenada', fechas: '30/7 – 31/7', hero: 'https://picsum.photos/seed/rn-en-hero/1400/460' };
     this.DESC_ENSENADA = 'Ensenada es una ciudad portuaria de Baja California, a hora y media de la frontera, famosa por su malecón frente a la bahía de Todos Santos, sus tacos de pescado y su cercanía con el Valle de Guadalupe, la principal región vinícola de México. Al sur, La Bufadora lanza chorros de mar de más de 20 metros; en el centro, la Primera y la Plaza Cívica concentran cantinas históricas, cafés y una escena gastronómica que mezcla mariscos de la lonja con cocina de autor.';
@@ -149,6 +160,14 @@ class Component extends DCLogic {
         name: it.nombre, nota: it.nota || '',
         horario: h0 ? (h1 ? h0 + ' - ' + h1 : h0) : '',
         costo: Number(it.precio) || 0, travel: null,
+        // El horario también se guarda suelto: la cadena 'horario' es
+        // para pintar, pero para editarlo hacen falta los dos extremos.
+        hora: (it.hora || '').slice(0, 5), horaFin: (it.hora_fin || '').slice(0, 5),
+        moneda: it.moneda || 'MXN', gastoCat: it.gasto_cat || '',
+        gastoDesc: it.gasto_desc || '', gastoModo: it.gasto_modo || 'no',
+        reparto: Array.isArray(it.reparto) ? it.reparto.map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })) : [],
+        // Cómo se va de este lugar al siguiente. null = el de por defecto.
+        modo: it.modo_viaje || null,
         reacts: Array.isArray(it.reacts) ? it.reacts.map(r => ({ e: r.e, n: Number(r.n) || 0, mine: !!r.mine })) : [],
         pid: it.place_id || null,
         lat: (it.lat === null || it.lat === undefined) ? null : Number(it.lat),
@@ -167,10 +186,11 @@ class Component extends DCLogic {
       items: (L.items || []).map(x => ({ iid: Number(x.id), t: x.texto, done: !!Number(x.hecho) }))
     }));
     this.MIEMBROS = (B.miembros || []).map(m => ({
+      uid: Number(m.usuario_id),
       inicial: (m.nombre || '?').trim().charAt(0).toUpperCase(),
       nombre: ((m.nombre || '') + ' ' + (m.apellidos || '')).trim(), rol: m.rol, foto: m.foto_perfil || null
     }));
-    if (!this.MIEMBROS.length) this.MIEMBROS = [{ inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: null }];
+    if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: null }];
     const dest = P.destino || 'mi destino';
     this.META = {
       titulo: P.nombre || ('Nuestro viaje a ' + dest),
@@ -475,7 +495,10 @@ class Component extends DCLogic {
     } else if (!prev) {
       setTimeout(() => this.fitAllPins(true), 700);
     }
-    this._routeKey = null;
+    // El mapa se acaba de (re)crear: las polilíneas viejas quedaron
+    // huérfanas, así que se fuerza el redibujado de todos los días.
+    this._dayKey = [];
+    this._polys = [];
     this._updateRoute();
   }
   // ════ Google Places (M2): Explorar con lugares reales ════
@@ -648,28 +671,235 @@ class Component extends DCLogic {
     requestAnimationFrame(run);
     setTimeout(run, 120);   // respaldo: pestañas en 2º plano o paneles sin composición
   }
-  // polilíneas de ruta por día (nativas; sustituyen al polyline del SVG)
+  // ════ Rutas del itinerario ════════════════════════════════════
+  //  Una polilínea por TRAMO (par de lugares consecutivos), no una por
+  //  día. Cuesta lo mismo de dibujar y es lo que permite que, al
+  //  reordenar, los tramos que no cambiaron conserven su geometría en
+  //  vez de recalcularse enteros.
+  //
+  //  Se usa google.maps.Polyline y no un SVG propio a pesar de que los
+  //  pines van con proyección casera: la Polyline no depende de
+  //  getProjection() (que es lo que fallaba con los pines), y además
+  //  vive por debajo de ellos, así que nunca tapa un número.
+  //  ⚠ Esto se sostiene mientras el mapa siga siendo ráster. Si algún
+  //  día se le pone un mapId, pasa a vectorial con inclinación y giro,
+  //  y MERC() —que no conoce el ángulo de cámara— dejaría de cuadrar.
+
+  _rutaEstilo(color, firme) {
+    // Firme = geometría real o recta conocida. No firme = provisional o
+    // tramo que no se pudo resolver: punteado, que en la API de Maps no
+    // es dasharray sino símbolos repetidos sobre una línea invisible.
+    if (firme) {
+      return { strokeColor: color, strokeOpacity: .95, strokeWeight: 4 };
+    }
+    return {
+      strokeColor: color, strokeOpacity: 0, strokeWeight: 4,
+      icons: [{
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 2.4,
+                fillColor: color, fillOpacity: .85, strokeOpacity: 0 },
+        offset: '0', repeat: '11px'
+      }]
+    };
+  }
+
+  _destruirDia(di) {
+    const d = (this._polys || [])[di];
+    if (!d) return;
+    d.segs.forEach(sg => {
+      if (sg.halo) sg.halo.setMap(null);
+      if (sg.line) sg.line.setMap(null);
+    });
+    this._polys[di] = null;
+  }
+
+  _rebuildDay(di) {
+    this._destruirDia(di);
+    const arr = (this.state.dayItems || [])[di] || [];
+    const color = this.DAYS[di] ? this.DAYS[di].color : '#F0B429';
+    const segs = [];
+    let faltan = false;
+
+    for (let i = 0; i + 1 < arr.length; i++) {
+      const a = arr[i], b = arr[i + 1];
+      // Un lugar sin coordenadas NO se puede puentear: antes el filtro lo
+      // descartaba en silencio y la línea unía a sus vecinos, dibujando
+      // una ruta que nadie calculó. Mejor dejar el hueco visible.
+      if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) {
+        segs.push({ halo: null, line: null, sinDatos: true });
+        continue;
+      }
+      const recta = [{ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }];
+      const k = this._segKey(a, b);
+      const g = this._segs ? this._segs[k] : undefined;
+
+      // Tres estados, y distinguirlos importa:
+      //   sin entrada  → todavía no se ha pedido    → punteado + pedirlo
+      //   entrada ok   → geometría real de carretera → sólido
+      //   entrada !ok  → Google dijo que no hay ruta → punteado y NO volver
+      //                  a pedirlo, o se pediría en cada carga para siempre
+      if (g === undefined) faltan = true;
+      const firme = !!(g && g.ok && g.pts && g.pts.length > 1);
+      const path = firme ? g.pts : recta;
+
+      // Halo blanco por debajo: sin él el color del día se pierde sobre
+      // las carreteras amarillas del mapa y dos días que compartan calle
+      // no se distinguen.
+      const halo = new google.maps.Polyline({
+        map: this._map, path, geodesic: false, clickable: false,
+        strokeColor: '#FFFFFF', strokeOpacity: firme ? .9 : 0, strokeWeight: 7, zIndex: 1
+      });
+      const line = new google.maps.Polyline(Object.assign({
+        map: this._map, path, geodesic: false, clickable: false, zIndex: 2
+      }, this._rutaEstilo(color, firme)));
+
+      segs.push({ halo, line, a: k, real: firme });
+    }
+    (this._polys = this._polys || [])[di] = { segs };
+    // Los tramos que aún no conocemos se piden en diferido. No hay bucle:
+    // al volver la respuesta quedan con entrada en _segs (con ok true o
+    // false) y ya no vuelven a marcarse como pendientes.
+    if (faltan && !this._rutasApagadas) this._rutaSucia(di);
+  }
+
+  // ── Texto del traslado entre dos lugares ──────────────────────
+  //  Bajo un kilómetro se lee mejor en metros ("850 m" dice más que
+  //  "0,9 km"); a partir de ahí, kilómetros con un decimal.
+  _fmtDist(m) {
+    if (m == null) return '';
+    // Redondear ANTES de decidir la unidad: si no, 995 m se redondea a
+    // 1000 y se imprimiría "1000 m", contradiciendo la propia regla.
+    const r = Math.round(m / 10) * 10;
+    // Punto decimal, no coma: en México el separador decimal es el punto.
+    return r < 1000 ? r + ' m' : (r / 1000).toFixed(1) + ' km';
+  }
+  _fmtDur(s) {
+    if (s == null) return '';
+    const min = Math.round(s / 60);
+    if (min < 60) return min + ' min';
+    const h = Math.floor(min / 60), r = min % 60;
+    return r ? h + ' h ' + r + ' min' : h + ' h';
+  }
+  // Modo efectivo del tramo que sale de este lugar
+  _modoDe(it) { return it && it.modo ? it.modo : 'DRIVE'; }
+
+  // Cambiar el medio de transporte de un tramo. Cambia la clave del tramo,
+  // así que la geometría se vuelve a pedir sola (y si ya se pidió antes con
+  // ese modo, sale de la caché sin gastar nada).
+  _setModo(di, it, modo) {
+    const days = this.state.dayItems.map(a => [...a]);
+    const j = (days[di] || []).findIndex(x => x.uid === it.uid);
+    if (j < 0) return;
+    days[di][j] = { ...days[di][j], modo };
+    this.setState({ dayItems: days, modoMenu: null });
+    if (it.sid) this._sync('plan_items.php', { action: 'update', id: it.sid, modo_viaje: modo });
+    this._rutaSucia(di);
+  }
+
+  // La clave lleva el modo: el mismo par a pie y en coche son dos rutas
+  // distintas. Debe coincidir con rutaClave()/hash de api/ruta.php.
+  _segKey(a, b) {
+    const id = (x) => x.pid || (x.lat != null ? x.lat.toFixed(5) + ',' + x.lng.toFixed(5) : 'x');
+    return this._modoDe(a) + '|' + id(a) + '>' + id(b);
+  }
+
+  // Visibilidad: barato, se recalcula siempre. NUNCA con setMap(null),
+  // que desvincula el overlay y lo rehace entero al volver.
+  _applyRouteVisibility() {
+    const s = this.state, lc = s.layerChecks || {};
+    (this._polys || []).forEach((d, di) => {
+      if (!d) return;
+      const on = !!s.routeLines
+        && lc['d' + di] !== false
+        && (s.rutaSolo === null || s.rutaSolo === undefined || s.rutaSolo === di);
+      d.segs.forEach(sg => {
+        if (sg.halo) sg.halo.setVisible(on);
+        if (sg.line) sg.line.setVisible(on);
+      });
+    });
+  }
+
+  // ── Geometría real: pedirla, con freno y sin pisarse ──────────
+  //  Al soltar un lugar arrastrado se marca el día como sucio. El
+  //  debounce hace que tres arrastres seguidos sean UNA petición, no tres.
+  _rutaSucia(...dias) {
+    if (!this.PLAN_ID) return;
+    this._sucios = this._sucios || {};
+    dias.forEach(di => { if (di != null && di >= 0) this._sucios[di] = true; });
+    clearTimeout(this._rutaT);
+    this._rutaT = setTimeout(() => this._pedirRutas(), 400);
+  }
+
+  _pedirRutas() {
+    const s = this.state;
+    // _dayKey lo crea _updateRoute(), que no llega a ejecutarse si no hay
+    // mapa (pantalla estrecha). Sin esta línea, pedir los tramos reventaba
+    // antes del fetch y la lista se quedaba en "Calculando…" para siempre.
+    this._dayKey = this._dayKey || [];
+    const pend = Object.keys(this._sucios || {}).map(Number);
+    this._sucios = {};
+    pend.forEach(di => {
+      const arr = (s.dayItems || [])[di] || [];
+      // Se pide aunque la capa del día esté oculta en el mapa: el tiempo y
+      // la distancia se leen en la lista del itinerario, que se ve siempre.
+      const puntos = arr.filter(x => x.lat != null && x.lng != null)
+        .map(x => ({ pid: x.pid || '', lat: x.lat, lng: x.lng, modo: this._modoDe(x) }));
+      if (puntos.length < 2) return;
+
+      // Sello del orden actual: si al volver la respuesta el día ya cambió,
+      // se descarta en vez de pintar una ruta que ya no corresponde.
+      const sello = this._dayKey[di];
+      fetch('api/ruta.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+        body: JSON.stringify({ plan_id: this.PLAN_ID, dia: puntos, modo: 'DRIVE' })
+      })
+        .then(r => r.json())
+        .then(j => {
+          if (!j || !j.ok || !j.tramos) return;
+          if (this._dayKey[di] !== sello) return;   // el usuario siguió moviendo
+          // 'recta' significa que el servicio de rutas no estaba disponible
+          // (sin clave, API apagada, tope alcanzado). NO son respuestas
+          // autorizadas: guardarlas marcaría todos los tramos como
+          // "sin ruta" para siempre y enseñaría tiempos inventados.
+          // Se apaga para esta sesión y el mapa se queda con rectas.
+          // setState y no sólo _updateRoute(): el tiempo y la distancia se
+          // calculan al pintar la lista, así que hace falta un re-render.
+          if (j.fuente === 'recta') { this._rutasApagadas = true; this.setState({ rutasN: (this.state.rutasN || 0) + 1 }); return; }
+          this._segs = this._segs || {};
+          j.tramos.forEach(t => {
+            this._segs[t.k] = {
+              ok: !!t.ok,
+              pts: (t.pts || []).map(c => ({ lat: c[0], lng: c[1] })),
+              m: t.m, s: t.s
+            };
+          });
+          // Forzar el redibujado del mapa y, con el setState, el repintado
+          // de la lista para que aparezcan el tiempo y la distancia.
+          this._dayKey[di] = null;
+          this.setState({ rutasN: (this.state.rutasN || 0) + 1 });
+        })
+        .catch(() => {});
+    });
+  }
+
   _updateRoute() {
     if (!this._map) return;
-    const s = this.state;
-    const key = (s.routeLines ? '1' : '0') + '|' +
-      (s.dayItems || []).map(a => a.map(x => x.uid).join(',')).join(';') + '|' +
-      JSON.stringify(s.layerChecks || {});
-    if (key === this._routeKey) return;
-    this._routeKey = key;
-    (this._polys || []).forEach(pl => pl.setMap(null));
-    this._polys = [];
-    if (!s.routeLines) return;
-    (s.dayItems || []).forEach((arr, di) => {
-      if ((s.layerChecks || {})['d' + di] === false) return;
-      const path = arr.filter(x => x.lat != null && x.lng != null).map(x => ({ lat: x.lat, lng: x.lng }));
-      if (path.length < 2) return;
-      this._polys.push(new google.maps.Polyline({
-        map: this._map, path, geodesic: true,
-        strokeColor: this.DAYS[di] ? this.DAYS[di].color : '#F0B429',
-        strokeOpacity: .95, strokeWeight: 4
-      }));
+    const dias = this.state.dayItems || [];
+    this._dayKey = this._dayKey || [];
+    this._polys = this._polys || [];
+
+    // Días que ya no existen (se borró el último)
+    for (let di = dias.length; di < this._polys.length; di++) this._destruirDia(di);
+    this._polys.length = dias.length;
+
+    // Geometría: sólo se rehace el día cuyo orden o coordenadas cambiaron
+    dias.forEach((arr, di) => {
+      const k = arr.map(x => x.uid + '@' +
+        (x.lat == null ? '-' : x.lat.toFixed(5) + ',' + x.lng.toFixed(5))).join('|');
+      if (k !== this._dayKey[di]) { this._dayKey[di] = k; this._rebuildDay(di); }
     });
+
+    this._applyRouteVisibility();
   }
   fitAllPins(first) {
     if (!this._map) return;
@@ -691,7 +921,24 @@ class Component extends DCLogic {
   }
   componentDidUpdate() {
     this._ensureMap();
+    this._asegurarTramos();
     this._updateRoute();
+    this._emoMontar();
+  }
+
+  // El tiempo y la distancia se enseñan en la LISTA del itinerario, que
+  // existe aunque el mapa no esté montado (pantallas estrechas, o el panel
+  // del mapa cerrado). Por eso pedir los tramos no puede depender del mapa:
+  // si dependiera, en móvil pondría "Calculando…" para siempre.
+  _asegurarTramos() {
+    if (!this.PLAN_ID || this._rutasApagadas) return;
+    (this.state.dayItems || []).forEach((arr, di) => {
+      for (let i = 0; i + 1 < arr.length; i++) {
+        const a = arr[i], b = arr[i + 1];
+        if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) continue;
+        if (!this._segs || this._segs[this._segKey(a, b)] === undefined) { this._rutaSucia(di); return; }
+      }
+    });
   }
   place(id) {
     for (const p of this.PLACES) { if (p.id === id) return p; }
@@ -707,6 +954,24 @@ class Component extends DCLogic {
       }
     }
     return null;
+  }
+  // En qué día del itinerario está el lugar que enseña la ficha, y en
+  // qué posición. Es lo que recorre el paginador "n de n".
+  _diaDelDetalle(id) {
+    if (!id) return null;
+    const dias = this.state.dayItems || [];
+    for (let di = 0; di < dias.length; di++) {
+      const arr = dias[di] || [];
+      const i = arr.findIndex(x => (x.pid || x.uid) === id);
+      if (i >= 0) return { di, i, arr };
+    }
+    return null;
+  }
+  // Centra el mapa en un lugar sin alejar lo que el usuario ya tenía.
+  _centrarEn(it) {
+    if (!this._map || !it || it.lat == null || it.lng == null) return;
+    this._map.panTo({ lat: Number(it.lat), lng: Number(it.lng) });
+    if (this._map.getZoom() < 15) this._map.setZoom(15);
   }
   // Adapta un item del itinerario a la forma que espera el panel de detalle
   _itemComoLugar(it, di, i) {
@@ -751,6 +1016,206 @@ class Component extends DCLogic {
         if (dest) { dest.reacts = j.reacts || []; this.setState({ dayItems: arr }); }
       });
     }
+  }
+  // ════════════ Selector de emojis ════════════
+  // Geometría del panel (400x550). Las alturas tienen que cuadrar al
+  // píxel con el CSS de .rn-emogrid: se usan para el
+  // contain-intrinsic-size de cada sección, y si mienten, el
+  // scrollHeight y los offsets dejan de ser reales y el subrayado
+  // apuntaría a la categoría equivocada.
+  static get EMO() { return { COLS: 8, CELDA: 44, CAB: 30, ANCHO: 400, ALTO: 550, TAB: 400 / 9, SUB: 26 }; }
+
+  // Orden de las pestañas del frame de Figma. No es el del catálogo:
+  // ahí Viajes (3) va antes que Actividad (4), y en el diseño el balón
+  // va antes que el coche. Las secciones se pintan en este mismo orden
+  // para que el subrayado y el scroll coincidan.
+  _emoIconos() {
+    if (this._emoIco) return this._emoIco;
+    const F = (d, vb, w, h) => ({ d, vb, w: String(w), h: String(h), relleno: 'currentColor', trazo: 'none', grosor: '0' });
+    this._emoIco = [
+      // El reloj no venía entre los SVG de Font Awesome, así que va
+      // dibujado con trazo (círculo + manecillas), como en el frame.
+      { n: 'Usados frecuentemente', cat: -1, d: 'M21 12a9 9 0 1 1-18 0 9 9 0 1 1 18 0M12 7v5l3 2', vb: '0 0 24 24', w: '22', h: '22', relleno: 'none', trazo: 'currentColor', grosor: '2' },
+      // Los ocho de Font Awesome. El viewBox va recortado a la caja
+      // real del glifo (el descargado siempre es 0 0 640 640, con
+      // relleno alrededor) y el eje mayor mide 22 px, como se pidió.
+      { n: 'Caritas y personas', cat: 0, ...F('M528 320C528 205.1 434.9 112 320 112C205.1 112 112 205.1 112 320C112 434.9 205.1 528 320 528C434.9 528 528 434.9 528 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320zM241.3 383.4C256.3 399 282.4 416 320 416C357.6 416 383.7 399 398.7 383.4C407.9 373.8 423.1 373.5 432.6 382.7C442.1 391.9 442.5 407.1 433.3 416.6C411.2 439.6 373.3 464 320 464C266.7 464 228.8 439.6 206.7 416.6C197.5 407 197.8 391.8 207.4 382.7C217 373.6 232.2 373.8 241.3 383.4zM208 272C208 254.3 222.3 240 240 240C257.7 240 272 254.3 272 272C272 289.7 257.7 304 240 304C222.3 304 208 289.7 208 272zM372 280C372 291 363 300 352 300C341 300 332 291 332 280C332 246.9 358.9 220 392 220L408 220C441.1 220 468 246.9 468 280C468 291 459 300 448 300C437 300 428 291 428 280C428 269 419 260 408 260L392 260C381 260 372 269 372 280z', '64 64 512 512', 22, 22) },
+      { n: 'Animales y naturaleza', cat: 1, ...F('M298.5 156.9C312.8 199.8 298.2 243.1 265.9 253.7C233.6 264.3 195.8 238.1 181.5 195.2C167.2 152.3 181.8 109 214.1 98.4C246.4 87.8 284.2 114 298.5 156.9zM164.4 262.6C183.3 295 178.7 332.7 154.2 346.7C129.7 360.7 94.5 345.8 75.7 313.4C56.9 281 61.4 243.3 85.9 229.3C110.4 215.3 145.6 230.2 164.4 262.6zM133.2 465.2C185.6 323.9 278.7 288 320 288C361.3 288 454.4 323.9 506.8 465.2C510.4 474.9 512 485.3 512 495.7L512 497.3C512 523.1 491.1 544 465.3 544C453.8 544 442.4 542.6 431.3 539.8L343.3 517.8C328 514 312 514 296.7 517.8L208.7 539.8C197.6 542.6 186.2 544 174.7 544C148.9 544 128 523.1 128 497.3L128 495.7C128 485.3 129.6 474.9 133.2 465.2zM485.8 346.7C461.3 332.7 456.7 295 475.6 262.6C494.5 230.2 529.6 215.3 554.1 229.3C578.6 243.3 583.2 281 564.3 313.4C545.4 345.8 510.3 360.7 485.8 346.7zM374.1 253.7C341.8 243.1 327.2 199.8 341.5 156.9C355.8 114 393.6 87.8 425.9 98.4C458.2 109 472.8 152.3 458.5 195.2C444.2 238.1 406.4 264.3 374.1 253.7z', '64 96 512 448', 22, 19.25) },
+      { n: 'Comida y bebida', cat: 2, ...F('M320 176C311.2 176 304 168.8 304 160L304 144C304 99.8 339.8 64 384 64L400 64C408.8 64 416 71.2 416 80L416 96C416 140.2 380.2 176 336 176L320 176zM96 352C96 275.7 131.7 192 208 192C235.3 192 267.7 202.3 290.7 211.3C309.5 218.6 330.6 218.6 349.4 211.3C372.3 202.4 404.8 192 432.1 192C508.4 192 544.1 275.7 544.1 352C544.1 480 464.1 576 384.1 576C367.6 576 346 569.4 332.6 564.7C324.5 561.9 315.7 561.9 307.6 564.7C294.2 569.4 272.6 576 256.1 576C176.1 576 96.1 480 96.1 352z', '96 64 448 512', 19.25, 22) },
+      { n: 'Actividad', cat: 4, ...F('M156.7 122.8L235.1 201.2C253.3 176.2 264 145.3 264 112C264 97.9 262.1 84.3 258.5 71.4C220.5 80.8 185.9 98.6 156.7 122.8zM122.8 156.7C98.6 185.9 80.8 220.5 71.4 258.5C84.3 262.1 97.9 264 112 264C145.3 264 176.1 253.3 201.2 235.1L122.8 156.7zM320 64C315.4 64 310.8 64.1 306.3 64.4C310 79.7 312 95.6 312 112C312 158.6 296.1 201.4 269.4 235.4L320 286.1L483.3 122.8C438.9 86.1 382.1 64 320 64zM112 312C95.6 312 79.6 310 64.4 306.3C64.2 310.8 64 315.4 64 320C64 382.1 86.1 438.9 122.8 483.3L286.1 320L235.4 269.4C201.4 296.1 158.6 312 112 312zM575.6 333.7C575.8 329.2 576 324.6 576 320C576 257.9 553.9 201.1 517.2 156.7L353.9 320L404.6 370.6C438.6 343.9 481.5 328 528 328C544.4 328 560.4 330 575.6 333.7zM568.5 381.5C555.6 377.9 542 376 527.9 376C494.6 376 463.8 386.7 438.7 404.9L517.1 483.3C541.3 454.1 559.1 419.5 568.5 381.5zM404.9 438.8C386.7 463.8 376 494.7 376 528C376 542.1 377.9 555.7 381.5 568.6C419.5 559.2 454.1 541.4 483.3 517.2L404.9 438.8zM370.6 404.5L320 353.9L156.7 517.2C201 553.9 257.9 576 320 576C324.6 576 329.2 575.9 333.7 575.6C330 560.3 328 544.4 328 528C328 481.4 343.9 438.6 370.6 404.6z', '64 64 512 512', 22, 22) },
+      { n: 'Viajes y lugares', cat: 3, ...F('M199.2 181.4L173.1 256L466.9 256L440.8 181.4C436.3 168.6 424.2 160 410.6 160L229.4 160C215.8 160 203.7 168.6 199.2 181.4zM103.6 260.8L138.8 160.3C152.3 121.8 188.6 96 229.4 96L410.6 96C451.4 96 487.7 121.8 501.2 160.3L536.4 260.8C559.6 270.4 576 293.3 576 320L576 512C576 529.7 561.7 544 544 544L512 544C494.3 544 480 529.7 480 512L480 480L160 480L160 512C160 529.7 145.7 544 128 544L96 544C78.3 544 64 529.7 64 512L64 320C64 293.3 80.4 270.4 103.6 260.8zM192 368C192 350.3 177.7 336 160 336C142.3 336 128 350.3 128 368C128 385.7 142.3 400 160 400C177.7 400 192 385.7 192 368zM480 400C497.7 400 512 385.7 512 368C512 350.3 497.7 336 480 336C462.3 336 448 350.3 448 368C448 385.7 462.3 400 480 400z', '64 96 512 448', 22, 19.25) },
+      { n: 'Objetos', cat: 5, ...F('M420.9 448C428.2 425.7 442.8 405.5 459.3 388.1C492 353.7 512 307.2 512 256C512 150 426 64 320 64C214 64 128 150 128 256C128 307.2 148 353.7 180.7 388.1C197.2 405.5 211.9 425.7 219.1 448L420.8 448zM416 496L224 496L224 512C224 556.2 259.8 592 304 592L336 592C380.2 592 416 556.2 416 512L416 496zM312 176C272.2 176 240 208.2 240 248C240 261.3 229.3 272 216 272C202.7 272 192 261.3 192 248C192 181.7 245.7 128 312 128C325.3 128 336 138.7 336 152C336 165.3 325.3 176 312 176z', '128 64 384 528', 16, 22) },
+      { n: 'Símbolos', cat: 6, ...F('M238.9 336C249.6 336 259.6 341.3 265.5 350.2L277.3 368L304 368C330.5 368 352 389.5 352 416L352 528C352 554.5 330.5 576 304 576L112 576C85.5 576 64 554.5 64 528L64 416C64 389.5 85.5 368 112 368L138.7 368L150.5 350.2C156.4 341.3 166.4 336 177.1 336L238.8 336zM517.5 324C523.1 319.1 531.4 318.7 537.4 323.1C543.4 327.5 545.7 335.5 542.7 342.4L504.3 432L560 432C566.7 432 572.6 436.1 575 442.4C577.4 448.7 575.6 455.7 570.6 460.1L442.6 572.1C437 577 428.7 577.4 422.7 573C416.7 568.6 414.4 560.6 417.4 553.7L455.9 464L400.1 464C393.4 464 387.5 459.9 385.1 453.6C382.7 447.3 384.5 440.3 389.5 435.9L517.5 323.9zM208 424C181.5 424 160 445.5 160 472C160 498.5 181.5 520 208 520C234.5 520 256 498.5 256 472C256 445.5 234.5 424 208 424zM547.8 64.4C554.3 63.3 560.9 64.8 566.3 68.8C572.4 73.3 576 80.5 576 88L576 240L575.7 244.9C572.4 269.1 545.2 288 512 288C476.7 288 448 266.5 448 240C448 213.5 476.7 192 512 192C517.5 192 522.9 192.6 528 193.6L528 144.3L416 177.9L416 288.1L415.7 293C412.4 317.2 385.2 336.1 352 336.1C316.7 336.1 288 314.6 288 288.1C288 261.6 316.7 240.1 352 240.1C357.5 240.1 362.9 240.7 368 241.7L368 136C368 125.4 375 116 385.1 113L545.1 65L547.8 64.4zM252.9 64C290 64 320 94 320 131.1L320 137.2C320 193.3 244.8 249.3 209.7 272.5C198.9 279.6 185.1 279.6 174.3 272.5C139.2 249.4 64 193.3 64 137.2L64 131.1C64 94 94 64 131.1 64C152.2 64 172 73.9 184.7 90.8L192 100.6L199.3 90.8C212 73.9 231.8 64 252.9 64z', '64 64 512 512', 22, 22) },
+      { n: 'Banderas', cat: 7, ...F('M160 96C160 78.3 145.7 64 128 64C110.3 64 96 78.3 96 96L96 544C96 561.7 110.3 576 128 576C145.7 576 160 561.7 160 544L160 422.4L222.7 403.6C264.6 391 309.8 394.9 348.9 414.5C391.6 435.9 441.4 438.5 486.1 421.7L523.2 407.8C535.7 403.1 544 391.2 544 377.8L544 130.1C544 107.1 519.8 92.1 499.2 102.4L487.4 108.3C442.5 130.8 389.6 130.8 344.6 108.3C308.2 90.1 266.3 86.5 227.4 98.2L160 118.4L160 96z', '96 64 448 512', 19.25, 22) }
+    ];
+    return this._emoIco;
+  }
+
+  // Índice emoji -> nombre, para los title="" y para validar lo que
+  // viene de localStorage antes de inyectarlo como HTML.
+  //
+  // 23 nombres del catálogo vienen ya con entidades HTML dentro
+  // («persona haciendo el gesto de &quot;no&quot;», los ideogramas
+  // japoneses...). Si no se deshacen aquí, _emoEsc las escapa otra
+  // vez y el tooltip enseña &quot; en crudo. Se decodifica una lista
+  // cerrada y en una sola pasada; volver a escapar después es lo que
+  // mantiene esto a salvo.
+  _emoNombres() {
+    if (this._emoNom) return this._emoNom;
+    const ENT = { '&quot;': '"', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&#39;': "'" };
+    const limpio = (t) => String(t).replace(/&(?:quot|amp|lt|gt|#39);/g, (m) => ENT[m]);
+    const m = Object.create(null);
+    (window.RN_EMOJIS || []).forEach(c => c.e.forEach(e => { m[e[0]] = limpio(e[1]); }));
+    this._emoNom = m;
+    return m;
+  }
+
+  // Búsqueda sin tildes en los dos sentidos. El catálogo mezcla las
+  // dos formas («árbol», «café», pero «mexico» sin acento), así que
+  // plegar sólo la consulta no bastaría: se pliegan ambos lados. El
+  // índice se cachea porque normalizar 1.898 cadenas en cada tecla
+  // sería absurdo.
+  _emoPlegar(t) {
+    return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+  _emoIndiceBusqueda() {
+    if (this._emoBus) return this._emoBus;
+    const out = [];
+    (window.RN_EMOJIS || []).forEach(c => c.e.forEach(e => out.push([e[0], this._emoPlegar(e[2])])));
+    this._emoBus = out;
+    return out;
+  }
+
+  _emoClaveFrec() { return 'rn_emojis_frecuentes_v1_' + ((this.USER && this.USER.id) || 0); }
+  _emoCuenta() {
+    try {
+      const o = JSON.parse(localStorage.getItem(this._emoClaveFrec()) || '{}');
+      return (o && typeof o === 'object') ? o : {};
+    } catch (e) { return {}; }
+  }
+  // Los 16 más usados. El filtro contra el catálogo no es cosmético:
+  // es lo que hace seguro inyectar esta lista como HTML, porque nada
+  // que no sea un emoji ya presente en js/emojis.js llega a la rejilla.
+  _emoFrecuentes() {
+    const cuenta = this._emoCuenta();
+    const nombres = this._emoNombres();
+    const out = Object.keys(cuenta)
+      .filter(e => nombres[e] !== undefined && cuenta[e] > 0)
+      .sort((a, b) => cuenta[b] - cuenta[a] || a.localeCompare(b))
+      .slice(0, 16);
+    // Al estrenar la aplicación no hay historial; se completa con los
+    // habituales para que la primera pestaña no salga vacía.
+    for (const e of ['👍', '❤️', '🎉', '😂', '😍', '🔥', '👏', '🙌', '😮', '😢', '🤔', '✅', '🙏', '💯', '😅', '🥳']) {
+      if (out.length >= 16) break;
+      if (out.indexOf(e) < 0 && nombres[e] !== undefined) out.push(e);
+    }
+    return out;
+  }
+  _emoSumar(emoji) {
+    try {
+      const o = this._emoCuenta();
+      o[emoji] = (o[emoji] || 0) + 1;
+      localStorage.setItem(this._emoClaveFrec(), JSON.stringify(o));
+    } catch (e) { /* modo privado o cuota llena: no pasa nada */ }
+    this._emoHtml = null;   // la primera sección cambió
+  }
+
+  _emoEsc(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  _emoSeccion(i, titulo, lista, nombres) {
+    const G = Component.EMO;
+    const alto = G.CAB + Math.ceil(lista.length / G.COLS) * G.CELDA;
+    const h = ['<section id="rnEmoSec' + i + '" style="content-visibility:auto;contain-intrinsic-size:auto ' +
+               alto + 'px"><p>' + this._emoEsc(titulo) + '</p><div class="g">'];
+    for (const e of lista) {
+      h.push('<button type="button" data-e="' + this._emoEsc(e) + '" title="' +
+             this._emoEsc(nombres[e] || '') + '">' + this._emoEsc(e) + '</button>');
+    }
+    h.push('</div></section>');
+    return h.join('');
+  }
+  // Las nueve secciones seguidas, en HTML plano y cacheado. Pasarlas
+  // por el sc-for costaría 201 ms en cada render de la aplicación
+  // (medido: 1.898 emojis x el clon del objeto de ~291 claves que
+  // walkFor hace por elemento), y aquí no dependen del estado.
+  _emoHTMLTodo() {
+    if (this._emoHtml) return this._emoHtml;
+    const CAT = window.RN_EMOJIS || [];
+    const nombres = this._emoNombres();
+    const partes = [];
+    this._emoIconos().forEach((ic, i) => {
+      const lista = ic.cat < 0
+        ? this._emoFrecuentes()
+        : (CAT[ic.cat] ? CAT[ic.cat].e.map(e => e[0]) : []);
+      partes.push(this._emoSeccion(i, ic.n, lista, nombres));
+    });
+    this._emoHtml = partes.join('');
+    return this._emoHtml;
+  }
+  _emoHTMLBusqueda(q) {
+    const out = [];
+    for (const [emo, txt] of this._emoIndiceBusqueda()) {
+      if (txt.indexOf(q) >= 0) { out.push(emo); if (out.length >= 180) break; }
+    }
+    if (!out.length) return '<p class="rn-emovacio">Ningún emoji coincide.</p>';
+    return this._emoSeccion(0, 'Resultados', out, this._emoNombres());
+  }
+
+  // Rellena la rejilla e indexa los offsets de cada sección. Se llama
+  // desde componentDidUpdate, así que tiene que ser idempotente: sólo
+  // toca el DOM cuando cambia lo que hay que enseñar (si reinyectara
+  // en cada render se perdería la posición del scroll).
+  _emoMontar() {
+    const g = document.getElementById('rnEmoGrid');
+    if (!g) { this._emoOffs = null; this._emoIrA = null; return; }
+    const q = this._emoPlegar((this.state.emoQ || '').trim());
+    const clave = q ? 'q ' + q : 'cat';
+    if (g.getAttribute('data-rn') !== clave) {
+      g.innerHTML = q ? this._emoHTMLBusqueda(q) : this._emoHTMLTodo();
+      g.setAttribute('data-rn', clave);
+      g.scrollTop = 0;
+      this._emoOffs = null;
+    }
+    if (!this._emoOffs) {
+      this._emoOffs = Array.prototype.map.call(g.querySelectorAll('section'), s => s.offsetTop);
+    }
+    if (this._emoIrA != null) {
+      const t = this._emoOffs[this._emoIrA];
+      this._emoIrA = null;
+      // Salto seco, no scroll suave: de una categoría a otra hay miles
+      // de píxeles y animarlos desfilaría por todas las de en medio.
+      // Además el scroll suave no se ejecuta con "reducir movimiento"
+      // ni en una pestaña en segundo plano, y ahí el botón no haría
+      // nada. Lo que sí se desliza es el subrayado, con su transition.
+      if (t != null) g.scrollTop = t;
+    }
+  }
+  _emoCerrar() { this.setState({ emoPicker: null, emoDi: null, emoQ: '' }); }
+  _emoIr(i) {
+    this._emoIrA = i;
+    this.setState({ emoCat: i, emoQ: '' });
+  }
+  // Coloca el panel pegado al botón, sin salirse de la ventana.
+  _emoAbrir(di, uid, btn) {
+    const G = Component.EMO;
+    const r = btn.getBoundingClientRect();
+    const alto = Math.min(G.ALTO, window.innerHeight - 24);
+    // En un teléfono de 375 px un panel de 400 dejaría fuera de la
+    // pantalla la última columna de emojis, y con html,body en
+    // overflow:hidden no habría manera de llegar hasta ella.
+    const ancho = Math.min(G.ANCHO, window.innerWidth - 16);
+    let x = r.left + r.width / 2 - ancho / 2;
+    x = Math.max(8, Math.min(x, window.innerWidth - ancho - 8));
+    let y = r.bottom + 8;
+    if (y + alto > window.innerHeight - 8) y = r.top - 8 - alto;   // se abre hacia arriba
+    // Y pase lo que pase, dentro de la ventana: si el botón queda a
+    // medias del borde no se puede dejar el panel medio fuera.
+    y = Math.max(8, Math.min(y, window.innerHeight - alto - 8));
+    this.setState({
+      emoPicker: uid, emoDi: di, emoQ: '', emoCat: 0,
+      emoPos: { x: Math.round(x), y: Math.round(y), w: Math.round(ancho), h: alto }
+    });
   }
   mutateItem(di, uid, fn) {
     const days = this.state.dayItems.map(a => a.map(x => ({ ...x })));
@@ -1046,8 +1511,11 @@ class Component extends DCLogic {
     return frases.join(' ');
   }
 
-  openDetail(id, tab) {
-    this.setState({ detail: id, detailTab: tab || 'about', detailLoading: true, layersOpen: false, mapSearchOpen: false,
+  // 'desde' recuerda con qué lista se abrió la ficha: la del día del
+  // itinerario o la de resultados. Un lugar puede estar en las dos, y
+  // sin esto el paginador no sabría cuál recorrer.
+  openDetail(id, tab, desde) {
+    this.setState({ detail: id, detailFrom: desde || null, detailTab: tab || 'about', detailLoading: true, layersOpen: false, mapSearchOpen: false,
       rvwOpen: {}, rvwShown: 5, detHoursOpen: false });
     clearTimeout(this._dt);
     const p = this.place(id);
@@ -1073,11 +1541,257 @@ class Component extends DCLogic {
       this._dt = setTimeout(() => this.setState({ detailLoading: false }), 550);
     }
   }
+  // ════════════ Horario y coste de un lugar ════════════
+  // Horas cada media hora, de 0:00 a 23:30.
+  static get HORAS() {
+    const out = [];
+    for (let h = 0; h < 24; h++) { out.push(h + ':00'); out.push(h + ':30'); }
+    return out;
+  }
+  // Divisas: las mismas de includes/currency.php, que es quien valida
+  // en el servidor.
+  static get MONEDAS() {
+    return [
+      { c: 'MXN', s: '$', n: 'Peso mexicano' }, { c: 'USD', s: '$', n: 'Dólar estadounidense' },
+      { c: 'EUR', s: '€', n: 'Euro' }, { c: 'GBP', s: '£', n: 'Libra esterlina' },
+      { c: 'CAD', s: 'C$', n: 'Dólar canadiense' }, { c: 'JPY', s: '¥', n: 'Yen japonés' },
+      { c: 'BRL', s: 'R$', n: 'Real brasileño' }, { c: 'COP', s: '$', n: 'Peso colombiano' },
+      { c: 'ARS', s: '$', n: 'Peso argentino' }
+    ];
+  }
+  static get PALETA() {
+    return ['#E14434', '#E8722B', '#F2C230', '#5DBB63',
+            '#2BB3A3', '#2D7FF9', '#6F42C1', '#F59B7C',
+            '#E8609B', '#E8365D', '#C64BD1', '#8B5CF6',
+            '#2D9CDB', '#12A47A', '#41A24D', '#38BDF8'];
+  }
+
+  // Categorías del gasto, con los iconos de Font Awesome. El viewBox
+  // va recortado al glifo y el eje mayor mide 20 px, igual que en las
+  // pestañas del selector de emojis.
+  _gcats() {
+    if (this._gcatsCache) return this._gcatsCache;
+    const F = (t, vb, w, h, d) => ({ v: t.toLowerCase(), t, vb, w: String(w), h: String(h), d });
+    this._gcatsCache = [
+      F('Actividad', '32 128 576 384', 20, 13.33, 'M96 128C60.7 128 32 156.7 32 192L32 256C32 264.8 39.4 271.7 47.7 274.6C66.5 281.1 80 299 80 320C80 341 66.5 358.9 47.7 365.4C39.4 368.3 32 375.2 32 384L32 448C32 483.3 60.7 512 96 512L544 512C579.3 512 608 483.3 608 448L608 384C608 375.2 600.6 368.3 592.3 365.4C573.5 358.9 560 341 560 320C560 299 573.5 281.1 592.3 274.6C600.6 271.7 608 264.8 608 256L608 192C608 156.7 579.3 128 544 128L96 128zM448 400L448 240L192 240L192 400L448 400zM144 224C144 206.3 158.3 192 176 192L464 192C481.7 192 496 206.3 496 224L496 416C496 433.7 481.7 448 464 448L176 448C158.3 448 144 433.7 144 416L144 224z'),
+      F('Comida', '80 64 464 512', 18.13, 20, 'M127.9 78.4C127.1 70.2 120.2 64 112 64C103.8 64 96.9 70.2 96 78.3L81.9 213.7C80.6 219.7 80 225.8 80 231.9C80 277.8 115.1 315.5 160 319.6L160 544C160 561.7 174.3 576 192 576C209.7 576 224 561.7 224 544L224 319.6C268.9 315.5 304 277.8 304 231.9C304 225.8 303.4 219.7 302.1 213.7L287.9 78.3C287.1 70.2 280.2 64 272 64C263.8 64 256.9 70.2 256.1 78.4L242.5 213.9C241.9 219.6 237.1 224 231.4 224C225.6 224 220.8 219.6 220.2 213.8L207.9 78.6C207.2 70.3 200.3 64 192 64C183.7 64 176.8 70.3 176.1 78.6L163.8 213.8C163.3 219.6 158.4 224 152.6 224C146.8 224 142 219.6 141.5 213.9L127.9 78.4zM512 64C496 64 384 96 384 240L384 352C384 387.3 412.7 416 448 416L480 416L480 544C480 561.7 494.3 576 512 576C529.7 576 544 561.7 544 544L544 96C544 78.3 529.7 64 512 64z'),
+      F('Bebidas', '160 64 320 544', 11.76, 20, 'M224 64C208.7 64 195.6 74.8 192.6 89.7L163.2 237C161.1 247.5 160 258.2 160 269L160 272C160 349.4 215 414 288 428.8L288 544L224 544C206.3 544 192 558.3 192 576C192 593.7 206.3 608 224 608L416 608C433.7 608 448 593.7 448 576C448 558.3 433.7 544 416 544L352 544L352 428.8C425 414 480 349.4 480 272L480 269C480 258.3 478.9 247.6 476.8 237L447.4 89.7C444.4 74.8 431.3 64 416 64L224 64zM225.9 249.6L250.2 128L389.8 128L414.1 249.6C415.4 256 416 262.5 416 269L416 272C416 325 373 368 320 368C267 368 224 325 224 272L224 269C224 262.5 224.6 256 225.9 249.6z'),
+      F('Alojamiento', '32 96 576 448', 20, 15.56, 'M64 96C81.7 96 96 110.3 96 128L96 352L320 352L320 224C320 206.3 334.3 192 352 192L512 192C565 192 608 235 608 288L608 512C608 529.7 593.7 544 576 544C558.3 544 544 529.7 544 512L544 448L96 448L96 512C96 529.7 81.7 544 64 544C46.3 544 32 529.7 32 512L32 128C32 110.3 46.3 96 64 96zM144 256C144 220.7 172.7 192 208 192C243.3 192 272 220.7 272 256C272 291.3 243.3 320 208 320C172.7 320 144 291.3 144 256z'),
+      F('Compras', '96 32 448 512', 17.5, 20, 'M256 144C256 108.7 284.7 80 320 80C355.3 80 384 108.7 384 144L384 192L256 192L256 144zM208 192L144 192C117.5 192 96 213.5 96 240L96 448C96 501 139 544 192 544L448 544C501 544 544 501 544 448L544 240C544 213.5 522.5 192 496 192L432 192L432 144C432 82.1 381.9 32 320 32C258.1 32 208 82.1 208 144L208 192zM232 240C245.3 240 256 250.7 256 264C256 277.3 245.3 288 232 288C218.7 288 208 277.3 208 264C208 250.7 218.7 240 232 240zM384 264C384 250.7 394.7 240 408 240C421.3 240 432 250.7 432 264C432 277.3 421.3 288 408 288C394.7 288 384 277.3 384 264z'),
+      F('Supermercado', '0 48 569 528', 20, 18.56, 'M24 48C10.7 48 0 58.7 0 72C0 85.3 10.7 96 24 96L69.3 96C73.2 96 76.5 98.8 77.2 102.6L129.3 388.9C135.5 423.1 165.3 448 200.1 448L456 448C469.3 448 480 437.3 480 424C480 410.7 469.3 400 456 400L200.1 400C188.5 400 178.6 391.7 176.5 380.3L171.4 352L475 352C505.8 352 532.2 330.1 537.9 299.8L568.9 133.9C572.6 114.2 557.5 96 537.4 96L124.7 96L124.3 94C119.5 67.4 96.3 48 69.2 48L24 48zM208 576C234.5 576 256 554.5 256 528C256 501.5 234.5 480 208 480C181.5 480 160 501.5 160 528C160 554.5 181.5 576 208 576zM432 576C458.5 576 480 554.5 480 528C480 501.5 458.5 480 432 480C405.5 480 384 501.5 384 528C384 554.5 405.5 576 432 576z'),
+      F('Coche', '64 96 512 448', 20, 17.5, 'M199.2 181.4L173.1 256L466.9 256L440.8 181.4C436.3 168.6 424.2 160 410.6 160L229.4 160C215.8 160 203.7 168.6 199.2 181.4zM103.6 260.8L138.8 160.3C152.3 121.8 188.6 96 229.4 96L410.6 96C451.4 96 487.7 121.8 501.2 160.3L536.4 260.8C559.6 270.4 576 293.3 576 320L576 512C576 529.7 561.7 544 544 544L512 544C494.3 544 480 529.7 480 512L480 480L160 480L160 512C160 529.7 145.7 544 128 544L96 544C78.3 544 64 529.7 64 512L64 320C64 293.3 80.4 270.4 103.6 260.8zM192 368C192 350.3 177.7 336 160 336C142.3 336 128 350.3 128 368C128 385.7 142.3 400 160 400C177.7 400 192 385.7 192 368zM480 400C497.7 400 512 385.7 512 368C512 350.3 497.7 336 480 336C462.3 336 448 350.3 448 368C448 385.7 462.3 400 480 400z'),
+      F('Gasolina', '80 64 496 512', 19.38, 20, 'M96 128C96 92.7 124.7 64 160 64L320 64C355.3 64 384 92.7 384 128L384 320L392 320C440.6 320 480 359.4 480 408L480 440C480 453.3 490.7 464 504 464C517.3 464 528 453.3 528 440L528 286C500.4 278.9 480 253.8 480 224L480 164.5L454.2 136.2C445.3 126.4 446 111.2 455.8 102.3C465.6 93.4 480.8 94.1 489.7 103.9L561.4 182.7C570.8 193 576 206.4 576 220.4L576 440C576 479.8 543.8 512 504 512C464.2 512 432 479.8 432 440L432 408C432 385.9 414.1 368 392 368L384 368L384 529.4C393.3 532.7 400 541.6 400 552C400 565.3 389.3 576 376 576L104 576C90.7 576 80 565.3 80 552C80 541.5 86.7 532.7 96 529.4L96 128zM160 144L160 240C160 248.8 167.2 256 176 256L304 256C312.8 256 320 248.8 320 240L320 144C320 135.2 312.8 128 304 128L176 128C167.2 128 160 135.2 160 144z'),
+      F('Vuelo', '36 80 572 480', 20, 16.78, 'M552 264C582.9 264 608 289.1 608 320C608 350.9 582.9 376 552 376L424.7 376L265.5 549.6C259.4 556.2 250.9 560 241.9 560L198.2 560C187.3 560 179.6 549.3 183 538.9L237.3 376L137.6 376L84.8 442C81.8 445.8 77.2 448 72.3 448L52.5 448C42.1 448 34.5 438.2 37 428.1L64 320L37 211.9C34.4 201.8 42.1 192 52.5 192L72.3 192C77.2 192 81.8 194.2 84.8 198L137.6 264L237.3 264L183 101.1C179.6 90.7 187.3 80 198.2 80L241.9 80C250.9 80 259.4 83.8 265.5 90.4L424.7 264L552 264z'),
+      F('Tren', '128 64 384 544', 14.12, 20, 'M128 160C128 107 171 64 224 64L416 64C469 64 512 107 512 160L512 416C512 456.1 487.4 490.5 452.5 504.8L506.4 568.5C515 578.6 513.7 593.8 503.6 602.3C493.5 610.8 478.3 609.6 469.8 599.5L395.8 512L244.5 512L170.5 599.5C161.9 609.6 146.8 610.9 136.7 602.3C126.6 593.7 125.3 578.6 133.9 568.5L187.8 504.8C152.6 490.5 128 456.1 128 416L128 160zM192 192L192 288C192 305.7 206.3 320 224 320L416 320C433.7 320 448 305.7 448 288L448 192C448 174.3 433.7 160 416 160L224 160C206.3 160 192 174.3 192 192zM320 448C337.7 448 352 433.7 352 416C352 398.3 337.7 384 320 384C302.3 384 288 398.3 288 416C288 433.7 302.3 448 320 448z'),
+      F('Cultura', '64 64 512 512', 20, 20, 'M302.7 69.1C313.2 62.3 326.8 62.3 337.3 69.1L561.3 213.1C573.2 220.8 578.7 235.4 574.7 249C570.7 262.6 558.2 272 544 272L512 272L512 480L563.2 518.4C571.3 524.4 576 533.9 576 544C576 561.7 561.7 576 544 576L96 576C78.3 576 64 561.7 64 544C64 533.9 68.7 524.4 76.8 518.4L128 480L128 480L128 272L96 272C81.8 272 69.3 262.6 65.3 249C61.3 235.4 66.8 220.7 78.7 213.1L302.7 69.1zM400 272L400 480L464 480L464 272L400 272zM288 480L352 480L352 272L288 272L288 480zM176 272L176 480L240 480L240 272L176 272z'),
+      F('Otro', '128 64 384 512', 15, 20, 'M439.4 96L448 96C483.3 96 512 124.7 512 160L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 160C128 124.7 156.7 96 192 96L200.6 96C211.6 76.9 232.3 64 256 64L384 64C407.7 64 428.4 76.9 439.4 96zM376 176C389.3 176 400 165.3 400 152C400 138.7 389.3 128 376 128L264 128C250.7 128 240 138.7 240 152C240 165.3 250.7 176 264 176L376 176zM320 312C336.1 312 349.2 325.1 349.2 341.2C349.2 349.9 346.1 355.1 342.3 358.9C337.8 363.3 331.6 366.4 325.5 368.4C310.6 373.4 296 387.7 296 407.9C296 421.2 306.7 431.9 320 431.9C331.5 431.9 341.2 423.8 343.5 412.9C362.7 405.8 397.2 386.6 397.2 341.1C397.2 298.5 362.6 263.9 320 263.9C277.4 263.9 242.8 298.5 242.8 341.1C242.8 354.4 253.5 365.1 266.8 365.1C280.1 365.1 290.8 354.4 290.8 341.1C290.8 325 303.9 311.9 320 311.9zM348 480C348 464.5 335.5 452 320 452C304.5 452 292 464.5 292 480C292 495.5 304.5 508 320 508C335.5 508 348 495.5 348 480z')
+    ];
+    return this._gcatsCache;
+  }
+  _itemPorUid(uid) {
+    const dias = this.state.dayItems || [];
+    for (let di = 0; di < dias.length; di++) {
+      const it = (dias[di] || []).find(x => x.uid === uid);
+      if (it) return { di, it };
+    }
+    return null;
+  }
+  _parcheaItem(uid, patch) {
+    const dias = this.state.dayItems.map(a => a.map(x => ({ ...x })));
+    for (const arr of dias) {
+      const it = arr.find(x => x.uid === uid);
+      if (it) { Object.assign(it, patch); break; }
+    }
+    this.setState({ dayItems: dias });
+  }
+
+  // ── Horario ──
+  _horaAbrir(uid, btn) {
+    const ref = this._itemPorUid(uid);
+    if (!ref) return;
+    const r = btn.getBoundingClientRect();
+    const A = 312, H = 330;
+    let x = Math.max(8, Math.min(r.left, window.innerWidth - A - 8));
+    let y = r.bottom + 8;
+    if (y + H > window.innerHeight - 8) y = r.top - 8 - H;
+    y = Math.max(8, Math.min(y, window.innerHeight - H - 8));
+    this.setState({
+      horaMenu: { uid, x: Math.round(x), y: Math.round(y) },
+      hIni: ref.it.hora || '', hFin: ref.it.horaFin || '', hCual: 'ini'
+    });
+  }
+  _horaCerrar() { this.setState({ horaMenu: null }); }
+  _horaElegir(v) {
+    if (this.state.hCual === 'fin') this.setState({ hFin: v });
+    // Elegir el inicio salta al final: es el orden natural y ahorra
+    // un clic en el caso normal.
+    else this.setState({ hIni: v, hCual: 'fin' });
+  }
+  _horaAplicar(ini, fin) {
+    const m = this.state.horaMenu;
+    if (!m) return;
+    const ref = this._itemPorUid(m.uid);
+    this._parcheaItem(m.uid, { hora: ini, horaFin: fin, horario: ini ? (fin ? ini + ' - ' + fin : ini) : '' });
+    if (ref && ref.it.sid) this._sync('plan_items.php', { action: 'update', id: ref.it.sid, hora: ini, hora_fin: fin });
+    this._horaCerrar();
+  }
+
+  // ── Gasto ──
+  _gastoAbrir(uid) {
+    const ref = this._itemPorUid(uid);
+    if (!ref) return;
+    const it = ref.it;
+    // Se trabaja sobre un borrador: nada cambia hasta pulsar Guardar.
+    const rep = {};
+    (it.reparto || []).forEach(r => { rep[r.uid] = { monto: r.monto, color: r.color || '' }; });
+    this.setState({
+      gastoMenu: { uid },
+      gMonto: it.costo > 0 ? String(it.costo) : '',
+      gMoneda: it.moneda || 'MXN', gCat: it.gastoCat || '', gDesc: it.gastoDesc || '',
+      gModo: it.gastoModo || 'no', gRep: rep,
+      gMonOpen: false, gCatOpen: false, gModoOpen: false, gDonaOpen: true, gColorUid: null
+    });
+  }
+  _gastoCerrar() { this.setState({ gastoMenu: null, gMonOpen: false, gCatOpen: false, gModoOpen: false, gColorUid: null }); }
+  _gastoNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; }
+  // Reparte a partes iguales dejando el sobrante en el primero: 100
+  // entre 3 son 33.33 tres veces y falta un céntimo; si no se le
+  // asigna a alguien, el total deja de cuadrar.
+  _gastoEquitativo(uids, total) {
+    const out = {};
+    if (!uids.length) return out;
+    const cent = Math.round(total * 100);
+    const base = Math.floor(cent / uids.length);
+    let resto = cent - base * uids.length;
+    uids.forEach((u, i) => { out[u] = (base + (i < resto ? 1 : 0)) / 100; });
+    return out;
+  }
+  _gastoRecalcula(rep, total) {
+    const uids = Object.keys(rep).map(Number);
+    const montos = this._gastoEquitativo(uids, total);
+    const out = {};
+    uids.forEach((u, i) => { out[u] = { monto: montos[u], color: (rep[u] && rep[u].color) || Component.PALETA[i % 16] }; });
+    return out;
+  }
+  _gastoModoCambia(modo) {
+    if (modo === 'no') { this.setState({ gModo: modo, gRep: {}, gModoOpen: false, gColorUid: null }); return; }
+    const s = this.state;
+    let rep = { ...s.gRep };
+    if (modo === 'todos') {
+      rep = {};
+      this.MIEMBROS.forEach((m, i) => {
+        const v = s.gRep[m.uid];
+        rep[m.uid] = { monto: 0, color: (v && v.color) || Component.PALETA[i % 16] };
+      });
+    } else if (!Object.keys(rep).length) {
+      const yo = Number(this.USER.id) || (this.MIEMBROS[0] || {}).uid;
+      if (yo) rep[yo] = { monto: 0, color: Component.PALETA[0] };
+    }
+    this.setState({ gModo: modo, gRep: this._gastoRecalcula(rep, this._gastoNum(s.gMonto)), gModoOpen: false });
+  }
+  _gastoToggleMiembro(uid) {
+    const rep = { ...this.state.gRep };
+    if (rep[uid]) delete rep[uid];
+    else rep[uid] = { monto: 0, color: Component.PALETA[Object.keys(rep).length % 16] };
+    this.setState({ gRep: this._gastoRecalcula(rep, this._gastoNum(this.state.gMonto)), gColorUid: null });
+  }
+  _gastoGuardar() {
+    const m = this.state.gastoMenu;
+    if (!m) return;
+    const s = this.state;
+    const ref = this._itemPorUid(m.uid);
+    const total = this._gastoNum(s.gMonto);
+    const reparto = Object.keys(s.gRep).map(u => ({ usuario_id: Number(u), monto: s.gRep[u].monto, color: s.gRep[u].color }));
+    this._parcheaItem(m.uid, {
+      costo: total, moneda: s.gMoneda, gastoCat: s.gCat, gastoDesc: s.gDesc, gastoModo: s.gModo,
+      reparto: reparto.map(r => ({ uid: r.usuario_id, monto: r.monto, color: r.color }))
+    });
+    if (ref && ref.it.sid) {
+      this._sync('plan_items.php', {
+        action: 'update', id: ref.it.sid, precio: total > 0 ? total : '', moneda: s.gMoneda,
+        gasto_cat: s.gCat, gasto_desc: s.gDesc, gasto_modo: s.gModo, reparto: reparto
+      });
+    }
+    this._gastoCerrar();
+  }
+  _gastoBorrar() {
+    const m = this.state.gastoMenu;
+    if (!m) return;
+    const ref = this._itemPorUid(m.uid);
+    this._parcheaItem(m.uid, { costo: 0, gastoCat: '', gastoDesc: '', gastoModo: 'no', reparto: [] });
+    if (ref && ref.it.sid) {
+      this._sync('plan_items.php', { action: 'update', id: ref.it.sid, precio: '', gasto_cat: '', gasto_desc: '', gasto_modo: 'no', reparto: [] });
+    }
+    this._gastoCerrar();
+  }
+
+  // ════════════ Añadir un lugar al plan ════════════
+  // Abre el menú de días anclado al botón. Antes el botón añadía
+  // directamente con dia = 0 ("guardado sin asignar"), que el
+  // servidor acepta pero que ninguna pantalla enseña: el lugar se
+  // guardaba de verdad y no aparecía en ninguna parte.
+  _addAbrir(id, btn) {
+    if (this.state.addMenu && this.state.addMenu.id === id) { this._addCerrar(); return; }
+    const r = btn.getBoundingClientRect();
+    const ANCHO = 200;
+    const alto = 12 + this._addOpciones(id).length * 38;
+    let x = Math.min(Math.max(8, r.right - ANCHO), window.innerWidth - ANCHO - 8);
+    let y = r.bottom + 6;
+    if (y + alto > window.innerHeight - 8) y = r.top - 6 - alto;
+    y = Math.max(8, Math.min(y, window.innerHeight - alto - 8));
+    this.setState({ addMenu: { id, x: Math.round(x), y: Math.round(y) } });
+  }
+  _addCerrar() { this.setState({ addMenu: null }); }
+  // Un día del itinerario por fila, con su color. No se ofrece
+  // "Lugares para visitar": es el dia = 0 que no tiene dónde verse.
+  _addOpciones(id) {
+    const diActual = this._addDiaDe(id);
+    const opts = this.DAYS.map((d, i) => ({
+      t: d.label, color: d.color, di: i, esDia: true, esQuitar: false,
+      cls: diActual === i ? 'on' : ''
+    }));
+    if (diActual !== null) opts.push({ t: 'Quitar del plan', color: '', di: -1, esDia: false, esQuitar: true, cls: 'rn-addquitar' });
+    return opts;
+  }
+  // En qué día está ya este lugar, o null. Se busca por place_id
+  // porque es lo que comparten Explorar, la ficha del mapa y el item.
+  _addDiaDe(id) {
+    const dias = this.state.dayItems || [];
+    for (let di = 0; di < dias.length; di++) {
+      for (const it of (dias[di] || [])) { if (it.pid && it.pid === id) return di; }
+    }
+    return null;
+  }
+  _addElegir(id, di) {
+    this._addCerrar();
+    if (di < 0) { this.toggleAdd(id); return; }        // quitar
+    const actual = this._addDiaDe(id);
+    if (actual === di) return;                          // ya está ahí
+    if (actual === null) { this.toggleAdd(id, di + 1); return; }
+    // Ya estaba en otro día: MOVER, no volver a añadir. Sin esto se
+    // creaba una fila nueva en plan_items y la vieja quedaba huérfana.
+    const dias = this.state.dayItems.map(a => [...a]);
+    const it = (dias[actual] || []).find(x => x.pid === id);
+    if (!it) return;
+    dias[actual] = dias[actual].filter(x => x !== it);
+    dias[di] = [...dias[di], it];
+    this.setState({ dayItems: dias, justAdded: id });
+    clearTimeout(this._ja); this._ja = setTimeout(() => this.setState({ justAdded: null }), 900);
+    if (it.sid) this._sync('plan_items.php', { action: 'move', id: it.sid, dia: di + 1, orden: dias[di].length - 1 });
+    this._reproject();
+  }
   toggleAdd(id, day) {
     const a = { ...this.state.added };
     if (a[id] && day === undefined) {
-      // Quitar del plan: eliminar en servidor el item cuyo place se agregó
-      const sid = this._addedSid ? this._addedSid[id] : null;
+      // Quitar del plan: eliminar en servidor el item cuyo place se
+      // agregó. Se busca primero en el itinerario porque _addedSid
+      // puede haber quedado desfasado tras un borrado o un movimiento.
+      let sid = null;
+      for (const arr of (this.state.dayItems || [])) {
+        for (const x of arr) { if (x.pid && x.pid === id && x.sid) { sid = x.sid; break; } }
+        if (sid) break;
+      }
+      if (!sid) sid = this._addedSid ? this._addedSid[id] : null;
       if (sid) {
         this._sync('plan_items.php', { action: 'del', id: sid });
         const days = this.state.dayItems.map(arr => arr.filter(x => x.sid !== sid));
@@ -1170,6 +1884,15 @@ class Component extends DCLogic {
     this._esc = (e) => {
       if (e.key !== 'Escape') return;
       const s = this.state;
+      if (s.gastoMenu) {
+        if (s.gMonOpen || s.gCatOpen || s.gModoOpen) { this.setState({ gMonOpen: false, gCatOpen: false, gModoOpen: false }); return; }
+        if (s.gColorUid != null) { this.setState({ gColorUid: null }); return; }
+        this._gastoCerrar(); return;
+      }
+      if (s.horaMenu) { this._horaCerrar(); return; }
+      if (s.emoPicker) { this._emoCerrar(); return; }
+      if (s.addMenu) { this._addCerrar(); return; }
+      if (s.modoMenu) { this.setState({ modoMenu: null }); return; }
       if (s.newListMenu) { this.setState({ newListMenu: false }); return; }
       if (s.userMenu || s.catOpen || s.addMenu !== null || s.dayMenu !== null) { this.setState({ userMenu: false, catOpen: false, addMenu: null, dayMenu: null }); return; }
       if (s.catAllOpen) { this.setState({ catAllOpen: false }); return; }
@@ -1221,8 +1944,157 @@ class Component extends DCLogic {
     const s = this.state;
     const V = {};
     V.noop = (e) => { if (e && e.preventDefault) e.preventDefault(); };
-    V.anyMenu = s.userMenu || s.catOpen || s.addMenu !== null || s.dayMenu !== null || s.listMenu !== null;
-    V.closeMenus = () => this.setState({ userMenu: false, catOpen: false, addMenu: null, dayMenu: null, listMenu: null });
+    // addMenu queda FUERA: tiene velo propio en la raíz. Mientras
+    // estuvo aquí, el velo global (z-index:450) se pintaba encima del
+    // menú —atrapado en el contexto de apilado z-index:45 de Explorar—
+    // y se comía el clic sobre el día.
+    V.anyMenu = s.userMenu || s.catOpen || s.dayMenu !== null || s.listMenu !== null;
+    V.closeMenus = () => this.setState({ userMenu: false, catOpen: false, dayMenu: null, listMenu: null });
+    // ── Horario del lugar ──
+    V.horaOn = !!s.horaMenu;
+    V.horaX = (s.horaMenu ? s.horaMenu.x : 0) + 'px';
+    V.horaY = (s.horaMenu ? s.horaMenu.y : 0) + 'px';
+    V.horaClose = () => this._horaCerrar();
+    V.horaIniTxt = s.hIni || 'Elegir';
+    V.horaFinTxt = s.hFin || 'Elegir';
+    V.horaIniCol = s.hIni ? '#212529' : '#8b969d';
+    V.horaFinCol = s.hFin ? '#212529' : '#8b969d';
+    V.horaIniBg = s.hCual === 'ini' ? '#E9EFF6' : '#F1F3F5';
+    V.horaFinBg = s.hCual === 'fin' ? '#E9EFF6' : '#F1F3F5';
+    V.horaPickIni = () => this.setState({ hCual: 'ini' });
+    V.horaPickFin = () => this.setState({ hCual: 'fin' });
+    const horaSel = s.hCual === 'fin' ? s.hFin : s.hIni;
+    V.horaOpts = Component.HORAS.map(h => ({
+      v: h, t: h, cls: h === horaSel ? 'on' : '', pick: () => this._horaElegir(h)
+    }));
+    V.horaBorrar = () => this._horaAplicar('', '');
+    V.horaGuardar = () => this._horaAplicar(s.hIni || '', s.hIni ? (s.hFin || '') : '');
+
+    // ── Gasto del lugar ──
+    V.gastoOn = !!s.gastoMenu;
+    V.gastoClose = () => this._gastoCerrar();
+    const mon = Component.MONEDAS.find(m => m.c === s.gMoneda) || Component.MONEDAS[0];
+    V.gastoMonSim = mon.s;
+    V.gastoMonCod = mon.c;
+    V.gastoMonOpen = !!s.gMonOpen;
+    V.gastoMonToggle = () => this.setState({ gMonOpen: !s.gMonOpen, gCatOpen: false, gModoOpen: false });
+    V.gastoMonedas = Component.MONEDAS.map(m => ({
+      sim: m.s, t: m.c + ' · ' + m.n, cls: m.c === s.gMoneda ? 'on' : '',
+      pick: () => this.setState({ gMoneda: m.c, gMonOpen: false })
+    }));
+    V.gastoMonto = s.gMonto;
+    V.gastoMontoChange = (e) => {
+      const v = e.target.value;
+      // Reparte el importe nuevo entre quienes ya estaban marcados.
+      this.setState({ gMonto: v, gRep: this._gastoRecalcula(this.state.gRep, this._gastoNum(v)) });
+    };
+    const cats = this._gcats();
+    const catSel = cats.find(c => c.v === s.gCat);
+    const catIco = catSel || cats[cats.length - 1];
+    V.gastoCatTxt = catSel ? catSel.t : 'Categoría';
+    V.gastoCatCol = catSel ? '#212529' : '#8b969d';
+    V.gastoCatD = catIco.d; V.gastoCatVB = catIco.vb; V.gastoCatW = catIco.w; V.gastoCatH = catIco.h;
+    V.gastoCatOpen = !!s.gCatOpen;
+    V.gastoCatToggle = () => this.setState({ gCatOpen: !s.gCatOpen, gMonOpen: false, gModoOpen: false });
+    V.gastoCats = cats.map(c => ({
+      t: c.t, d: c.d, vb: c.vb, w: c.w, h: c.h, cls: c.v === s.gCat ? 'on' : '',
+      pick: () => this.setState({ gCat: c.v, gCatOpen: false })
+    }));
+    V.gastoDesc = s.gDesc;
+    V.gastoDescChange = (e) => this.setState({ gDesc: e.target.value });
+
+    const MODOS = [{ v: 'no', t: 'No dividir' }, { v: 'todos', t: 'Todos' }, { v: 'individuos', t: 'Individuos' }];
+    V.gastoModoTxt = (MODOS.find(x => x.v === s.gModo) || MODOS[0]).t;
+    V.gastoModoOpen = !!s.gModoOpen;
+    V.gastoModoToggle = () => this.setState({ gModoOpen: !s.gModoOpen, gMonOpen: false, gCatOpen: false });
+    V.gastoModos = MODOS.map(x => ({ t: x.t, cls: x.v === s.gModo ? 'on' : '', pick: () => this._gastoModoCambia(x.v) }));
+
+    const fmt = (n) => n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // "No dividir" sólo enseña de quién es el gasto, sin casillas ni
+    // importes: no hay nada que repartir.
+    const soloYo = s.gModo === 'no';
+    const miembros = soloYo
+      ? this.MIEMBROS.filter(m => m.uid === Number(this.USER.id)).concat(this.MIEMBROS.length ? [] : [])
+      : this.MIEMBROS;
+    const listaFilas = (soloYo && !miembros.length) ? this.MIEMBROS.slice(0, 1) : miembros;
+    V.gastoFilas = listaFilas.map(m => {
+      const on = !!s.gRep[m.uid];
+      return {
+        nombre: m.nombre, inicial: m.inicial,
+        editable: !soloYo, conImporte: !soloYo,
+        on: on, boxBd: on ? '#E7AD00' : '#ADB5BD', boxBg: on ? '#E7AD00' : '#ffffff',
+        col: (soloYo || on) ? '#212529' : '#8b969d',
+        inBd: on ? '#2266ED' : '#DEE2E6',
+        monto: on ? String(s.gRep[m.uid].monto) : '0',
+        toggle: () => this._gastoToggleMiembro(m.uid),
+        montoChange: (e) => {
+          const rep = { ...this.state.gRep };
+          if (!rep[m.uid]) return;
+          rep[m.uid] = { ...rep[m.uid], monto: this._gastoNum(e.target.value) };
+          this.setState({ gRep: rep });
+        },
+        ok: V.noop
+      };
+    });
+    const sumaRep = Object.keys(s.gRep).reduce((a, u) => a + (s.gRep[u].monto || 0), 0);
+    const totalGasto = this._gastoNum(s.gMonto);
+    const cuadra = Math.abs(sumaRep - totalGasto) < 0.005;
+    V.gastoHayTotal = !soloYo && Object.keys(s.gRep).length > 0;
+    V.gastoTotalTxt = mon.c + ' ' + fmt(sumaRep);
+    V.gastoTotalCol = cuadra ? '#0D1F27' : '#C0341D';
+    V.gastoDescuadre = !cuadra;
+    V.gastoDescuadreTxt = sumaRep > totalGasto
+      ? 'Te pasas ' + fmt(sumaRep - totalGasto) + ' del importe.'
+      : 'Faltan ' + fmt(totalGasto - sumaRep) + ' por repartir.';
+
+    // ── Distribución (dona + paleta) ──
+    V.gastoDonaOpen = !!s.gDonaOpen;
+    V.gastoDonaRot = s.gDonaOpen ? '0deg' : '-90deg';
+    V.gastoDonaToggle = () => this.setState({ gDonaOpen: !s.gDonaOpen, gColorUid: null });
+    const conMonto = Object.keys(s.gRep).map(Number).filter(u => (s.gRep[u].monto || 0) > 0);
+    const sumaDona = conMonto.reduce((a, u) => a + s.gRep[u].monto, 0);
+    V.gastoDonaHay = conMonto.length > 0;
+    V.gastoDonaVacia = conMonto.length === 0;
+    const C = 2 * Math.PI * 44;      // circunferencia del radio 44 del SVG
+    let acum = 0;
+    V.gastoDona = conMonto.map(u => {
+      const m = this.MIEMBROS.find(x => x.uid === u) || { nombre: '—' };
+      const frac = sumaDona > 0 ? s.gRep[u].monto / sumaDona : 0;
+      const largo = C * frac;
+      const off = -acum;
+      acum += largo;
+      return {
+        nombre: m.nombre, color: s.gRep[u].color || Component.PALETA[0],
+        pct: '%' + Math.round(frac * 100),
+        dash: largo.toFixed(2) + ' ' + (C - largo).toFixed(2),
+        offset: off.toFixed(2),
+        borde: s.gColorUid === u ? '#D9D9D9' : 'transparent',
+        pickColor: () => this.setState({ gColorUid: s.gColorUid === u ? null : u })
+      };
+    });
+    V.gastoColorOn = s.gColorUid !== null && s.gColorUid !== undefined;
+    V.gastoPaleta = Component.PALETA.map(c => ({
+      c: c,
+      ring: (s.gColorUid != null && s.gRep[s.gColorUid] && s.gRep[s.gColorUid].color === c) ? '0 0 0 2px #ffffff, 0 0 0 4px #6F42C1' : 'none',
+      pick: () => {
+        const rep = { ...this.state.gRep };
+        const u = this.state.gColorUid;
+        if (rep[u]) rep[u] = { ...rep[u], color: c };
+        this.setState({ gRep: rep, gColorUid: null });
+      }
+    }));
+    V.gastoGuardar = () => this._gastoGuardar();
+    V.gastoBorrar = () => this._gastoBorrar();
+    V.gastoCur = cuadra || soloYo ? 'pointer' : 'not-allowed';
+    V.gastoOp = cuadra || soloYo ? '1' : '.55';
+
+    V.addOpen = !!s.addMenu;
+    V.addX = (s.addMenu ? s.addMenu.x : 0) + 'px';
+    V.addY = (s.addMenu ? s.addMenu.y : 0) + 'px';
+    V.addClose = () => this._addCerrar();
+    V.addOpts = s.addMenu
+      ? this._addOpciones(s.addMenu.id).map(o => ({ ...o, pick: () => this._addElegir(s.addMenu.id, o.di) }))
+      : [];
     V.userMenu = s.userMenu;
     V.toggleUserMenu = () => this.setState({ userMenu: !s.userMenu, catOpen: false });
     V.catOpen = s.catOpen; V.catLabel = s.catLabel; V.catRot = s.catOpen ? '180deg' : '0deg';
@@ -1423,10 +2295,9 @@ class Component extends DCLogic {
         addShadow: isAdded ? 'none' : '0 2px 8px rgba(14,42,51,.28)',
         addTxt: isAdded ? 'Añadido' : 'Añadir al plan de viaje',
         justAdded: s.justAdded === p.id, bookIcon: s.justAdded !== p.id,
-        addClick: () => this.toggleAdd(p.id),
-        menuOpen: s.addMenu === p.id,
-        caretClick: () => this.setState({ addMenu: s.addMenu === p.id ? null : p.id }),
-        dayOpts: [{ t: 'Lugares para visitar', pin: '#12808C', di: 0 }].concat(this.DAYS.map((d, i) => ({ t: d.label, pin: d.color, di: i + 1 }))).map(o => ({ ...o, pick: () => this.toggleAdd(p.id, o.di) }))
+        // Los dos abren el mismo menú: elegir día es el único camino.
+        addClick: (e) => this._addAbrir(p.id, e.currentTarget),
+        caretClick: (e) => this._addAbrir(p.id, e.currentTarget)
       };
     };
     const secTop = this.PLACES.filter(p => p.sec === 'top' && match(p)).map(rowVM);
@@ -1592,30 +2463,63 @@ class Component extends DCLogic {
     ];
 
     // ── Selector de emojis (catálogo Unicode completo, js/emojis.js) ──
-    const CAT = window.RN_EMOJIS || [];
+    // La rejilla NO se pinta aquí: la rellena _emoMontar() con HTML
+    // estático. Aquí sólo van las pestañas, el subrayado y el buscador.
+    const G = Component.EMO;
     const emoBusca = (s.emoQ || '').trim().toLowerCase();
-    const emoCatIdx = Math.min(s.emoCat || 0, Math.max(0, CAT.length - 1));
-    const emojisVisibles = () => {
-      if (emoBusca) {
-        const out = [];
-        for (const c of CAT) {
-          for (const e of c.e) {
-            if (e[2].indexOf(emoBusca) >= 0) { out.push(e); if (out.length >= 180) return out; }
-          }
-        }
-        return out;
-      }
-      return CAT[emoCatIdx] ? CAT[emoCatIdx].e : [];
-    };
+    const emoPos = s.emoPos || { x: 0, y: 0, w: G.ANCHO, h: G.ALTO };
+    const emoW = emoPos.w || G.ANCHO;
+    V.emoOpen = !!s.emoPicker;
+    V.emoX = emoPos.x + 'px';
+    V.emoY = emoPos.y + 'px';
+    V.emoW = emoW + 'px';
+    V.emoH = emoPos.h + 'px';
     V.emoQ = s.emoQ || '';
-    V.emoQChange = (e) => this.setState({ emoQ: e.target.value });
-    V.emoCats = CAT.map((c, i) => ({
-      n: c.n, ic: c.ic,
-      bg: (!emoBusca && i === emoCatIdx) ? '#E9EFF6' : 'transparent',
-      pick: () => this.setState({ emoCat: i, emoQ: '' })
+    V.emoQChange = (e) => {
+      const v = e.target.value;
+      // Al vaciar el buscador la rejilla vuelve arriba (_emoMontar),
+      // así que la pestaña subrayada tiene que volver con ella; si no,
+      // se queda señalando una categoría que ya no se está viendo.
+      this.setState(v.trim() ? { emoQ: v } : { emoQ: v, emoCat: 0 });
+    };
+    V.emoClose = () => this._emoCerrar();
+    const emoIdx = Math.min(Math.max(0, s.emoCat || 0), this._emoIconos().length - 1);
+    V.emoTabs = this._emoIconos().map((ic, i) => ({
+      n: ic.n, d: ic.d, vb: ic.vb, w: ic.w, h: ic.h,
+      relleno: ic.relleno, trazo: ic.trazo, grosor: ic.grosor,
+      cls: (!emoBusca && i === emoIdx) ? 'on' : '',
+      pick: () => this._emoIr(i)
     }));
-    V.emoTitulo = emoBusca ? 'Resultados' : (CAT[emoCatIdx] ? CAT[emoCatIdx].n : '');
-    V.emoVacio = emoBusca !== '' && emojisVisibles().length === 0;
+    // Buscando no hay secciones que subrayar, así que se desvanece.
+    V.emoUnderOp = emoBusca ? '0' : '1';
+    const tabW = emoW / this._emoIconos().length;
+    V.emoUnderX = (emoIdx * tabW + (tabW - G.SUB) / 2).toFixed(1) + 'px';
+    V.emoPick = (e) => {
+      const b = e.target && e.target.closest ? e.target.closest('button[data-e]') : null;
+      if (!b) return;
+      const emoji = b.getAttribute('data-e');
+      const di = this.state.emoDi, uid = this.state.emoPicker;
+      if (!emoji || uid == null || di == null) return;
+      // El lugar puede haber desaparecido con el panel abierto (lo
+      // borró otra persona del plan, o el propio usuario). reaccionar()
+      // se limita a volver sin avisar, así que sin esta comprobación
+      // la reacción se perdía en silencio y encima contaba como usada.
+      const fila = (this.state.dayItems || [])[di];
+      if (!fila || !fila.some(x => x.uid === uid)) { this._emoCerrar(); return; }
+      this._emoSumar(emoji);
+      this.reaccionar(di, uid, emoji);
+    };
+    V.emoScroll = (e) => {
+      const g = e.target;
+      const offs = this._emoOffs;
+      if (!offs || !offs.length || emoBusca) return;
+      let a = 0;
+      for (let i = 0; i < offs.length; i++) if (offs[i] <= g.scrollTop + 6) a = i;
+      // Sin esto, una última sección más corta que el panel nunca
+      // llegaría a activarse por mucho que se baje.
+      if (g.scrollTop + g.clientHeight >= g.scrollHeight - 2) a = offs.length - 1;
+      if (a !== this.state.emoCat) this.setState({ emoCat: a });
+    };
 
     // ── Itinerario ──
     const DAYMETA = this.DAYS.map(d => ({ title: d.title, total: '', color: d.color }));
@@ -1669,15 +2573,75 @@ class Component extends DCLogic {
           num: String(i + 1), name: it.name,
           pinFill: meta.color,
           // El nombre abre la ficha del lugar en el mapa
-          nameCur: it.pid ? 'pointer' : 'default',
-          nameTitle: it.pid ? 'Ver información de ' + it.name : it.name,
-          openDet: () => { if (it.pid) this.openDetail(it.pid); },
+          nameCur: 'pointer',
+          nameTitle: 'Ver información de ' + it.name,
+          // Al pulsar la tarjeta se despliegan "Añadir" (hora) y
+          // "Añadir costo". Se abre una sola a la vez.
+          abierto: s.itemOpen === it.uid,
+          sinNota: !(it.nota || '').trim(),
+          toggleAbierto: (e) => {
+            // Los controles de dentro (nombre, reacciones, papelera,
+            // medio de transporte) ya tienen su acción: si no se
+            // descartan aquí, pulsarlos plegaría además la tarjeta.
+            const t = e && e.target;
+            if (t && t.closest && t.closest('button, input, textarea, select, a, .rn-itemname')) return;
+            this.setState({ itemOpen: this.state.itemOpen === it.uid ? null : it.uid });
+          },
+          addHora: (e) => this._horaAbrir(it.uid, e.currentTarget),
+          addCosto: () => this._gastoAbrir(it.uid),
+          openDet: () => { this._centrarEn(it); this.openDetail(it.pid || it.uid, null, 'itin'); },
           hasNota: !!it.nota, nota: it.nota,
           hasChips: !!(it.horario || it.costo > 0), hasHorario: !!it.horario, horario: it.horario,
           hasCosto: it.costo > 0, costo: it.costo > 0 ? moneyChip(it.costo) : '',
-          hasTravel: !!it.travel, walk: !!it.travel && it.travel.mode === 'walk', car: !!it.travel && it.travel.mode === 'car',
-          travel: it.travel ? it.travel.t : '',
-          lineB: it.travel ? '2px dashed #CCCCCC' : 'none',
+          ...(() => {
+            // Traslado de ESTE lugar al siguiente del mismo día.
+            const sig = items[i + 1];
+            const modo = this._modoDe(it);
+            let txt = '', listo = false;
+            if (sig) {
+              if (this.PLAN_ID) {
+                const g = this._segs ? this._segs[this._segKey(it, sig)] : undefined;
+                if (g && g.ok) {
+                  txt = [this._fmtDur(g.s), this._fmtDist(g.m)].filter(Boolean).join(' • ');
+                  listo = true;
+                } else if (g) {
+                  txt = 'Sin ruta directa';      // Google dice que no hay camino
+                  listo = true;
+                } else if (!this._rutasApagadas) {
+                  txt = 'Calculando…';
+                }
+                // Con el servicio caído no se pone nada: mejor una fila
+                // vacía que un tiempo inventado o un "sin ruta" que miente.
+              } else if (it.travel) {
+                txt = it.travel.t; listo = true;   // datos del prototipo sin servidor
+              }
+            }
+            const modoDemo = it.travel ? (it.travel.mode === 'car' ? 'DRIVE' : 'WALK') : 'DRIVE';
+            const mEfec = this.PLAN_ID ? modo : modoDemo;
+            return {
+              // La fila existe siempre que haya un lugar siguiente: así la
+              // línea punteada y el selector de transporte no desaparecen
+              // aunque todavía no se sepa el tiempo.
+              hasTravel: !!sig,
+              travel: txt,
+              travelOp: listo ? '1' : '.55',     // "Calculando…" va más apagado
+              walk: mEfec === 'WALK', car: mEfec === 'DRIVE', bike: mEfec === 'BICYCLE',
+              modoOpen: s.modoMenu === it.uid,
+              modoToggle: (e) => {
+                e.preventDefault(); e.stopPropagation();
+                this.setState({ modoMenu: s.modoMenu === it.uid ? null : it.uid });
+              },
+              modos: [
+                { k: 'WALK', t: 'A pie' }, { k: 'DRIVE', t: 'En coche' }, { k: 'BICYCLE', t: 'En bicicleta' }
+              ].map(m => ({
+                t: m.t, on: mEfec === m.k,
+                bg: mEfec === m.k ? '#EFF3F6' : 'transparent',
+                esWalk: m.k === 'WALK', esCar: m.k === 'DRIVE', esBike: m.k === 'BICYCLE',
+                pick: (e) => { e.preventDefault(); this._setModo(di, it, m.k); }
+              })),
+              lineB: sig ? '2px dashed #CCCCCC' : 'none'
+            };
+          })(),
           hasReacts: !!(it.reacts && it.reacts.length), noReacts: !(it.reacts && it.reacts.length),
           quickEmos: ['👍', '❤️', '🎉'].map(pe => ({
             e: pe,
@@ -1688,12 +2652,22 @@ class Component extends DCLogic {
             bd: r.mine ? '#B9BEF0' : '#DEE2E6', bg: r.mine ? '#EEF0FE' : '#ffffff',
             click: () => this.reaccionar(di, it.uid, r.e)
           })),
-          pickOpen: s.emoPicker === it.uid,
-          pickToggle: () => this.setState({ emoPicker: this.state.emoPicker === it.uid ? null : it.uid, emoQ: '' }),
-          pickEmos: s.emoPicker === it.uid
-            ? emojisVisibles().map(x => ({ e: x[0], t: x[1], pick: () => this.reaccionar(di, it.uid, x[0]) }))
-            : [],
-          del: () => { const days = this.state.dayItems.map(a => [...a]); days[di] = days[di].filter(x => x.uid !== it.uid); this.setState({ dayItems: days }); if (it.sid) this._sync('plan_items.php', { action: 'del', id: it.sid }); },
+          pickToggle: (e) => {
+            if (this.state.emoPicker === it.uid) { this._emoCerrar(); return; }
+            this._emoAbrir(di, it.uid, e.currentTarget);
+          },
+          // Al borrar hay que soltar también la marca de "Añadido":
+          // si no, Explorar seguía anunciando el lugar como añadido y
+          // el siguiente clic mandaba un del con un id ya inexistente.
+          del: () => {
+            const days = this.state.dayItems.map(a => [...a]);
+            days[di] = days[di].filter(x => x.uid !== it.uid);
+            const added = { ...this.state.added };
+            if (it.pid) { delete added[it.pid]; if (this._addedSid) delete this._addedSid[it.pid]; }
+            this.setState({ dayItems: days, added });
+            if (it.sid) this._sync('plan_items.php', { action: 'del', id: it.sid });
+            this._reproject();
+          },
           dragStart: (e) => { this.setState({ drag: { day: di, uid: it.uid } }); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', it.uid); } catch (err) {} },
           dragEnd: () => this.setState({ drag: null, dragOver: null })
         })),
@@ -1742,6 +2716,17 @@ class Component extends DCLogic {
           }
         })),
         acClose: () => setTimeout(() => { if (this.state.acKey === 'd:' + di) this.setState({ acKey: null, acItems: [] }); }, 150),
+        // Mismo gesto que en Resumen: al enfocar, el buscador se
+        // estira y los dos botones de la derecha se pliegan. La clave
+        // va con prefijo 'd' para no chocar con los ids de las listas.
+        placeFocus: () => this.setState({ placeFocusId: 'd' + di }),
+        placeBlur: () => {
+          if (this.state.placeFocusId === 'd' + di) this.setState({ placeFocusId: null });
+          setTimeout(() => { if (this.state.acKey === 'd:' + di) this.setState({ acKey: null, acItems: [] }); }, 150);
+        },
+        btnW: s.placeFocusId === 'd' + di ? '0px' : '42px',
+        btnML: s.placeFocusId === 'd' + di ? '-9px' : '0px',
+        btnOp: s.placeFocusId === 'd' + di ? '0' : '1',
         recsOpen: !!s.dayRecsOpen[di], recsRot: s.dayRecsOpen[di] ? '0deg' : '-90deg',
         recsToggle: () => this.setState({ dayRecsOpen: { ...this.state.dayRecsOpen, [di]: !this.state.dayRecsOpen[di] } }),
         recs: RECS.map(rc => ({ ...rc, add: () => addToDay(di, rc.name, rc) }))
@@ -1992,7 +2977,10 @@ class Component extends DCLogic {
       arr.forEach((it, i) => {
         const p = pinPx[it.uid];
         if (!p) return;
-        const hot = s.hoverPlace === it.uid;
+        // También se resalta el pin del lugar que enseña la ficha, no
+        // sólo el que está bajo el ratón: al pasar de un sitio a otro
+        // con las flechas hay que ver a cuál corresponde la ficha.
+        const hot = s.hoverPlace === it.uid || s.detail === (it.pid || it.uid);
         V.mapPins.push({
           // el número sigue al orden del día en el Itinerario (se
           // recalcula solo al arrastrar y soltar una tarjeta)
@@ -2004,8 +2992,8 @@ class Component extends DCLogic {
           // Clic en el pin: abre la ficha del lugar (y si es un lugar
           // escrito a mano, al menos centra el mapa en él)
           click: () => {
-            if (it.pid) { this.openDetail(it.pid); return; }
-            if (this._map) { this._map.panTo({ lat: it.lat, lng: it.lng }); if (this._map.getZoom() < 15) this._map.setZoom(15); }
+            this._centrarEn(it);
+            this.openDetail(it.pid || it.uid, null, 'itin');
           },
           enter: () => this.setState({ hoverPlace: it.uid }),
           leave: () => { if (this.state.hoverPlace === it.uid) this.setState({ hoverPlace: null }); }
@@ -2081,17 +3069,37 @@ class Component extends DCLogic {
       { t: 'Lugares principales a visitar', color: this.PIN.atr, k: 'top' },
       { t: 'Mejores sitios para comer', color: this.PIN.com, k: 'eat' }
     ].map(l => ({ ...l, on: layerOn(l.k), toggle: () => setLayer(l.k, !layerOn(l.k)) }));
-    V.layersIt = this.DAYS.map((d, i) => ({ t: d.label, color: d.color, k: 'd' + i }))
-      .map(l => ({ ...l, on: layerOn(l.k), toggle: () => setLayer(l.k, !layerOn(l.k)) }));
-    V.layersAll = (e) => { e.preventDefault(); this.setState({ layerChecks: {} }); };
+    V.layersIt = this.DAYS.map((d, i) => ({ t: d.label, color: d.color, k: 'd' + i, i }))
+      .map(l => ({
+        ...l,
+        on: layerOn(l.k),
+        toggle: () => setLayer(l.k, !layerOn(l.k)),
+        // "Solo" aísla la RUTA de este día sin tocar layerChecks, para que
+        // los pines de los demás días sigan a la vista y no se pierda el
+        // contexto de dónde está el resto del viaje.
+        soloOn: s.rutaSolo === l.i,
+        soloTxt: s.rutaSolo === l.i ? 'Ver todas' : 'Solo',
+        solo: (e) => { e.preventDefault(); this.setState({ rutaSolo: s.rutaSolo === l.i ? null : l.i, routeLines: true }); }
+      }));
+    V.rutaSoloOn = s.rutaSolo !== null && s.rutaSolo !== undefined;
+    V.rutaSoloTxt = V.rutaSoloOn && this.DAYS[s.rutaSolo]
+      ? 'Mostrando sólo la ruta de ' + this.DAYS[s.rutaSolo].label : '';
+    V.rutaSoloClear = (e) => { e.preventDefault(); this.setState({ rutaSolo: null }); };
+    V.layersAll = (e) => { e.preventDefault(); this.setState({ layerChecks: {}, rutaSolo: null }); };
     V.layersNone = (e) => {
       e.preventDefault();
       const off = { top: false, eat: false };
       this.DAYS.forEach((_, i) => { off['d' + i] = false; });
       this.setState({ layerChecks: off });
     };
-    V.routeToggle = (e) => { e.preventDefault(); this.setState({ routeLines: !s.routeLines }); };
-    V.routeTxt = s.routeLines ? 'Ocultar líneas de ruta' : 'Mostrar siempre líneas de ruta';
+    V.routeToggle = (e) => {
+      e.preventDefault();
+      // Apagar las rutas también limpia el aislamiento: si no, al volver a
+      // encenderlas reaparecería una sola y parecería que se rompió algo.
+      this.setState({ routeLines: !s.routeLines, rutaSolo: s.routeLines ? null : s.rutaSolo });
+    };
+    V.routeTxt = s.routeLines ? 'Ocultar rutas' : 'Mostrar rutas';
+    V.routeOn = !!s.routeLines;
 
     // ── Detalle ──
     const det = s.detail ? this.place(s.detail) : null;
@@ -2103,14 +3111,29 @@ class Component extends DCLogic {
     const _navAll = this.PLACES.concat(_navExtra);
     const detNav = (this.PLAN_ID && _navAll.length) ? _navAll : null;
     const dIdxNav = detNav && s.detail ? detNav.findIndex(p => p.id === s.detail) : -1;
-    if (detNav && s.detail && dIdxNav >= 0) {
+    // Ficha abierta desde el itinerario: el paginador recorre los
+    // lugares de ESE día, en su orden. Antes se quedaba clavado en
+    // "1 de 1" con las flechas muertas.
+    const diaDet = s.detailFrom === 'itin' ? this._diaDelDetalle(s.detail) : null;
+    if (diaDet) {
+      V.resIdx = String(diaDet.i + 1);
+      V.resTotal = String(diaDet.arr.length);
+      // Al cambiar de lugar el mapa lo sigue, para que la ficha y el
+      // pin resaltado hablen siempre del mismo sitio.
+      const irA = (j) => {
+        const it = diaDet.arr[j];
+        if (!it) return;
+        this.openDetail(it.pid || it.uid, this.state.detailTab, 'itin');
+        this._centrarEn(it);
+      };
+      V.resPrev = () => { if (diaDet.i > 0) irA(diaDet.i - 1); };
+      V.resNext = () => { if (diaDet.i < diaDet.arr.length - 1) irA(diaDet.i + 1); };
+    } else if (detNav && s.detail && dIdxNav >= 0) {
       V.resIdx = String(dIdxNav + 1);
       V.resTotal = String(detNav.length);
       V.resPrev = () => { if (dIdxNav > 0) this.openDetail(detNav[dIdxNav - 1].id, this.state.detailTab); };
       V.resNext = () => { if (dIdxNav < detNav.length - 1) this.openDetail(detNav[dIdxNav + 1].id, this.state.detailTab); };
     } else if (s.detail) {
-      // Ficha abierta desde el itinerario: no forma parte de la lista de
-      // resultados, así que el paginador queda en un solo elemento
       V.resIdx = '1'; V.resTotal = '1';
       V.resPrev = V.noop; V.resNext = V.noop;
     } else {
@@ -2138,7 +3161,10 @@ class Component extends DCLogic {
       V.detAddBg = isAdded ? '#E9ECEF' : '#E7AD00';
       V.detAddCol = isAdded ? '#666F76' : '#FFFFFF';
       V.detAddTxt = isAdded ? 'Añadido' : 'Añadir al plan de viaje';
-      V.detAddClick = () => this.toggleAdd(det.id);
+      // La flecha estaba enlazada a este MISMO handler, así que un
+      // control que dice "Elegir día" borraba el lugar del plan.
+      V.detAddClick = (e) => this._addAbrir(det.id, e.currentTarget);
+      V.detCaretClick = (e) => this._addAbrir(det.id, e.currentTarget);
       // Abre el asistente en panel grande SIN cerrar la ficha: el usuario
       // sigue viendo la información del lugar mientras conversa
       const openChatFromDet = () => this.openChatFull();

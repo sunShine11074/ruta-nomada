@@ -75,7 +75,7 @@ $rolBadge = ['propietario' => '👑 Propietario', 'editor' => '✏️ Editor', '
         <h2 class="dashboard-title">Mis planes</h2>
         <p class="dashboard-subtitle">Tus itinerarios de viaje: los que creaste y los que compartieron contigo.</p>
       </div>
-      <a href="crear_plan.php" style="display:inline-flex;align-items:center;gap:8px;background:#F5B93F;color:#0E2A33;font-weight:700;font-size:.85rem;padding:.65rem 1.2rem;border-radius:20px;text-decoration:none;box-shadow:0 2px 8px rgba(245,185,63,.4);">＋ Crear plan de viaje</a>
+      <a href="plan.php" style="display:inline-flex;align-items:center;gap:8px;background:#F5B93F;color:#0E2A33;font-weight:700;font-size:.85rem;padding:.65rem 1.2rem;border-radius:20px;text-decoration:none;box-shadow:0 2px 8px rgba(245,185,63,.4);">＋ Crear plan de viaje</a>
     </div>
 
     <?php if (!empty($error_db)): ?>
@@ -88,7 +88,7 @@ $rolBadge = ['propietario' => '👑 Propietario', 'editor' => '✏️ Editor', '
           <div style="font-size:2.4rem;margin-bottom:.4rem;">🗺️</div>
           <strong>Aún no tienes planes de viaje.</strong>
           <p style="color:var(--gray-500);margin:.4rem 0 1rem;">Crea el primero y arma tu itinerario día por día.</p>
-          <a href="crear_plan.php" style="display:inline-block;background:#F5B93F;color:#0E2A33;font-weight:700;padding:.7rem 1.4rem;border-radius:20px;text-decoration:none;">Crear plan de viaje</a>
+          <a href="plan.php" style="display:inline-block;background:#F5B93F;color:#0E2A33;font-weight:700;padding:.7rem 1.4rem;border-radius:20px;text-decoration:none;">Crear plan de viaje</a>
         </div>
       <?php endif; ?>
       <?php foreach ($planes as $p): ?>

@@ -117,11 +117,26 @@ function planFullJson(int $planId, array $acc): array
     // Items por día (dia 0 = guardados sin asignar)
     $stmt = $db->prepare(
         'SELECT id, dia, orden, nombre, categoria, hora, hora_fin, duracion,
-                precio, nota, place_id, lat, lng, imagen_url
+                precio, moneda, gasto_cat, gasto_desc, gasto_modo,
+                nota, place_id, lat, lng, imagen_url, modo_viaje
            FROM plan_items WHERE plan_id = ? ORDER BY dia, orden, id'
     );
     $stmt->execute([$planId]);
     $items = $stmt->fetchAll();
+
+    // Cómo se reparte el coste de cada lugar entre los compañeros
+    $stmt = $db->prepare(
+        'SELECT g.item_id, g.usuario_id, g.monto, g.color
+           FROM plan_item_gasto g JOIN plan_items i ON i.id = g.item_id
+          WHERE i.plan_id = ? ORDER BY g.id'
+    );
+    $stmt->execute([$planId]);
+    $reparto = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $reparto[(int)$r['item_id']][] = [
+            'uid' => (int)$r['usuario_id'], 'monto' => (float)$r['monto'], 'color' => $r['color'],
+        ];
+    }
 
     // Reacciones agregadas por lugar (una por persona; 'mine' marca la propia)
     $stmt = $db->prepare(
@@ -138,7 +153,8 @@ function planFullJson(int $planId, array $acc): array
         $porItem[(int)$r['item_id']][] = ['e' => $r['emoji'], 'n' => (int)$r['n'], 'mine' => (bool)$r['mine']];
     }
     foreach ($items as &$it) {
-        $it['reacts'] = $porItem[(int)$it['id']] ?? [];
+        $it['reacts']  = $porItem[(int)$it['id']] ?? [];
+        $it['reparto'] = $reparto[(int)$it['id']] ?? [];
     }
     unset($it);
 

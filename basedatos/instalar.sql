@@ -132,6 +132,19 @@ CREATE TABLE `plan_invitaciones` (
   KEY `idx_plan` (`plan_id`),
   CONSTRAINT `fk_planinv_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS `plan_item_gasto`;
+CREATE TABLE `plan_item_gasto` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `item_id` int(11) NOT NULL,
+  `usuario_id` int(11) NOT NULL,
+  `monto` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `color` char(7) DEFAULT NULL COMMENT 'Color de su porción en la dona, p. ej. #41A24D',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_item_usuario` (`item_id`,`usuario_id`),
+  KEY `idx_gasto_usuario` (`usuario_id`),
+  CONSTRAINT `fk_itemgasto_item` FOREIGN KEY (`item_id`) REFERENCES `plan_items` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_itemgasto_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `plan_item_reacciones`;
 CREATE TABLE `plan_item_reacciones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -157,7 +170,12 @@ CREATE TABLE `plan_items` (
   `hora` time DEFAULT NULL,
   `hora_fin` time DEFAULT NULL,
   `duracion` varchar(20) DEFAULT NULL,
+  `modo_viaje` enum('DRIVE','WALK','BICYCLE') DEFAULT NULL COMMENT 'Cómo se va de este lugar al siguiente',
   `precio` decimal(10,2) DEFAULT NULL,
+  `moneda` char(3) NOT NULL DEFAULT 'MXN' COMMENT 'Divisa del importe; códigos de includes/currency.php',
+  `gasto_cat` varchar(24) DEFAULT NULL COMMENT 'Categoría del gasto (actividad, comida, ...)',
+  `gasto_desc` varchar(500) DEFAULT NULL COMMENT 'Descripción libre del gasto',
+  `gasto_modo` enum('no','todos','individuos') NOT NULL DEFAULT 'no' COMMENT 'Cómo se divide el coste',
   `nota` text DEFAULT NULL,
   `place_id` varchar(60) DEFAULT NULL COMMENT 'ID de Google Places (opcional)',
   `lat` decimal(10,7) DEFAULT NULL,
