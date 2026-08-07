@@ -25,6 +25,33 @@ y vuelve a abrir la ventana.
 > **Un consejo:** usa siempre **Git Bash**, no el CMD normal. Los
 > comandos de esta guía están escritos para él.
 
+### ⚠ Si usas la terminal de VS Code, lee esto
+
+La terminal de VS Code abre **PowerShell**, no Git Bash, y ahí **la
+mitad de los comandos de esta guía no funcionan**. Dos motivos:
+
+| En Git Bash | En PowerShell |
+|---|---|
+| `git pull && php algo.php` | `&&` **no existe** → un comando por línea |
+| `/c/xampp/mysql/bin/mysql.exe` | `& "C:\xampp\mysql\bin\mysql.exe"` |
+| `php herramientas/diagnostico.php` | `& "C:\xampp\php\php.exe" herramientas\diagnostico.php` |
+
+Si pegas un comando con `&&` en PowerShell verás esto, y **no se ejecuta
+nada**, ni siquiera la primera parte:
+
+```
+El token '&&' no es un separador de instrucciones válido en esta versión.
+```
+
+Tienes dos salidas. La cómoda:
+
+**Cambia la terminal de VS Code a Git Bash.** Pulsa el `∨` que hay al
+lado del `+` en la esquina de la terminal → *Git Bash*. A partir de ahí
+todos los comandos de esta guía funcionan tal cual.
+
+O si prefieres quedarte en PowerShell, usa la columna de la derecha de
+la tabla y pega **una línea cada vez**.
+
 ---
 
 ## Parte 1 — Instalación (esto se hace UNA sola vez)
@@ -93,10 +120,17 @@ Después ábrelos con el Bloc de notas y pega la clave donde dice
 php herramientas/diagnostico.php
 ```
 
-Si `php` no se reconoce, usa la ruta completa:
+Si `php` no se reconoce —y en XAMPP normalmente **no** se reconoce,
+porque no está en el PATH— usa la ruta completa:
 
 ```bash
 /c/xampp/php/php.exe herramientas/diagnostico.php
+```
+
+En PowerShell:
+
+```powershell
+& "C:\xampp\php\php.exe" herramientas\diagnostico.php
 ```
 
 Te va a listar, una por una, las claves, la base de datos y las tablas,
@@ -114,8 +148,14 @@ usuarios y tus planes.** Ponla al día con un solo comando:
 /c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
 ```
 
+En PowerShell, el mismo comando se escribe así:
+
+```powershell
+& "C:\xampp\mysql\bin\mysql.exe" -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
+```
+
 Añade lo que falta y **no borra nada**. Se puede ejecutar dos veces sin
-problema. Al terminar imprime `5` y `1`: son las columnas y la tabla
+problema. Al terminar imprime `5` y `3`: son las columnas y las tablas
 que añadió.
 
 **b) Empiezas de cero (o el diagnóstico dice que faltan tablas):**
@@ -123,6 +163,13 @@ que añadió.
 ```bash
 /c/xampp/mysql/bin/mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS ruta_nomada CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 /c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/instalar.sql"
+```
+
+En PowerShell:
+
+```powershell
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "CREATE DATABASE IF NOT EXISTS ruta_nomada CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root ruta_nomada -e "source basedatos/instalar.sql"
 ```
 
 `instalar.sql` crea **todo**: no necesitas ningún `migrate_*.sql` ni
@@ -242,6 +289,12 @@ Las tres causas, en orden de probabilidad:
 
    ```bash
    /c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
+   ```
+
+   En PowerShell:
+
+   ```powershell
+   & "C:\xampp\mysql\bin\mysql.exe" -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
    ```
 
 2. **La Routes API no está habilitada** en el proyecto de Google Cloud
