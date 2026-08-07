@@ -52,6 +52,26 @@ todos los comandos de esta guía funcionan tal cual.
 O si prefieres quedarte en PowerShell, usa la columna de la derecha de
 la tabla y pega **una línea cada vez**.
 
+### O ni terminal ni nada: doble clic
+
+Para lo que hay que hacer después de cada `git pull` —poner la base de
+datos al día y comprobar que no falta nada— hay un atajo:
+
+> En la carpeta del proyecto, entra en **`herramientas`** y haz **doble
+> clic en `actualizar.bat`**.
+
+Se coloca solo en la carpeta correcta, usa las rutas completas de XAMPP,
+actualiza la base sin borrar nada y termina enseñando el diagnóstico. Da
+igual qué terminal tengas configurada. Si XAMPP no está en `C:\xampp`,
+ábrelo con el Bloc de notas y corrige las dos primeras rutas.
+
+**Ojo con una confusión fácil:** `cd` sirve para *entrar en una carpeta*.
+`mysql.exe` no es una carpeta, es un programa, así que `cd mysql.exe`
+siempre va a dar «No se encuentra la ruta de acceso». Y los comandos de
+base de datos hay que lanzarlos **desde la carpeta del proyecto**, no
+desde `C:\xampp\mysql\bin`, porque la ruta `basedatos/actualizar_bd.sql`
+se busca a partir de donde estés.
+
 ---
 
 ## Parte 1 — Instalación (esto se hace UNA sola vez)
@@ -285,7 +305,8 @@ Las tres causas, en orden de probabilidad:
 
 1. **Faltan las tablas `tramo_cache` y `ruta_uso`.** Estuvieron sueltas
    en `migrate_rutas.sql` un tiempo y no entraban en la instalación.
-   Se arregla sin perder datos:
+   Se arregla sin perder datos, y lo más fácil es **doble clic en
+   `herramientas/actualizar.bat`**. Si prefieres la terminal:
 
    ```bash
    /c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
