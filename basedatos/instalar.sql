@@ -2,13 +2,26 @@
 --   instalar.sql — Instalación completa | Ruta Nómada
 --
 --   ESTE ES EL ÚNICO ARCHIVO QUE HACE FALTA para dejar la base de
---   datos lista: crea las 15 tablas, el procedimiento almacenado y
+--   datos lista: crea las 18 tablas, el procedimiento almacenado y
 --   los destinos de ejemplo. NO trae usuarios ni planes; cada quien
 --   se registra en su propia copia.
 --
 --   Los migrate_*.sql de esta carpeta son el historial de cómo fue
 --   creciendo el esquema. Si partes de cero NO los necesitas:
 --   este archivo ya los incluye todos.
+--
+--   EL ORDEN DE LAS TABLAS NO ES ALFABÉTICO Y ES A PROPÓSITO. Cada
+--   tabla se crea DESPUÉS de aquellas a las que apunta con una clave
+--   foránea, y los DROP van al principio en el orden contrario. Antes
+--   estaban por orden alfabético, así que `ai_uso` —que apunta a
+--   `usuarios` y a `planes`— se creaba la primera de todas. Por
+--   terminal colaba, porque el SET FOREIGN_KEY_CHECKS = 0 de abajo
+--   silencia la comprobación; pero phpMyAdmin trae marcada su casilla
+--   "Habilitar la revisión de claves foráneas" e ignora ese SET, y la
+--   importación moría con
+--       #1005 ... (Error: 150 "Foreign key constraint is incorrectly formed").
+--   Con el orden correcto el archivo entra igual de bien por las dos
+--   vías, con la comprobación encendida o apagada.
 --
 --   CÓMO USARLO
 --   1. Crea la base (una sola vez):
@@ -43,21 +56,35 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 
+-- ── Se borran todas primero, hijas antes que madres ─────────
+--
+-- El orden importa: con la revisión de claves foráneas activada
+-- (phpMyAdmin la trae marcada por defecto) no se puede borrar una
+-- tabla de la que otra depende, ni crear una que apunte a otra que
+-- todavía no existe.
+
+DROP TABLE IF EXISTS `plan_lista_items`;
+DROP TABLE IF EXISTS `plan_item_reacciones`;
+DROP TABLE IF EXISTS `plan_item_gasto`;
+DROP TABLE IF EXISTS `plan_miembros`;
+DROP TABLE IF EXISTS `plan_listas`;
+DROP TABLE IF EXISTS `plan_items`;
+DROP TABLE IF EXISTS `plan_invitaciones`;
+DROP TABLE IF EXISTS `plan_gastos`;
+DROP TABLE IF EXISTS `plan_destinos`;
 DROP TABLE IF EXISTS `ai_uso`;
-CREATE TABLE `ai_uso` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `usuario_id` int(11) NOT NULL,
-  `plan_id` int(11) DEFAULT NULL,
-  `creado` datetime NOT NULL DEFAULT current_timestamp(),
-  `tokens_in` int(11) NOT NULL DEFAULT 0,
-  `tokens_out` int(11) NOT NULL DEFAULT 0,
-  `modelo` varchar(60) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_usuario_fecha` (`usuario_id`,`creado`),
-  KEY `fk_aiuso_plan` (`plan_id`),
-  CONSTRAINT `fk_aiuso_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_aiuso_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS `viajes_usuario`;
+DROP TABLE IF EXISTS `planes`;
+DROP TABLE IF EXISTS `password_resets`;
+DROP TABLE IF EXISTS `favoritos`;
+DROP TABLE IF EXISTS `usuarios`;
+DROP TABLE IF EXISTS `destinos`;
+DROP TABLE IF EXISTS `ruta_uso`;
+DROP TABLE IF EXISTS `tramo_cache`;
+
+
+-- ── Y se crean al revés, cada madre antes que sus hijas ─────
+
 
 -- ── Caché de rutas del itinerario (api/ruta.php) ─────────────
 --
@@ -73,8 +100,6 @@ CREATE TABLE `ai_uso` (
 -- OJO con el TTL de 25 días de api/ruta.php: los términos de Google
 -- Maps Platform permiten cachear coordenadas derivadas 30 días como
 -- mucho. Los place_id sí son permanentes; lo que caduca es la geometría.
-
-DROP TABLE IF EXISTS `tramo_cache`;
 CREATE TABLE `tramo_cache` (
   `hash` char(32) NOT NULL COMMENT 'md5(modo|origen>destino)',
   `pts` mediumtext DEFAULT NULL COMMENT 'JSON [[lat,lng],...]; NULL si no hubo ruta',
@@ -86,16 +111,15 @@ CREATE TABLE `tramo_cache` (
   KEY `idx_creado` (`creado`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- Contador del gasto del mes. Vive en el servidor y no en el navegador
 -- porque localStorage se borra y es por equipo: no protege de nada.
-DROP TABLE IF EXISTS `ruta_uso`;
 CREATE TABLE `ruta_uso` (
   `mes` char(7) NOT NULL COMMENT 'AAAA-MM',
   `n` int(11) NOT NULL DEFAULT 0 COMMENT 'peticiones enviadas a Google ese mes',
   PRIMARY KEY (`mes`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DROP TABLE IF EXISTS `destinos`;
 CREATE TABLE `destinos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(150) NOT NULL,
@@ -109,7 +133,32 @@ CREATE TABLE `destinos` (
   `estado` enum('activo','inactivo','pendiente') NOT NULL DEFAULT 'activo',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `favoritos`;
+
+CREATE TABLE `usuarios` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) NOT NULL,
+  `apellidos` varchar(120) NOT NULL DEFAULT '',
+  `genero` enum('Hombre','Mujer','Otro') DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `telefono` varchar(20) NOT NULL DEFAULT '',
+  `fecha_nacimiento` date DEFAULT NULL,
+  `nacionalidad` varchar(60) NOT NULL DEFAULT 'Mexicana',
+  `estado` varchar(60) NOT NULL DEFAULT '',
+  `ciudad` varchar(60) NOT NULL DEFAULT '',
+  `lenguaje` varchar(30) NOT NULL DEFAULT 'Español',
+  `divisa` varchar(10) NOT NULL DEFAULT 'MXN',
+  `foto_perfil` varchar(500) DEFAULT NULL,
+  `foto_banner` varchar(500) DEFAULT NULL,
+  `pais` varchar(60) NOT NULL DEFAULT 'Mexico',
+  `idioma` varchar(30) NOT NULL DEFAULT 'Espanol',
+  `rol` enum('viajero','admin') DEFAULT 'viajero',
+  `creado_en` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `idx_usuarios_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `favoritos` (
   `usuario_id` int(11) NOT NULL,
   `destino_id` int(11) NOT NULL,
@@ -118,7 +167,7 @@ CREATE TABLE `favoritos` (
   CONSTRAINT `favoritos_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE,
   CONSTRAINT `favoritos_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `password_resets`;
+
 CREATE TABLE `password_resets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `usuario_id` int(11) NOT NULL,
@@ -131,7 +180,58 @@ CREATE TABLE `password_resets` (
   KEY `usuario_id` (`usuario_id`),
   CONSTRAINT `password_resets_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_destinos`;
+
+CREATE TABLE `planes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `nombre` varchar(200) NOT NULL,
+  `destino` varchar(120) DEFAULT NULL,
+  `lat` decimal(10,7) DEFAULT NULL,
+  `lng` decimal(10,7) DEFAULT NULL,
+  `fecha_inicio` date DEFAULT NULL,
+  `fecha_fin` date DEFAULT NULL,
+  `privacidad` enum('solo','amigos','publico') NOT NULL DEFAULT 'solo',
+  `portada_url` varchar(500) DEFAULT NULL,
+  `estado` enum('borrador','activo','completado') DEFAULT 'borrador',
+  `presupuesto` decimal(12,2) DEFAULT NULL,
+  `creado_en` datetime DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `dia_subtitulos` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `usuario_id` (`usuario_id`),
+  CONSTRAINT `planes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `viajes_usuario` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `destino_id` int(11) NOT NULL,
+  `plan_id` int(11) DEFAULT NULL,
+  `fecha` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `usuario_id` (`usuario_id`),
+  KEY `destino_id` (`destino_id`),
+  KEY `plan_id` (`plan_id`),
+  CONSTRAINT `viajes_usuario_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
+  CONSTRAINT `viajes_usuario_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`),
+  CONSTRAINT `viajes_usuario_ibfk_3` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `ai_uso` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `plan_id` int(11) DEFAULT NULL,
+  `creado` datetime NOT NULL DEFAULT current_timestamp(),
+  `tokens_in` int(11) NOT NULL DEFAULT 0,
+  `tokens_out` int(11) NOT NULL DEFAULT 0,
+  `modelo` varchar(60) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_usuario_fecha` (`usuario_id`,`creado`),
+  KEY `fk_aiuso_plan` (`plan_id`),
+  CONSTRAINT `fk_aiuso_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_aiuso_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `plan_destinos` (
   `plan_id` int(11) NOT NULL,
   `destino_id` int(11) NOT NULL,
@@ -140,7 +240,7 @@ CREATE TABLE `plan_destinos` (
   CONSTRAINT `plan_destinos_ibfk_1` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `plan_destinos_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_gastos`;
+
 CREATE TABLE `plan_gastos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
@@ -154,7 +254,7 @@ CREATE TABLE `plan_gastos` (
   KEY `idx_plan_gastos` (`plan_id`),
   CONSTRAINT `fk_plangastos_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_invitaciones`;
+
 CREATE TABLE `plan_invitaciones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
@@ -169,34 +269,7 @@ CREATE TABLE `plan_invitaciones` (
   KEY `idx_plan` (`plan_id`),
   CONSTRAINT `fk_planinv_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_item_gasto`;
-CREATE TABLE `plan_item_gasto` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `item_id` int(11) NOT NULL,
-  `usuario_id` int(11) NOT NULL,
-  `monto` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `color` char(7) DEFAULT NULL COMMENT 'Color de su porción en la dona, p. ej. #41A24D',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_item_usuario` (`item_id`,`usuario_id`),
-  KEY `idx_gasto_usuario` (`usuario_id`),
-  CONSTRAINT `fk_itemgasto_item` FOREIGN KEY (`item_id`) REFERENCES `plan_items` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_itemgasto_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_item_reacciones`;
-CREATE TABLE `plan_item_reacciones` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `item_id` int(11) NOT NULL,
-  `usuario_id` int(11) NOT NULL,
-  `emoji` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_item_usuario` (`item_id`,`usuario_id`),
-  KEY `idx_item` (`item_id`),
-  KEY `fk_react_user` (`usuario_id`),
-  CONSTRAINT `fk_react_item` FOREIGN KEY (`item_id`) REFERENCES `plan_items` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_react_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_items`;
+
 CREATE TABLE `plan_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
@@ -224,18 +297,7 @@ CREATE TABLE `plan_items` (
   KEY `idx_plan_dia` (`plan_id`,`dia`,`orden`),
   CONSTRAINT `fk_planitems_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_lista_items`;
-CREATE TABLE `plan_lista_items` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `lista_id` int(11) NOT NULL,
-  `texto` varchar(500) NOT NULL,
-  `hecho` tinyint(1) NOT NULL DEFAULT 0,
-  `orden` smallint(5) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`),
-  KEY `fk_planlistaitems` (`lista_id`),
-  CONSTRAINT `fk_planlistaitems` FOREIGN KEY (`lista_id`) REFERENCES `plan_listas` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_listas`;
+
 CREATE TABLE `plan_listas` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
@@ -247,7 +309,7 @@ CREATE TABLE `plan_listas` (
   KEY `fk_planlistas` (`plan_id`),
   CONSTRAINT `fk_planlistas` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `plan_miembros`;
+
 CREATE TABLE `plan_miembros` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
@@ -260,68 +322,44 @@ CREATE TABLE `plan_miembros` (
   CONSTRAINT `fk_planmiembros_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_planmiembros_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `planes`;
-CREATE TABLE `planes` (
+
+CREATE TABLE `plan_item_gasto` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `item_id` int(11) NOT NULL,
   `usuario_id` int(11) NOT NULL,
-  `nombre` varchar(200) NOT NULL,
-  `destino` varchar(120) DEFAULT NULL,
-  `lat` decimal(10,7) DEFAULT NULL,
-  `lng` decimal(10,7) DEFAULT NULL,
-  `fecha_inicio` date DEFAULT NULL,
-  `fecha_fin` date DEFAULT NULL,
-  `privacidad` enum('solo','amigos','publico') NOT NULL DEFAULT 'solo',
-  `portada_url` varchar(500) DEFAULT NULL,
-  `estado` enum('borrador','activo','completado') DEFAULT 'borrador',
-  `presupuesto` decimal(12,2) DEFAULT NULL,
-  `creado_en` datetime DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `dia_subtitulos` text DEFAULT NULL,
+  `monto` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `color` char(7) DEFAULT NULL COMMENT 'Color de su porción en la dona, p. ej. #41A24D',
   PRIMARY KEY (`id`),
-  KEY `usuario_id` (`usuario_id`),
-  CONSTRAINT `planes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `usuarios`;
-CREATE TABLE `usuarios` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(100) NOT NULL,
-  `apellidos` varchar(120) NOT NULL DEFAULT '',
-  `genero` enum('Hombre','Mujer','Otro') DEFAULT NULL,
-  `email` varchar(150) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `telefono` varchar(20) NOT NULL DEFAULT '',
-  `fecha_nacimiento` date DEFAULT NULL,
-  `nacionalidad` varchar(60) NOT NULL DEFAULT 'Mexicana',
-  `estado` varchar(60) NOT NULL DEFAULT '',
-  `ciudad` varchar(60) NOT NULL DEFAULT '',
-  `lenguaje` varchar(30) NOT NULL DEFAULT 'Español',
-  `divisa` varchar(10) NOT NULL DEFAULT 'MXN',
-  `foto_perfil` varchar(500) DEFAULT NULL,
-  `foto_banner` varchar(500) DEFAULT NULL,
-  `pais` varchar(60) NOT NULL DEFAULT 'Mexico',
-  `idioma` varchar(30) NOT NULL DEFAULT 'Espanol',
-  `rol` enum('viajero','admin') DEFAULT 'viajero',
-  `creado_en` datetime DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`),
-  UNIQUE KEY `idx_usuarios_email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-DROP TABLE IF EXISTS `viajes_usuario`;
-CREATE TABLE `viajes_usuario` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `usuario_id` int(11) NOT NULL,
-  `destino_id` int(11) NOT NULL,
-  `plan_id` int(11) DEFAULT NULL,
-  `fecha` datetime DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `usuario_id` (`usuario_id`),
-  KEY `destino_id` (`destino_id`),
-  KEY `plan_id` (`plan_id`),
-  CONSTRAINT `viajes_usuario_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
-  CONSTRAINT `viajes_usuario_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`),
-  CONSTRAINT `viajes_usuario_ibfk_3` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`)
+  UNIQUE KEY `uq_item_usuario` (`item_id`,`usuario_id`),
+  KEY `idx_gasto_usuario` (`usuario_id`),
+  CONSTRAINT `fk_itemgasto_item` FOREIGN KEY (`item_id`) REFERENCES `plan_items` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_itemgasto_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `plan_item_reacciones` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `item_id` int(11) NOT NULL,
+  `usuario_id` int(11) NOT NULL,
+  `emoji` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_item_usuario` (`item_id`,`usuario_id`),
+  KEY `idx_item` (`item_id`),
+  KEY `fk_react_user` (`usuario_id`),
+  CONSTRAINT `fk_react_item` FOREIGN KEY (`item_id`) REFERENCES `plan_items` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_react_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `plan_lista_items` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `lista_id` int(11) NOT NULL,
+  `texto` varchar(500) NOT NULL,
+  `hecho` tinyint(1) NOT NULL DEFAULT 0,
+  `orden` smallint(5) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `fk_planlistaitems` (`lista_id`),
+  CONSTRAINT `fk_planlistaitems` FOREIGN KEY (`lista_id`) REFERENCES `plan_listas` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
