@@ -51,6 +51,21 @@ $acc  = ['rol' => $rol, 'plan' => $row, 'user_id' => (int)$_SESSION['user']['id'
 $boot = planFullJson($planId, $acc);
 $csrf = csrfToken();
 
+// Foto de perfil de quien mira. La sesión no la lleva (sólo id, nombre y
+// email), así que hay que ir a por ella igual que hace includes/topbar.php
+// en el resto de páginas. Se comprueba que el archivo siga existiendo: si
+// alguien borró la imagen a mano, la fila de la base se queda apuntando a
+// la nada y saldría el icono de imagen rota en vez de la inicial.
+$fotoUsuario = null;
+try {
+    $stFoto = $db->prepare('SELECT foto_perfil FROM usuarios WHERE id = ? LIMIT 1');
+    $stFoto->execute([(int)$user['id']]);
+    $fp = (string)($stFoto->fetchColumn() ?: '');
+    if ($fp !== '' && is_file(__DIR__ . '/' . $fp)) $fotoUsuario = $fp;
+} catch (Throwable $e) {
+    // sin foto no se rompe nada: se cae a la inicial de siempre
+}
+
 $tituloPagina = htmlspecialchars($row['nombre'], ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
@@ -66,6 +81,7 @@ window.PLAN_USER = <?= json_encode([
     'id'      => (int)$user['id'],
     'nombre'  => $user['nombre'],
     'inicial' => mb_strtoupper(mb_substr(trim($user['nombre']), 0, 1)),
+    'foto'    => $fotoUsuario,
 ], JSON_UNESCAPED_UNICODE) ?>;
 window.gmapsReady = new Promise(function (res) { window.__plMapReady = res; });
 // Nivel 1 del "Acerca de": editorialSummary con la clase nueva Place.

@@ -141,7 +141,7 @@ class Component extends DCLogic {
     const B = window.PLAN_BOOT;
     this.CSRF = window.PLAN_CSRF || '';
     this.USER = window.PLAN_USER || { inicial: 'R', nombre: 'Ramon' };
-    this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: null }];
+    this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     this.puedeEditar = true;   // por defecto (modo demo sin servidor)
     this.META = { titulo: 'Nuestro viaje a Ensenada', destino: 'Ensenada', fechas: '30/7 – 31/7', hero: 'https://picsum.photos/seed/rn-en-hero/1400/460' };
     this.DESC_ENSENADA = 'Ensenada es una ciudad portuaria de Baja California, a hora y media de la frontera, famosa por su malecón frente a la bahía de Todos Santos, sus tacos de pescado y su cercanía con el Valle de Guadalupe, la principal región vinícola de México. Al sur, La Bufadora lanza chorros de mar de más de 20 metros; en el centro, la Primera y la Plaza Cívica concentran cantinas históricas, cafés y una escena gastronómica que mezcla mariscos de la lonja con cocina de autor.';
@@ -193,7 +193,7 @@ class Component extends DCLogic {
       inicial: (m.nombre || '?').trim().charAt(0).toUpperCase(),
       nombre: ((m.nombre || '') + ' ' + (m.apellidos || '')).trim(), rol: m.rol, foto: m.foto_perfil || null
     }));
-    if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: null }];
+    if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     const dest = P.destino || 'mi destino';
     this.META = {
       titulo: P.nombre || ('Nuestro viaje a ' + dest),
@@ -619,6 +619,19 @@ class Component extends DCLogic {
     });
   }
   // pines proyectables: itinerario + lugares de Explorar cargados
+  // ¿Sigue pintándose en el mapa este lugar de Explorar?
+  //
+  // Sólo mientras su panel está abierto. Al cerrarlo, los treinta pines de
+  // atracciones, restaurantes y alojamientos tapaban el itinerario, que es
+  // lo único que se quiere ver ahí. No se borra nada: this.PLACES sigue en
+  // memoria y al reabrir Explorar vuelven sin gastar otra búsqueda.
+  //
+  // La excepción es el lugar cuya ficha está abierta: la tarjeta vive en el
+  // mapa y puede quedarse tras salir de Explorar, así que dejarle sin pin
+  // sería enseñar la información de un sitio que no está en ninguna parte.
+  _exPinVive(p) {
+    return !!this.state.exOpen || this.state.detail === p.id;
+  }
   _pinList() {
     const out = [];
     const lc = this.state.layerChecks || {};
@@ -631,6 +644,7 @@ class Component extends DCLogic {
     });
     (this.PLACES || []).forEach(p => {
       if (p.lat == null || p.lng == null) return;
+      if (!this._exPinVive(p)) return;
       // La capa se decide por la sección (top / eat / stay), no por la
       // categoría: con el mapeo viejo los hoteles se apagaban al quitar
       // "Mejores sitios para comer" y su propia casilla no hacía nada.
@@ -3156,6 +3170,11 @@ class Component extends DCLogic {
     // fuera un lugar, su pin también se va: de lo contrario quedarían dos
     // pines con el mismo número y ninguno correspondería a la lista.
     (this.PLACES || []).forEach(p => {
+      // También aquí, y no sólo en _pinList: componentDidUpdate no
+      // reproyecta, así que _pinPx conserva las posiciones viejas hasta el
+      // siguiente movimiento del mapa. Sin esta línea los pines seguirían
+      // a la vista después de cerrar Explorar, hasta que se moviera el mapa.
+      if (!this._exPinVive(p)) return;
       const n = exNum[p.id] || (exq ? 0 : (p.num || 0));
       if (!n) return;
       const pp = pinPx[p.id];
@@ -3221,6 +3240,10 @@ class Component extends DCLogic {
     V.layersOpen = s.layersOpen;
     V.layersToggle = () => this.setState({ layersOpen: !s.layersOpen, mapSearchOpen: false });
     const setLayer = (k, v) => this.setState({ layerChecks: { ...this.state.layerChecks, [k]: v } });
+    // Con Explorar cerrado sus pines no están en el mapa, así que estas tres
+    // casillas no encenderían ni apagarían nada: se esconde la sección
+    // entera en vez de dejar tres controles muertos.
+    V.layersResShow = !!s.exOpen;
     V.layersRes = [
       { t: 'Lugares principales a visitar', color: this.PIN.atr, k: 'top' },
       { t: 'Mejores sitios para comer', color: this.PIN.com, k: 'eat' },
@@ -3527,13 +3550,18 @@ class Component extends DCLogic {
     V.hasDestinoDesc = !!(s.destinoDesc || '').trim();
     V.heroImg = this.META.hero;
     V.userInitial = this.USER.inicial;
+    // La foto de perfil de quien mira. Cuando no hay, se queda la inicial
+    // sobre el círculo dorado de siempre.
+    V.userFoto = this.USER.foto || '';
+    V.userHasFoto = !!this.USER.foto;
+    V.userNoFoto = !this.USER.foto;
     V.chatTitle = this.META.titulo;
     V.conceptoPlaceholder = 'Concepto (p. ej. Boletos ' + this.META.destino + ')';
     V.exSearchPh = this.META.destino;
     V.miembrosVM = this.MIEMBROS.map(m => ({
       inicial: m.inicial,
       titulo: m.nombre + ' · ' + m.rol,
-      hasFoto: !!m.foto, foto: m.foto || ''
+      hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || ''
     }));
     return V;
   }
