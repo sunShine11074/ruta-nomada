@@ -1,7 +1,7 @@
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.PIN = { atr: '#7B61FF', com: '#E8365D', sav: '#12808C', act: '#F0B429' };
+    this.PIN = { atr: '#7B61FF', com: '#E8365D', sav: '#12808C', act: '#F0B429', hot: '#0C8BD7' };
     this.PLACES = [
       { id: 'playa', num: 1, cat: 'atr', sec: 'top', name: 'Playa Hermosa', rating: 4.2, rev: 3210, chips: ['Playa', 'Familiar'], more: 2, seed: 'rn-en-playa', x: 30, y: 74,
         desc: 'Playa Hermosa es una playa de arena con olas que rompen en ambos lados, variando según la temporada. Aunque no es conocida por sus olas de alta calidad, la zona ofrece servicios esenciales como baños, duchas, basureros, salvavidas, instalaciones de estacionamiento, palapas para sombra y una tienda cercana para mayor comodidad.',
@@ -112,6 +112,9 @@ class Component extends DCLogic {
       dayRecsOpen: { 0: true, 1: true },
       drag: null, dragOver: null, emoPicker: null,
       exQ: '', skelGuides: false, skelPlaces: false,
+      // Explorar: qué secciones enseñan los 10 y en qué reseña va cada
+      // carrusel (por place_id)
+      exMas: {}, rvwIdx: {},
       resIdx: 19, narrow: false, mobile: false, mapModal: false, winW: 1440,
       // Listas del Resumen (Wanderlog): menú de nueva lista, nota en
       // edición, arrastre de artículos y foco del buscador de lugar
@@ -533,7 +536,10 @@ class Component extends DCLogic {
     };
     const BUSQ = [
       { q: 'atracciones turísticas en ' + dest, sec: 'top', cat: 'atr' },
-      { q: 'mejores restaurantes en ' + dest, sec: 'eat', cat: 'com' }
+      { q: 'mejores restaurantes en ' + dest, sec: 'eat', cat: 'com' },
+      // Alojamiento: la consulta nombra los tres tipos para que Google
+      // no devuelva sólo cadenas hoteleras grandes.
+      { q: 'hoteles, moteles y hostales en ' + dest, sec: 'stay', cat: 'hot' }
     ];
     const resultados = {};
     let pendientes = BUSQ.length;
@@ -556,7 +562,9 @@ class Component extends DCLogic {
             lat: loc ? loc.lat() : null, lng: loc ? loc.lng() : null,
             recent: false
           };
-          if (i < 6) places.push(p);
+          // 10 por sección: es lo que enseña "Mostrar más". Antes se
+          // guardaban 6 y no había de dónde sacar los otros cuatro.
+          if (i < Component.EX_MAS) places.push(p);
           else if (recs.length < 6) recs.push({ name: p.name, seed: p.seed, foto: foto, gpid: p.gpid, lat: p.lat, lng: p.lng });
         });
       });
@@ -565,7 +573,7 @@ class Component extends DCLogic {
     };
     BUSQ.forEach(b => {
       svc.textSearch({ query: b.q }, (res, st) => {
-        resultados[b.sec] = (st === 'OK' && res) ? res.slice(0, 12) : [];
+        resultados[b.sec] = (st === 'OK' && res) ? res.slice(0, 16) : [];
         if (st !== 'OK') console.warn('[plan] textSearch', b.sec, st);
         listo();
       });
@@ -623,7 +631,10 @@ class Component extends DCLogic {
     });
     (this.PLACES || []).forEach(p => {
       if (p.lat == null || p.lng == null) return;
-      if (lc[p.cat === 'atr' ? 'top' : 'eat'] === false) return;
+      // La capa se decide por la sección (top / eat / stay), no por la
+      // categoría: con el mapeo viejo los hoteles se apagaban al quitar
+      // "Mejores sitios para comer" y su propia casilla no hacía nada.
+      if (lc[p.sec] === false) return;
       out.push({ id: p.id, lat: p.lat, lng: p.lng });
     });
     (this.SEARCH || []).forEach(p => {
@@ -921,6 +932,16 @@ class Component extends DCLogic {
   }
   componentDidUpdate() {
     this._ensureMap();
+    // Centrado que quedó en cola porque el mapa no existía todavía
+    // (la ficha abierta en pantalla estrecha monta el mapa a la vez).
+    // Va DESPUÉS de _ensureMap: al recrearse, el mapa conserva el
+    // centro anterior, y sin esto enseñaría el sitio equivocado.
+    if (this._map && this._centrarPend) {
+      const p = this._centrarPend;
+      this._centrarPend = null;
+      this._map.panTo(p);
+      if (this._map.getZoom() < 15) this._map.setZoom(15);
+    }
     this._asegurarTramos();
     this._updateRoute();
     this._emoMontar();
@@ -968,9 +989,15 @@ class Component extends DCLogic {
     return null;
   }
   // Centra el mapa en un lugar sin alejar lo que el usuario ya tenía.
+  // Si el mapa aún no existe (pantalla estrecha: el panel se monta AL
+  // abrir la ficha, no antes), el destino queda en cola y lo consume
+  // componentDidUpdate en cuanto _ensureMap lo cree.
   _centrarEn(it) {
-    if (!this._map || !it || it.lat == null || it.lng == null) return;
-    this._map.panTo({ lat: Number(it.lat), lng: Number(it.lng) });
+    if (!it || it.lat == null || it.lng == null) return;
+    const p = { lat: Number(it.lat), lng: Number(it.lng) };
+    if (!this._map) { this._centrarPend = p; return; }
+    this._centrarPend = null;
+    this._map.panTo(p);
     if (this._map.getZoom() < 15) this._map.setZoom(15);
   }
   // Adapta un item del itinerario a la forma que espera el panel de detalle
@@ -1515,18 +1542,28 @@ class Component extends DCLogic {
   // itinerario o la de resultados. Un lugar puede estar en las dos, y
   // sin esto el paginador no sabría cuál recorrer.
   openDetail(id, tab, desde) {
-    this.setState({ detail: id, detailFrom: desde || null, detailTab: tab || 'about', detailLoading: true, layersOpen: false, mapSearchOpen: false,
-      rvwOpen: {}, rvwShown: 5, detHoursOpen: false });
+    // En pantalla estrecha (≤1024) el panel de la ficha vive DENTRO
+    // del sc-if de mapVisible, que está desmontado: el clic escribía
+    // el estado y no se pintaba absolutamente nada. Abrir el modal del
+    // mapa monta el panel, y de paso enseña el pin del lugar.
+    const patch = { detail: id, detailFrom: desde || null, detailTab: tab || 'about', detailLoading: true, layersOpen: false, mapSearchOpen: false,
+      rvwOpen: {}, rvwShown: 5, detHoursOpen: false };
+    if (this.state.narrow && !this.state.mapModal) patch.mapModal = true;
+    this.setState(patch);
     clearTimeout(this._dt);
     const p = this.place(id);
     if (this.PLAN_ID && p && p.gpid) {
       if (this._map && p.lat != null) this._map.panTo({ lat: p.lat, lng: p.lng });
       this._details(p.gpid, (d) => {
-        // la primera reseña real alimenta también el carrusel de la fila
-        if (d && d.reviews && d.reviews.length && !p.rvw) {
-          const r0 = d.reviews[0];
-          const txt = (r0.t || '').slice(0, 220);
-          p.rvw = { t: txt + ((r0.t || '').length > 220 ? '…' : ''), stars: r0.stars, who: r0.who };
+        // Las reseñas reales alimentan el carrusel de la fila. Se
+        // guardan TODAS las que dio Google (_details ya recorta a 5),
+        // no sólo la primera: antes las otras cuatro se tiraban y los
+        // chevrones no tenían a dónde avanzar.
+        if (d && d.reviews && d.reviews.length && !(p.rvws || []).length) {
+          p.rvws = d.reviews.slice(0, Component.RVW_TOPE).map(r => {
+            const t = r.t || '';
+            return { t: t.slice(0, 220) + (t.length > 220 ? '…' : ''), stars: r.stars, who: r.who };
+          });
         }
         if (this.state.detail === id) this.setState({ detailLoading: false });
         // El "Acerca de" va aparte: la ficha ya se puede leer mientras se
@@ -1541,6 +1578,47 @@ class Component extends DCLogic {
       this._dt = setTimeout(() => this.setState({ detailLoading: false }), 550);
     }
   }
+  // ════════════ Explorar ════════════
+  static get EX_INI() { return 4; }    // lugares al entrar
+  static get EX_MAS() { return 10; }   // lugares tras "Mostrar más"
+  static get RVW_TOPE() { return 5; }  // reseñas del carrusel
+  static get EX_SECS() {
+    return [
+      { k: 'top',  t: 'Lugares principales a visitar', chip: 'Qué hacer',      icono: 'que-hacer' },
+      { k: 'eat',  t: 'Mejores sitios para comer',     chip: 'Dónde comer',    icono: 'donde-comer' },
+      { k: 'stay', t: 'Alojamientos más destacados',   chip: 'Dónde alojarse', icono: 'donde-alojarse' }
+    ];
+  }
+  // Reseñas de un lugar para el carrusel. Acepta la forma vieja (rvw,
+  // una sola) para que el modo demo siga enseñando la suya.
+  _rvwLista(p) {
+    if (Array.isArray(p.rvws) && p.rvws.length) return p.rvws.slice(0, Component.RVW_TOPE);
+    return p.rvw ? [p.rvw] : [];
+  }
+  // Despliega o repliega una sección de Explorar. Al replegar desaparecen
+  // seis tarjetas de golpe: si no se hiciera nada, el enlace saltaría muy
+  // por encima del borde superior y el usuario perdería el sitio. Se deja
+  // clavado donde estaba. Al desplegar no se toca el scroll, que para eso
+  // lo que interesa es ver lo que acaba de aparecer.
+  _exMasMenos(k) {
+    const abierta = !!(this.state.exMas || {})[k];
+    const sc = document.getElementById('rnExScroll');
+    const btn = document.getElementById('exMas' + k);
+    const antes = (abierta && sc && btn)
+      ? btn.getBoundingClientRect().top - sc.getBoundingClientRect().top : null;
+    this.setState({ exMas: { ...(this.state.exMas || {}), [k]: !abierta } });
+    if (antes === null) return;
+    requestAnimationFrame(() => {
+      const b2 = document.getElementById('exMas' + k);
+      if (!b2 || !sc) return;
+      const ahora = b2.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+      sc.scrollTop += (ahora - antes);
+    });
+  }
+  _rvwIr(id, i) {
+    this.setState({ rvwIdx: { ...(this.state.rvwIdx || {}), [id]: Math.max(0, i) } });
+  }
+
   // ════════════ Horario y coste de un lugar ════════════
   // Horas cada media hora, de 0:00 a 23:30.
   static get HORAS() {
@@ -1810,7 +1888,7 @@ class Component extends DCLogic {
     const p = this.place(id);
     if (p && this.PLAN_ID) {
       const dia = (typeof day === 'number' && day > 0) ? day : 0;
-      const catMap = { atr: 'hacer', com: 'rest', sav: 'custom' };
+      const catMap = { atr: 'hacer', com: 'rest', hot: 'hotel', sav: 'custom' };
       this._sync('plan_items.php', {
         action: 'add', dia: dia, nombre: p.name,
         categoria: catMap[p.cat] || 'custom',
@@ -1938,7 +2016,7 @@ class Component extends DCLogic {
         }).catch(() => {});
     }
   }
-  componentWillUnmount() { window.removeEventListener('keydown', this._esc); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); }
+  componentWillUnmount() { window.removeEventListener('keydown', this._esc); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
 
   renderVals() {
     const s = this.state;
@@ -2268,13 +2346,22 @@ class Component extends DCLogic {
     this._starRow = starRow;
     const exq = s.exQ.trim().toLowerCase();
     const match = (p) => !exq || p.name.toLowerCase().includes(exq);
-    const rowVM = (p) => {
+    // `n` es el número que va dentro del pin. Llega del sitio que pinta
+    // la fila, no del lugar: así cuenta la POSICIÓN dentro de su sección
+    // y siempre empieza en 1, también cuando el buscador ha filtrado.
+    const rowVM = (p, n) => {
       const isAdded = !!s.added[p.id];
       const hovered = s.hoverPlace === p.id;
       const dollar = p.price ? { on: '$'.repeat(p.price), off: '$'.repeat(4 - p.price) } : null;
       return {
-        num: String(p.num), name: p.name,
-        pinFill: hovered ? this.PIN.act : this.PIN[p.cat], pinK: hovered ? '1.15' : '1',
+        num: String(n), name: p.name,
+        // El pin conserva SIEMPRE el color de su categoría. Al pasar por
+        // encima sólo crece y levanta más sombra: teñirlo de amarillo
+        // hacía perder de vista a qué sección pertenece.
+        pinFill: this.PIN[p.cat], pinK: hovered ? '1.15' : '1',
+        pinShadow: hovered
+          ? 'drop-shadow(0 5px 7px rgba(13,31,39,.45))'
+          : 'drop-shadow(0 2px 3px rgba(13,31,39,.3))',
         rowBg: hovered ? '#f7fafc' : 'transparent',
         enter: () => this.setState({ hoverPlace: p.id }),
         leave: () => { if (this.state.hoverPlace === p.id) this.setState({ hoverPlace: null }); },
@@ -2285,10 +2372,24 @@ class Component extends DCLogic {
         hasPrice: !!dollar, priceOn: dollar ? dollar.on : '', priceOff: dollar ? dollar.off : '',
         desc: p.desc || '', hasDesc: !!(p.desc || '').trim(), seed: p.seed,
         foto: p.foto || ('https://picsum.photos/seed/' + p.seed + '/300/240'),
-        hasRvw: !!p.rvw,
-        rvwTxt: p.rvw ? '«' + p.rvw.t + '»' : '',
-        rvwStars: p.rvw ? starRow(p.rvw.stars, 15, 14) : null,
-        rvwWho: p.rvw ? p.rvw.who : '',
+        ...(() => {
+          // Carrusel: hasta 5 reseñas. Los chevrones desaparecen en los
+          // extremos en vez de quedarse pulsables sin hacer nada.
+          const lista = this._rvwLista(p);
+          const n = lista.length;
+          const i = Math.min(Math.max(0, (s.rvwIdx || {})[p.id] || 0), Math.max(0, n - 1));
+          const r0 = lista[i];
+          return {
+            hasRvw: n > 0,
+            rvwTxt: r0 ? '«' + r0.t + '»' : '',
+            rvwStars: r0 ? starRow(r0.stars, 15, 14) : null,
+            rvwWho: r0 ? r0.who : '',
+            rvwHayPrev: i > 0,
+            rvwHaySig: i < n - 1,
+            rvwPrev: () => this._rvwIr(p.id, i - 1),
+            rvwSig: () => this._rvwIr(p.id, i + 1)
+          };
+        })(),
         addBg: isAdded ? '#E9EFF6' : '#0E2A33',
         addCol: isAdded ? '#0D1F27' : '#ffffff',
         addDiv: isAdded ? '#c9d5dd' : 'rgba(255,255,255,.3)',
@@ -2300,12 +2401,58 @@ class Component extends DCLogic {
         caretClick: (e) => this._addAbrir(p.id, e.currentTarget)
       };
     };
-    const secTop = this.PLACES.filter(p => p.sec === 'top' && match(p)).map(rowVM);
-    const secEat = this.PLACES.filter(p => p.sec === 'eat' && match(p)).map(rowVM);
+    // Tres secciones, mismo molde. Se enseñan 4 al entrar y 10 al
+    // pulsar "Mostrar más", que ahora es UNO por sección y va al final,
+    // no uno debajo de cada lugar.
     const sections = [];
-    if (secTop.length) sections.push({ title: 'Lugares principales a visitar', rows: secTop });
-    if (secEat.length) sections.push({ title: 'Mejores sitios para comer', rows: secEat });
+    // Numeración de los pines: la posición dentro de su sección, de 1 en
+    // adelante. Se guarda por id para que el pin del mapa lleve el mismo
+    // número que la fila, sin depender de lo que trajera el cargador.
+    const exNum = {};
+    Component.EX_SECS.forEach(sd => {
+      const todos = this.PLACES.filter(p => p.sec === sd.k && match(p));
+      todos.forEach((p, i) => { exNum[p.id] = i + 1; });
+      if (!todos.length) return;
+      const abierta = !!(s.exMas || {})[sd.k];
+      const tope = abierta ? Component.EX_MAS : Component.EX_INI;
+      sections.push({
+        id: 'exSec' + sd.k, title: sd.t,
+        rows: todos.slice(0, tope).map((p, i) => rowVM(p, i + 1)),
+        // Al buscar no tiene sentido paginar: ya está filtrado. Fuera de
+        // eso el enlace NO desaparece al desplegar, se convierte en
+        // "Mostrar menos": si no, no habría manera de volver a 4.
+        hayMas: !exq && todos.length > Component.EX_INI,
+        masId: 'exMas' + sd.k,
+        masTxt: abierta ? 'Mostrar menos' : 'Mostrar más',
+        masRot: abierta ? '180deg' : '0deg',
+        mas: (e) => { if (e) e.preventDefault(); this._exMasMenos(sd.k); }
+      });
+    });
+    // La línea gris sólo separa una sección de la siguiente; entre los
+    // lugares de una misma sección no va ninguna.
+    sections.forEach((sc, i) => { sc.hayLinea = i < sections.length - 1; });
     V.exSections = sections;
+    // Los chips de debajo de la descripción saltan a su sección.
+    const irASec = (k) => {
+      const sc = document.getElementById('rnExScroll');
+      const el = document.getElementById('exSec' + k);
+      if (!sc || !el) return;
+      const destino = sc.scrollTop + el.getBoundingClientRect().top - sc.getBoundingClientRect().top - 12;
+      const desde = sc.scrollTop;
+      sc.scrollTo({ top: destino, behavior: 'smooth' });
+      // Red de seguridad: con "reducir movimiento" o en una pestaña en
+      // segundo plano el scroll suave no se ejecuta y el chip parecería
+      // no hacer nada. Sólo se coloca a mano si NO se movió ni un
+      // píxel; si el usuario interrumpió desplazando, se le respeta.
+      clearTimeout(this._exScrollT);
+      this._exScrollT = setTimeout(() => {
+        if (Math.abs(sc.scrollTop - desde) < 1 && Math.abs(destino - desde) > 1) sc.scrollTop = destino;
+      }, 320);
+    };
+    V.exChips = Component.EX_SECS.map(sd => ({
+      t: sd.chip, img: 'img/expl/' + sd.icono + '.png',
+      go: () => irASec(sd.k)
+    }));
     V.exEmpty = exq !== '' && sections.length === 0;
 
     // ── Listas ──
@@ -2573,18 +2720,22 @@ class Component extends DCLogic {
           num: String(i + 1), name: it.name,
           pinFill: meta.color,
           // El nombre abre la ficha del lugar en el mapa
-          nameCur: 'pointer',
           nameTitle: 'Ver información de ' + it.name,
           // Al pulsar la tarjeta se despliegan "Añadir" (hora) y
           // "Añadir costo". Se abre una sola a la vez.
           abierto: s.itemOpen === it.uid,
           sinNota: !(it.nota || '').trim(),
           toggleAbierto: (e) => {
-            // Los controles de dentro (nombre, reacciones, papelera,
-            // medio de transporte) ya tienen su acción: si no se
-            // descartan aquí, pulsarlos plegaría además la tarjeta.
+            // Los controles de dentro (botones, asa de arrastre) ya
+            // tienen su acción; el resto de la tarjeta despliega.
+            //
+            // El nombre YA NO se descarta: su <p> tenía flex:1, o sea
+            // que su caja ocupaba el 87 % del ancho aunque el texto
+            // fuera corto, y ahí el clic no hacía nada. Ahora el <p>
+            // se ciñe al texto y, si se pulsa, abre la ficha del lugar
+            // Y despliega la tarjeta: las dos cosas son coherentes.
             const t = e && e.target;
-            if (t && t.closest && t.closest('button, input, textarea, select, a, .rn-itemname')) return;
+            if (t && t.closest && t.closest('button, input, textarea, select, a, .rn-grip')) return;
             this.setState({ itemOpen: this.state.itemOpen === it.uid ? null : it.uid });
           },
           addHora: (e) => this._horaAbrir(it.uid, e.currentTarget),
@@ -3000,13 +3151,18 @@ class Component extends DCLogic {
         });
       });
     });
-    // Pines de los lugares de Explorar (Places reales, capas top/eat)
+    // Pines de los lugares de Explorar (Places reales; capas top/eat/stay).
+    // Llevan el MISMO número que su fila. Si el buscador de Explorar dejó
+    // fuera un lugar, su pin también se va: de lo contrario quedarían dos
+    // pines con el mismo número y ninguno correspondería a la lista.
     (this.PLACES || []).forEach(p => {
+      const n = exNum[p.id] || (exq ? 0 : (p.num || 0));
+      if (!n) return;
       const pp = pinPx[p.id];
       if (!pp) return;
       const hot = s.hoverPlace === p.id || s.detail === p.id;
       V.mapPins.push({
-        num: String(p.num), name: p.name,
+        num: String(n), name: p.name,
         left: pp.left + 'px', top: pp.top + 'px',
         fill: this.PIN[p.cat],
         hover: hot, z: hot ? 55 : 40,
@@ -3067,7 +3223,8 @@ class Component extends DCLogic {
     const setLayer = (k, v) => this.setState({ layerChecks: { ...this.state.layerChecks, [k]: v } });
     V.layersRes = [
       { t: 'Lugares principales a visitar', color: this.PIN.atr, k: 'top' },
-      { t: 'Mejores sitios para comer', color: this.PIN.com, k: 'eat' }
+      { t: 'Mejores sitios para comer', color: this.PIN.com, k: 'eat' },
+      { t: 'Alojamientos más destacados', color: this.PIN.hot, k: 'stay' }
     ].map(l => ({ ...l, on: layerOn(l.k), toggle: () => setLayer(l.k, !layerOn(l.k)) }));
     V.layersIt = this.DAYS.map((d, i) => ({ t: d.label, color: d.color, k: 'd' + i, i }))
       .map(l => ({
@@ -3088,7 +3245,7 @@ class Component extends DCLogic {
     V.layersAll = (e) => { e.preventDefault(); this.setState({ layerChecks: {}, rutaSolo: null }); };
     V.layersNone = (e) => {
       e.preventDefault();
-      const off = { top: false, eat: false };
+      const off = { top: false, eat: false, stay: false };
       this.DAYS.forEach((_, i) => { off['d' + i] = false; });
       this.setState({ layerChecks: off });
     };
@@ -3151,7 +3308,11 @@ class Component extends DCLogic {
     }));
     V.detTabAbout = s.detailTab === 'about'; V.detTabRvw = s.detailTab === 'rvw'; V.detTabFotos = s.detailTab === 'fotos';
     if (det) {
-      V.detName = det.name; V.detNum = String(det.num);
+      V.detName = det.name;
+      // Los lugares de Explorar llevan en la ficha el mismo número que en
+      // su sección; los del itinerario, el de su posición en el día.
+      V.detNum = String(exNum[det.id] && det.sec !== 'itin' && det.sec !== 'search'
+        ? exNum[det.id] : det.num);
       V.detPin = det.pinColor || this.PIN[det.cat];
       V.detSeed = det.seed;
       V.detFoto = det.foto || ('https://picsum.photos/seed/' + det.seed + '/280/200');

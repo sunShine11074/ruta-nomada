@@ -18,8 +18,17 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
 .rn-mapcat:hover{background:#E6E6E4 !important;}
 .rn-menuitem:hover{background:#E9E9E9 !important;}
 .rn-gastorow + .rn-gastorow{border-top:1px solid #E4EBEF;}
-.rn-ckrow .rn-ckact{opacity:0;transition:opacity .12s;}
-.rn-ckrow:hover .rn-ckact{opacity:1;}
+/* opacity:0 NO desactiva el ratón: mientras sólo se atenuaba, la
+   barra de reacciones seguía capturando clics que el usuario creía
+   dar sobre la tarjeta. El pointer-events va atado a la visibilidad. */
+.rn-ckrow .rn-ckact{opacity:0;pointer-events:none;transition:opacity .12s;}
+.rn-ckrow:hover .rn-ckact,.rn-ckrow:focus-within .rn-ckact{opacity:1;pointer-events:auto;}
+/* El asa es ahora lo ÚNICO que se arrastra, así que no puede estar
+   invisible en reposo o nadie descubriría que se puede reordenar. */
+.rn-ckrow .rn-grip{opacity:.4;pointer-events:auto;}
+.rn-ckrow:hover .rn-grip{opacity:1;}
+.rn-grip:hover{background:#E4E7EA;}
+.rn-grip:active{cursor:grabbing;}
 .rn-itemcard:hover .rn-itemname{color:#858C93;}
 .rn-block .rn-blocktrash{opacity:0;transition:opacity .12s;}
 .rn-block:hover .rn-blocktrash{opacity:1;}
@@ -53,6 +62,12 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
 .rn-addrow.on{font-weight:700;}
 .rn-addrow.rn-addquitar{color:#C0341D;}
 .rn-addrow.rn-addquitar:hover{background:#FDECE8;}
+/* Tarjetas de "Categorías": el icono va en un disco que se tiñe al
+   pasar por encima. El fondo base va en clase, no en línea, porque el
+   runtime emite los style-hover sin !important. */
+.rn-catcard:hover{border-color:#b9d4ea;box-shadow:0 4px 14px rgba(13,31,39,.09);transform:translateY(-1px);}
+.rn-catcard:hover .rn-catico{background:#DCEBF7;}
+.rn-catcard:focus-visible{outline:2px solid #0E2A33;outline-offset:2px;}
 @keyframes rnFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 @keyframes rnFadeIn{from{opacity:0;}to{opacity:1;}}
 @keyframes rnMenu{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
@@ -406,13 +421,13 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         <h1 style="margin:0;font-size:40px;font-weight:700;color:#0D1F27;letter-spacing:-.6px">{{ destino }}</h1>
         <p style="margin:14px 0 0;font-size:14px;color:#33454e;line-height:1.75;text-wrap:pretty">{{ destinoDesc }}</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-          <button onClick="{{ noop }}" style="display:flex;align-items:center;gap:8px;border:1px solid #b9d4ea;border-radius:18px;background:#DCEBF7;padding:8px 15px;font-size:12.6px;font-weight:600;color:#14456e;cursor:pointer;transition:background .15s" style-hover="background:#cbe1f3" style-focus="outline:2px solid #0E2A33;outline-offset:2px"><img src="img/expl/que-hacer.png" alt="" style="width:16px;height:16px;object-fit:contain">Qué hacer</button>
-          <button onClick="{{ noop }}" style="display:flex;align-items:center;gap:8px;border:1px solid #b9d4ea;border-radius:18px;background:#DCEBF7;padding:8px 15px;font-size:12.6px;font-weight:600;color:#14456e;cursor:pointer;transition:background .15s" style-hover="background:#cbe1f3" style-focus="outline:2px solid #0E2A33;outline-offset:2px"><img src="img/expl/donde-comer.png" alt="" style="width:16px;height:16px;object-fit:contain">Dónde comer</button>
-          <button onClick="{{ noop }}" style="display:flex;align-items:center;gap:8px;border:1px solid #b9d4ea;border-radius:18px;background:#DCEBF7;padding:8px 15px;font-size:12.6px;font-weight:600;color:#14456e;cursor:pointer;transition:background .15s" style-hover="background:#cbe1f3" style-focus="outline:2px solid #0E2A33;outline-offset:2px"><img src="img/expl/donde-alojarse.png" alt="" style="width:16px;height:16px;object-fit:contain">Dónde alojarse</button>
+          <sc-for list="{{ exChips }}" as="ec" hint-placeholder-count="3">
+            <button onClick="{{ ec.go }}" style="display:flex;align-items:center;gap:8px;border:1px solid #b9d4ea;border-radius:18px;background:#DCEBF7;padding:8px 15px;font-size:12.6px;font-weight:600;color:#14456e;cursor:pointer;transition:background .15s" style-hover="background:#cbe1f3" style-focus="outline:2px solid #0E2A33;outline-offset:2px"><img src="{{ ec.img }}" alt="" style="width:16px;height:16px;object-fit:contain">{{ ec.t }}</button>
+          </sc-for>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:26px;position:relative">
           <h3 style="margin:0;font-size:19px;font-weight:700;color:#0D1F27">Categorías</h3>
-          <a href="#" onClick="{{ catAllToggle }}" style="font-size:12.8px;font-weight:600;color:#0D1F27;text-decoration:none" style-hover="text-decoration:underline">Ver todo</a>
+          <a href="#" onClick="{{ catAllToggle }}" style="font-size:12.8px;font-weight:600;color:#0D1F27;text-decoration:none" style-hover="text-decoration:underline">Ver todas</a>
           <sc-if value="{{ catAllOpen }}" hint-placeholder-val="{{ false }}">
             <div id="rnCatPanel" style="position:absolute;top:calc(100% + 8px);right:0;z-index:470;width:370px;max-width:100%;height:612px;background:#ffffff;border-radius:12px;box-shadow:0 14px 44px rgba(13,31,39,.3);display:flex;flex-direction:column;overflow:hidden;animation:rnMenu .18s ease both">
               <div style="padding:16px 18px 0;flex-shrink:0">
@@ -445,8 +460,8 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         </div>
         <div style="display:grid;grid-template-columns:repeat({{ catCols }},1fr);gap:10px;margin-top:13px">
           <sc-for list="{{ catCards }}" as="c" hint-placeholder-count="0">
-            <button onClick="{{ noop }}" style="display:flex;align-items:center;gap:10px;background:#F4F7F9;border:1px solid #DCE5EA;border-radius:10px;height:46px;padding:0 13px;cursor:pointer;font-size:12.6px;font-weight:500;color:#1a73c8;text-align:left;transition:border-color .15s,background .15s" style-hover="border-color:#93a2ab;background:#eef3f7" style-focus="outline:2px solid #0E2A33;outline-offset:1px">
-              {{ c.iconEl }}
+            <button onClick="{{ noop }}" class="rn-catcard" style="display:flex;align-items:center;gap:12px;background:#ffffff;border:1px solid #E4EBEF;border-radius:14px;height:58px;padding:0 14px;cursor:pointer;font-size:13px;font-weight:600;color:#0D1F27;text-align:left;transition:border-color .16s,box-shadow .16s,transform .12s">
+              <span class="rn-catico" style="width:36px;height:36px;border-radius:50%;background:#EEF3F7;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .16s">{{ c.iconEl }}</span>
               <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.t }}</span>
             </button>
           </sc-for>
@@ -470,11 +485,15 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
             </div>
           </sc-if>
           <sc-for list="{{ exSections }}" as="sec" hint-placeholder-count="0">
-            <h3 style="margin:0 0 4px;font-size:19px;font-weight:700;color:#0D1F27">{{ sec.title }}</h3>
+            <h3 id="{{ sec.id }}" style="margin:0 0 4px;font-size:19px;font-weight:700;color:#0D1F27">{{ sec.title }}</h3>
             <sc-for list="{{ sec.rows }}" as="r" hint-placeholder-count="0">
               <div onMouseEnter="{{ r.enter }}" onMouseLeave="{{ r.leave }}" style="padding:18px 10px 14px;margin:0 -10px;border-radius:12px;background:{{ r.rowBg }};transition:background .15s">
                 <div style="display:flex;align-items:flex-start;gap:11px">
-                  <svg width="24" height="30" viewBox="0 0 34 44" style="flex-shrink:0;margin-top:-2px;filter:drop-shadow(0 2px 3px rgba(13,31,39,.3));transition:transform .15s;transform:scale({{ r.pinK }})"><path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="{{ r.pinFill }}"></path><text x="17" y="23" text-anchor="middle" font-family="Poppins,sans-serif" font-size="15" font-weight="700" fill="#ffffff">{{ r.num }}</text></svg>
+                  <!-- El número va en un <span> encima del pin, NO en un <text> del SVG: el runtime envuelve cada {{ }} en <span class="sc-interp">, y dentro de un <text> ese span hereda el espacio de nombres SVG, no dibuja glifos y el número queda invisible (mismo montaje que los pines del mapa). -->
+                  <span style="position:relative;display:block;width:24px;height:30px;flex-shrink:0;margin-top:-2px;filter:{{ r.pinShadow }};transition:transform .15s,filter .15s;transform:scale({{ r.pinK }})">
+                    <svg width="24" height="30" viewBox="0 0 34 44" style="display:block"><path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="{{ r.pinFill }}"></path></svg>
+                    <span style="position:absolute;top:0;left:0;width:24px;height:23px;display:flex;align-items:center;justify-content:center;font-family:Poppins,sans-serif;font-size:10.2px;font-weight:700;color:#ffffff;pointer-events:none">{{ r.num }}</span>
+                  </span>
                   <h4 style="margin:0;font-size:15.5px;font-weight:700;color:#0D1F27;flex:1;min-width:0;cursor:pointer" onClick="{{ r.openDet }}">{{ r.name }}</h4>
                   <div style="position:relative;flex-shrink:0">
                     <span style="display:flex;align-items:stretch;border-radius:18px;overflow:hidden;background:{{ r.addBg }};transition:background .2s;box-shadow:{{ r.addShadow }}">
@@ -506,7 +525,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                   <img src="{{ r.foto }}" alt="" onClick="{{ r.openDet }}" style="width:132px;height:100px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#dfe6ec;cursor:pointer">
                 </div>
                 <sc-if value="{{ r.hasRvw }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:12px;margin:14px 0 0 35px">
-                  <button onClick="{{ noop }}" aria-label="Reseña anterior" style="width:30px;height:30px;border-radius:50%;border:1px solid #DCE5EA;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#5b6b74;flex-shrink:0" style-hover="background:#f1f5f8;color:#16262e"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+                  <sc-if value="{{ r.rvwHayPrev }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.rvwPrev }}" aria-label="Reseña anterior" style="width:30px;height:30px;border-radius:50%;border:1px solid #DCE5EA;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#5b6b74;flex-shrink:0" style-hover="background:#f1f5f8;color:#16262e"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button></sc-if>
                   <div style="flex:1;min-width:0">
                     <p style="margin:0;font-size:12.6px;font-style:italic;color:#4a5b64;line-height:1.65">{{ r.rvwTxt }}</p>
                     <div style="display:flex;align-items:center;gap:9px;margin-top:6px">
@@ -514,12 +533,15 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                       <a href="#" onClick="{{ noop }}" style="font-size:12px;font-weight:500">{{ r.rvwWho }} -- Reseña de Google</a>
                     </div>
                   </div>
-                  <button onClick="{{ noop }}" aria-label="Siguiente reseña" style="width:30px;height:30px;border-radius:50%;border:1px solid #DCE5EA;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#5b6b74;flex-shrink:0" style-hover="background:#f1f5f8;color:#16262e"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+                  <sc-if value="{{ r.rvwHaySig }}" hint-placeholder-val="{{ true }}"><button onClick="{{ r.rvwSig }}" aria-label="Siguiente reseña" style="width:30px;height:30px;border-radius:50%;border:1px solid #DCE5EA;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#5b6b74;flex-shrink:0" style-hover="background:#f1f5f8;color:#16262e"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button></sc-if>
                 </div></sc-if>
-                <a href="#" onClick="{{ noop }}" style="display:inline-flex;align-items:center;gap:6px;margin:13px 0 0 35px;font-size:12.6px;font-weight:600;color:#3c6478;text-decoration:none" style-hover="text-decoration:underline">Mostrar más <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></a>
               </div>
-              <div style="height:1px;background:#E4EBEF;margin:10px 0 14px"></div>
             </sc-for>
+            <!-- Un solo enlace por sección, que alterna entre Mostrar más y
+                 Mostrar menos: 20 px por encima, 40 px hasta la línea. -->
+            <sc-if value="{{ sec.hayMas }}" hint-placeholder-val="{{ true }}"><a href="#" id="{{ sec.masId }}" onClick="{{ sec.mas }}" style="display:flex;width:fit-content;align-items:center;gap:6px;margin:20px 0 0 35px;font-size:12.6px;font-weight:600;color:#3c6478;text-decoration:none" style-hover="text-decoration:underline">{{ sec.masTxt }} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({{ sec.masRot }});transition:transform .15s"><path d="M6 9l6 6 6-6"></path></svg></a></sc-if>
+            <!-- La única línea gris que hay: separa una sección de la siguiente. -->
+            <sc-if value="{{ sec.hayLinea }}" hint-placeholder-val="{{ true }}"><div style="height:1px;background:#DEE2E6;margin:40px 0 40px"></div></sc-if>
           </sc-for>
         </sc-if>
       </div>
@@ -572,10 +594,10 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                 <div onDragOver="{{ it.gapOver }}" onDragLeave="{{ it.gapLeave }}" onDrop="{{ it.gapDrop }}" style="height:{{ it.gapH }};border-radius:8px;border:{{ it.gapB }};background:{{ it.gapBg }};transition:height .12s;margin:1px 0"></div>
                 <div class="rn-block" style="margin-top:8px;position:relative">
                 <div>
-                <div class="rn-ckrow rn-itemcard" draggable="true" onClick="{{ it.toggleAbierto }}" onDragStart="{{ it.dragStart }}" onDragEnd="{{ it.dragEnd }}" style="flex:1;min-width:0;position:relative;background:#F1F3F5;border-radius:12px;padding:14px 18px 13px 24px;cursor:grab">
+                <div class="rn-ckrow rn-itemcard" onClick="{{ it.toggleAbierto }}" style="flex:1;min-width:0;position:relative;background:#F1F3F5;border-radius:12px;padding:14px 18px 13px 24px;cursor:pointer">
                   <span style="position:absolute;top:11px;left:-13px;width:26px;height:35px;pointer-events:none"><svg width="26" height="35" viewBox="128 64 384 518" style="display:block;filter:drop-shadow(0 1px 3px rgba(13,31,39,.25))"><path fill="{{ it.pinFill }}" d="M320 64C214 64 128 148.4 128 252.6C128 371.9 248.2 514.9 298.4 569.4C310.2 582.2 329.8 582.2 341.6 569.4C391.8 514.9 512 371.9 512 252.6C512 148.4 426 64 320 64z"></path></svg><span style="position:absolute;top:0;left:0;width:26px;height:25px;display:flex;align-items:center;justify-content:center;color:#ffffff;font-size:12px;font-weight:700">{{ it.num }}</span></span>
                   <sc-if value="{{ it.noReacts }}" hint-placeholder-val="{{ false }}">
-                    <span class="rn-ckact" style="position:absolute;right:16px;top:calc(100% - 12px);z-index:6;display:inline-flex;align-items:center;gap:2px;background:#ffffff;border:1px solid #E9ECEF;border-radius:10px;padding:2px 4px;box-shadow:0 2px 8px rgba(13,31,39,.12)">
+                    <span class="rn-ckact" style="position:absolute;right:16px;top:100%;z-index:6;display:inline-flex;align-items:center;gap:2px;background:#ffffff;border:1px solid #E9ECEF;border-radius:10px;padding:2px 4px;box-shadow:0 2px 8px rgba(13,31,39,.12)">
                       <sc-for list="{{ it.quickEmos }}" as="qe" hint-placeholder-count="0">
                         <button onClick="{{ qe.pick }}" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:6px;line-height:1" style-hover="background:#f1f5f8">{{ qe.e }}</button>
                       </sc-for>
@@ -588,19 +610,22 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                   </sc-if>
                   <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:flex-start;gap:8px">
-                      <p onClick="{{ it.openDet }}" class="rn-itemname" title="{{ it.nameTitle }}" style="margin:0;font-size:14.5px;font-weight:700;color:#0D1F27;flex:1;min-width:0;cursor:{{ it.nameCur }};transition:color .15s">{{ it.name }}</p>
-                      <svg class="rn-ckact" width="14" height="16" viewBox="0 0 640 640" style="flex-shrink:0;cursor:grab;margin-top:2px"><path fill="#495057" d="M288 104C288 81.9 270.1 64 248 64L200 64C177.9 64 160 81.9 160 104L160 152C160 174.1 177.9 192 200 192L248 192C270.1 192 288 174.1 288 152L288 104zM288 296C288 273.9 270.1 256 248 256L200 256C177.9 256 160 273.9 160 296L160 344C160 366.1 177.9 384 200 384L248 384C270.1 384 288 366.1 288 344L288 296zM160 488L160 536C160 558.1 177.9 576 200 576L248 576C270.1 576 288 558.1 288 536L288 488C288 465.9 270.1 448 248 448L200 448C177.9 448 160 465.9 160 488zM480 104C480 81.9 462.1 64 440 64L392 64C369.9 64 352 81.9 352 104L352 152C352 174.1 369.9 192 392 192L440 192C462.1 192 480 174.1 480 152L480 104zM352 296L352 344C352 366.1 369.9 384 392 384L440 384C462.1 384 480 366.1 480 344L480 296C480 273.9 462.1 256 440 256L392 256C369.9 256 352 273.9 352 296zM480 488C480 465.9 462.1 448 440 448L392 448C369.9 448 352 465.9 352 488L352 536C352 558.1 369.9 576 392 576L440 576C462.1 576 480 558.1 480 536L480 488z"></path></svg>
+                      <p onClick="{{ it.openDet }}" class="rn-itemname" title="{{ it.nameTitle }}" style="margin:0;font-size:14.5px;font-weight:700;color:#0D1F27;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;transition:color .15s">{{ it.name }}</p>
+                      <span style="flex:1;min-width:8px;align-self:stretch"></span>
+                      <span class="rn-ckact rn-grip" draggable="true" onDragStart="{{ it.dragStart }}" onDragEnd="{{ it.dragEnd }}" role="button" aria-label="Arrastrar para reordenar" title="Arrastrar para reordenar" style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin:-2px -4px 0 0;border-radius:6px;cursor:grab">
+                        <svg width="14" height="16" viewBox="0 0 640 640" style="display:block;pointer-events:none"><path fill="#495057" d="M288 104C288 81.9 270.1 64 248 64L200 64C177.9 64 160 81.9 160 104L160 152C160 174.1 177.9 192 200 192L248 192C270.1 192 288 174.1 288 152L288 104zM288 296C288 273.9 270.1 256 248 256L200 256C177.9 256 160 273.9 160 296L160 344C160 366.1 177.9 384 200 384L248 384C270.1 384 288 366.1 288 344L288 296zM160 488L160 536C160 558.1 177.9 576 200 576L248 576C270.1 576 288 558.1 288 536L288 488C288 465.9 270.1 448 248 448L200 448C177.9 448 160 465.9 160 488zM480 104C480 81.9 462.1 64 440 64L392 64C369.9 64 352 81.9 352 104L352 152C352 174.1 369.9 192 392 192L440 192C462.1 192 480 174.1 480 152L480 104zM352 296L352 344C352 366.1 369.9 384 392 384L440 384C462.1 384 480 366.1 480 344L480 296C480 273.9 462.1 256 440 256L392 256C369.9 256 352 273.9 352 296zM480 488C480 465.9 462.1 448 440 448L392 448C369.9 448 352 465.9 352 488L352 536C352 558.1 369.9 576 392 576L440 576C462.1 576 480 558.1 480 536L480 488z"></path></svg>
+                      </span>
                     </div>
                     <sc-if value="{{ it.hasNota }}" hint-placeholder-val="{{ false }}"><p style="margin:7px 0 0;font-size:12.6px;color:#4a5b64;line-height:1.72;white-space:pre-line;text-wrap:pretty">{{ it.nota }}</p></sc-if>
                     <sc-if value="{{ it.abierto }}" hint-placeholder-val="{{ false }}">
                       <sc-if value="{{ it.sinNota }}" hint-placeholder-val="{{ true }}"><p style="margin:7px 0 0;font-size:12.6px;color:#8b969d;line-height:1.72">Añadir notas, enlaces, etc. aquí</p></sc-if>
                       <div style="display:flex;align-items:center;gap:18px;margin-top:10px">
                         <button onClick="{{ it.addHora }}" style="display:flex;align-items:center;gap:7px;border:none;background:none;padding:0;cursor:pointer;font-family:inherit;font-size:12.6px;font-weight:600;color:#212529" style-hover="color:#0D1F27">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6C757D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
-                          Añadir
+                          <svg width="14" height="14" viewBox="64 64 512 512" style="flex-shrink:0"><path fill="#6C757D" d="M528 320C528 434.9 434.9 528 320 528C205.1 528 112 434.9 112 320C112 205.1 205.1 112 320 112C434.9 112 528 205.1 528 320zM64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320zM296 184L296 320C296 328 300 335.5 306.7 340L402.7 404C413.7 411.4 428.6 408.4 436 397.3C443.4 386.2 440.4 371.4 429.3 364L344 307.2L344 184C344 170.7 333.3 160 320 160C306.7 160 296 170.7 296 184z"></path></svg>
+                          Añadir tiempo
                         </button>
                         <button onClick="{{ it.addCosto }}" style="display:flex;align-items:center;gap:7px;border:none;background:none;padding:0;cursor:pointer;font-family:inherit;font-size:12.6px;font-weight:600;color:#212529" style-hover="color:#0D1F27">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6C757D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 1v22"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                          <svg width="7.88" height="14" viewBox="176 64 288 512" style="flex-shrink:0"><path fill="#6C757D" d="M296 88C296 74.7 306.7 64 320 64C333.3 64 344 74.7 344 88L344 128L400 128C417.7 128 432 142.3 432 160C432 177.7 417.7 192 400 192L285.1 192C260.2 192 240 212.2 240 237.1C240 259.6 256.5 278.6 278.7 281.8L370.3 294.9C424.1 302.6 464 348.6 464 402.9C464 463.2 415.1 512 354.9 512L344 512L344 552C344 565.3 333.3 576 320 576C306.7 576 296 565.3 296 552L296 512L224 512C206.3 512 192 497.7 192 480C192 462.3 206.3 448 224 448L354.9 448C379.8 448 400 427.8 400 402.9C400 380.4 383.5 361.4 361.3 358.2L269.7 345.1C215.9 337.5 176 291.4 176 237.1C176 176.9 224.9 128 285.1 128L296 128L296 88z"></path></svg>
                           Añadir costo
                         </button>
                       </div>
@@ -1082,7 +1107,11 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
               <div>
                 <img src="{{ detFoto }}" alt="" style="float:right;width:110px;height:78px;border-radius:10px;object-fit:cover;background:#dfe6ec;margin:0 0 15px 15px">
                 <div style="display:flex;align-items:flex-start;gap:15px">
-                  <svg width="22" height="28" viewBox="0 0 34 44" style="flex-shrink:0"><path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="{{ detPin }}"></path><text x="17" y="23" text-anchor="middle" font-family="Poppins,sans-serif" font-size="15" font-weight="700" fill="#ffffff">{{ detNum }}</text></svg>
+                  <!-- Mismo motivo que el pin de Explorar: el número en un <span>, no en un <text>. -->
+                  <span style="position:relative;display:block;width:22px;height:28px;flex-shrink:0">
+                    <svg width="22" height="28" viewBox="0 0 34 44" style="display:block"><path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="{{ detPin }}"></path></svg>
+                    <span style="position:absolute;top:0;left:0;width:22px;height:21px;display:flex;align-items:center;justify-content:center;font-family:Poppins,sans-serif;font-size:9.5px;font-weight:700;color:#ffffff;pointer-events:none">{{ detNum }}</span>
+                  </span>
                   <h4 style="margin:0;font-size:16px;font-weight:700;color:#0D1F27;flex:1;min-width:0">{{ detName }}</h4>
                 </div>
                 <p style="margin:10px 0 0;font-size:13.2px;color:#33454e;line-height:1.7;text-wrap:pretty">{{ detDesc }}</p>
