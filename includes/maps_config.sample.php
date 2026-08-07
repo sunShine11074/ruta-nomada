@@ -17,6 +17,12 @@
 //    · Places API            (buscar lugares, reseñas, horarios)
 //    · Places API (New)      (la descripción "Acerca de" de cada sitio)
 //    · Geocoding API         (convertir el destino en coordenadas)
+//    · Routes API            (la ruta por carretera entre los lugares de
+//                             un día; si falta, el mapa une los sitios con
+//                             rectas PUNTEADAS en vez de seguir las calles)
+//
+//  Para comprobar de una vez si están todas:
+//      php herramientas/diagnostico.php
 //
 //  ⚠ RESTRÍNGELA ANTES DE PUBLICAR NADA. Esta clave viaja en el HTML
 //  y cualquiera la puede leer con Ctrl+U; eso es normal en una clave
@@ -28,7 +34,7 @@
 //      NUNCA uses un comodín en un hosting compartido, tipo
 //      https://*.algun-hosting-gratis.net/*  — eso autoriza a todos
 //      los demás usuarios de ese hosting a gastar con tu clave.
-//    · Restricción de API → sólo las cuatro de arriba.
+//    · Restricción de API → sólo las cinco de arriba.
 //  Y ponle CUOTAS diarias (no sólo un presupuesto: el presupuesto
 //  avisa por correo, la cuota sí detiene el gasto).
 // ============================================================

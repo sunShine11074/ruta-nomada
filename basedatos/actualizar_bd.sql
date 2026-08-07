@@ -92,8 +92,37 @@ CREATE TABLE IF NOT EXISTS `plan_item_gasto` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- ── 3. Comprobación ─────────────────────────────────────────
--- Si todo salió bien, esto imprime 5 columnas nuevas y 1 tabla nueva.
+-- ── 3. Caché de rutas: por qué salen punteadas ──────────────
+--
+-- api/ruta.php consulta estas dos tablas ANTES de llamar a Google. Si no
+-- existen, la consulta falla, el navegador no recibe geometría y dibuja
+-- una recta PUNTEADA entre cada par de lugares en vez de la ruta real
+-- por carretera. Es exactamente el síntoma "las rutas están punteadas".
+--
+-- Estaban sueltas en migrate_rutas.sql y no entraban ni por instalar.sql
+-- ni por aquí, así que faltaban en TODA instalación que no fuera la
+-- original. Ya están en los dos sitios.
+
+CREATE TABLE IF NOT EXISTS `tramo_cache` (
+  `hash` char(32) NOT NULL COMMENT 'md5(modo|origen>destino)',
+  `pts` mediumtext DEFAULT NULL COMMENT 'JSON [[lat,lng],...]; NULL si no hubo ruta',
+  `ok` tinyint(1) NOT NULL DEFAULT 1 COMMENT '0 = Google dijo que no hay ruta',
+  `metros` int(11) DEFAULT NULL,
+  `segundos` int(11) DEFAULT NULL,
+  `creado` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`hash`),
+  KEY `idx_creado` (`creado`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ruta_uso` (
+  `mes` char(7) NOT NULL COMMENT 'AAAA-MM',
+  `n` int(11) NOT NULL DEFAULT 0 COMMENT 'peticiones enviadas a Google ese mes',
+  PRIMARY KEY (`mes`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ── 4. Comprobación ─────────────────────────────────────────
+-- Si todo salió bien, esto imprime 5 columnas nuevas y 3 tablas nuevas.
 
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -101,5 +130,6 @@ SELECT
        AND COLUMN_NAME IN ('modo_viaje','moneda','gasto_cat','gasto_desc','gasto_modo'))
     AS `columnas_nuevas_en_plan_items (deben ser 5)`,
   (SELECT COUNT(*) FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_item_gasto')
-    AS `tabla_plan_item_gasto (debe ser 1)`;
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN ('plan_item_gasto','tramo_cache','ruta_uso'))
+    AS `tablas_nuevas (deben ser 3)`;

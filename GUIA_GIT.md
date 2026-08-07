@@ -230,6 +230,44 @@ Casi siempre es la base de datos, que se quedó atrás:
 php herramientas/diagnostico.php
 ```
 
+### Las rutas del mapa salen punteadas
+
+El punteado es la línea de reserva: significa que la aplicación no pudo
+conseguir la ruta real por carretera y unió los lugares con una recta.
+Las tres causas, en orden de probabilidad:
+
+1. **Faltan las tablas `tramo_cache` y `ruta_uso`.** Estuvieron sueltas
+   en `migrate_rutas.sql` un tiempo y no entraban en la instalación.
+   Se arregla sin perder datos:
+
+   ```bash
+   /c/xampp/mysql/bin/mysql.exe -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
+   ```
+
+2. **La Routes API no está habilitada** en el proyecto de Google Cloud
+   de esa clave.
+
+3. **PHP no puede salir a internet**, casi siempre porque a XAMPP recién
+   instalado le faltan los certificados raíz de cURL.
+
+El diagnóstico distingue las tres y dice cuál es:
+
+```bash
+php herramientas/diagnostico.php
+```
+
+### No me deja elegir un lugar / el buscador de destino no sugiere nada
+
+Eso es la **Maps JavaScript API + Places API**, que corren en el
+navegador, así que el fallo no aparece en la terminal. Abre la página,
+pulsa **F12 → Console** y mira si sale algo en rojo terminado en
+`MapError`. El diagnóstico explica qué significa cada uno en su punto 7.
+
+Lo más habitual: pegar la clave dentro de `includes/maps_config.sample.php`
+en lugar de crear `includes/maps_config.php`. La aplicación **nunca** lee
+los `.sample`: son sólo plantillas. El diagnóstico también detecta ese
+despiste.
+
 ### Botón de emergencia
 
 Tirar TODO lo local y quedarte exactamente con lo que hay publicado.

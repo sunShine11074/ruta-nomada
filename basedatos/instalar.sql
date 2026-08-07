@@ -58,6 +58,43 @@ CREATE TABLE `ai_uso` (
   CONSTRAINT `fk_aiuso_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_aiuso_user` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Caché de rutas del itinerario (api/ruta.php) ─────────────
+--
+-- Sin estas dos tablas api/ruta.php revienta en su primera consulta y
+-- el mapa se queda con líneas rectas PUNTEADAS en vez de la ruta real
+-- por carretera. Estaban sólo en migrate_rutas.sql, así que cualquier
+-- instalación limpia nacía sin ellas.
+--
+-- Guarda la geometría de cada TRAMO (par de lugares consecutivos) para
+-- no volver a pedírsela a Google. Al reordenar un día, los tramos que
+-- no cambiaron salen de aquí y cuestan cero.
+--
+-- OJO con el TTL de 25 días de api/ruta.php: los términos de Google
+-- Maps Platform permiten cachear coordenadas derivadas 30 días como
+-- mucho. Los place_id sí son permanentes; lo que caduca es la geometría.
+
+DROP TABLE IF EXISTS `tramo_cache`;
+CREATE TABLE `tramo_cache` (
+  `hash` char(32) NOT NULL COMMENT 'md5(modo|origen>destino)',
+  `pts` mediumtext DEFAULT NULL COMMENT 'JSON [[lat,lng],...]; NULL si no hubo ruta',
+  `ok` tinyint(1) NOT NULL DEFAULT 1 COMMENT '0 = Google dijo que no hay ruta; se cachea para no reintentar siempre',
+  `metros` int(11) DEFAULT NULL,
+  `segundos` int(11) DEFAULT NULL,
+  `creado` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`hash`),
+  KEY `idx_creado` (`creado`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Contador del gasto del mes. Vive en el servidor y no en el navegador
+-- porque localStorage se borra y es por equipo: no protege de nada.
+DROP TABLE IF EXISTS `ruta_uso`;
+CREATE TABLE `ruta_uso` (
+  `mes` char(7) NOT NULL COMMENT 'AAAA-MM',
+  `n` int(11) NOT NULL DEFAULT 0 COMMENT 'peticiones enviadas a Google ese mes',
+  PRIMARY KEY (`mes`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `destinos`;
 CREATE TABLE `destinos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
