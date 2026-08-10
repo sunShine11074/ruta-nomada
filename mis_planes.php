@@ -212,21 +212,23 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
           <article class="mp-card" data-idx="<?= $i ?>" tabindex="0" aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"
                    style="background:<?= h($c['bg']) ?>">
             <span class="mp-card__deco" style="background:<?= h($c['deco']) ?>"></span>
-            <button type="button" class="mp-card__menu" aria-label="Más opciones de <?= h($p['nombre']) ?>"><?= ico('puntos', 13) ?></button>
+            <button type="button" class="mp-card__menu" aria-label="Más opciones de <?= h($p['nombre']) ?>"><?= icoAlto('puntos', 12) ?></button>
             <h3 class="mp-card__t" title="<?= h($p['nombre']) ?>"><?= h($p['nombre']) ?></h3>
-            <span class="mp-card__linea"><?= ico('calendario', 11) ?><?= h(mpFechas($p['fecha_inicio'], $p['fecha_fin'])) ?></span>
+            <!-- Alturas de dibujo medidas del frame: calendario 11, cerdito
+                 y lápiz 13, pin 10, corona 7. -->
+            <span class="mp-card__linea"><?= icoAlto('calendario', 11) ?><?= h(mpFechas($p['fecha_inicio'], $p['fecha_fin'])) ?></span>
             <div class="mp-card__pills">
               <!-- El pin va SIEMPRE en rojo, como en los frames: no sigue
                    el color del estado temporal. -->
-              <span class="mp-card__pill"><?= ico('ubicacion', 10, '#FA003F') ?><?= (int)$p['lugares'] ?> sitios</span>
-              <span class="mp-card__rol"><?= ico($esProp ? 'propietario' : 'invitado', 10, '#ffffff') ?><?= $esProp ? 'Propietario' : 'Invitado' ?></span>
+              <span class="mp-card__pill"><?= icoAlto('ubicacion', 10, '#FA003F') ?><?= (int)$p['lugares'] ?> sitios</span>
+              <span class="mp-card__rol"><?= icoAlto($esProp ? 'propietario' : 'invitado', 7, '#ffffff') ?><?= $esProp ? 'Propietario' : 'Invitado' ?></span>
             </div>
             <div class="mp-rotulo">Participantes:</div>
             <?= mpAvatares($p['miembros'], 3) ?>
             <div class="mp-rotulo">Presupuesto asignado:</div>
-            <span class="mp-card__linea mp-card__val"><?= ico('manoDinero', 11) ?><?= $p['presupuesto'] !== null ? h(mpDinero($p['presupuesto'])) : 'Sin asignar' ?></span>
+            <span class="mp-card__linea mp-card__val"><?= icoAlto('cerdito', 13) ?><?= $p['presupuesto'] !== null ? h(mpDinero($p['presupuesto'])) : 'Sin asignar' ?></span>
             <div class="mp-rotulo">Última modificación:</div>
-            <span class="mp-card__linea mp-card__val"><?= ico('lapiz', 11) ?><?= h(mpFechaGuion($p['updated_at'])) ?></span>
+            <span class="mp-card__linea mp-card__val"><?= icoAlto('lapiz', 13) ?><?= h(mpFechaGuion($p['updated_at'])) ?></span>
           </article>
         <?php endforeach; ?>
         </div>

@@ -50,6 +50,9 @@ body.dashboard-page { background: #FAFDFF; }
   --mp-aire:   15px;   /* separación del panel: arriba, derecha y abajo */
   --mp-panel:  350px;  /* ancho del panel, trazo incluido */
   --mp-sep:    41px;   /* hueco entre el contenido y el panel */
+  /* Margen izquierdo de la página: el borde de la primera tarjeta y el de
+     «Mis planes» caen en x=39 en el frame. */
+  --mp-izq:    39px;
   /* Lo que hay que reservar a la derecha para que nada pase por debajo */
   --mp-reserva: calc(var(--mp-panel) + var(--mp-aire) + var(--mp-sep));
 
@@ -58,7 +61,11 @@ body.dashboard-page { background: #FAFDFF; }
   --mp-linea:    #E4EBEF;
   --mp-fondo:    #F7FAFC;
   --mp-marino:   #062738;
-  --mp-azul:     #1B4FD8;
+  /* Muestreado en los DOS frames —el del panel y el de las tarjetas— y en
+     los dos sale el mismo: 19,55,163. Antes estaba en #1B4FD8, que es
+     bastante más claro. */
+  --mp-azul:     #1337A3;
+  --mp-negro:    #212529;  /* títulos y rótulos de las tarjetas */
   --mp-verde:    #36BE3B;
   --mp-naranja:  #FFA500;
   --mp-rojo:     #FA003F;
@@ -72,7 +79,7 @@ body.dashboard-page { background: #FAFDFF; }
    los botones de abajo quedaban fuera de la pantalla y había que
    scrollear la página entera para llegar a ellos. Ahora el panel se
    ancla arriba y abajo y es su interior el que se desplaza. */
-.mp-wrap { padding: 0 var(--mp-reserva) 40px 28px; }
+.mp-wrap { padding: 0 var(--mp-reserva) 40px var(--mp-izq); }
 .mp-main { min-width: 0; }
 .mp-side {
   position: fixed;
@@ -117,7 +124,7 @@ body.dashboard-page { background: #FAFDFF; }
    Ahí no hay altura que repartir, así que se deshace el reparto en
    franjas y todo crece con la página. */
 @media (max-width: 1180px) {
-  .mp-wrap { padding-right: 28px; }
+  .mp-wrap { padding-right: var(--mp-izq); }
   .mp-side { position: static; width: auto; margin-top: 22px; max-height: none; display: block; overflow: visible; }
   .mp-ficha, .mp-ficha__scroll { display: block; overflow: visible; min-height: 0; }
 }
@@ -128,14 +135,14 @@ body.dashboard-page { background: #FAFDFF; }
    los botones se iban encima de la columna del panel. */
 .mp-head {
   display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
-  padding: 22px var(--mp-reserva) 20px 28px;
+  padding: 22px var(--mp-reserva) 34px var(--mp-izq);
 }
-@media (max-width: 1180px) { .mp-head { padding-right: 28px; } }
+@media (max-width: 1180px) { .mp-head { padding-right: var(--mp-izq); } }
 .mp-title { margin: 0; font-size: 46px; font-weight: 700; letter-spacing: -.02em; }
-.mp-tools { display: flex; align-items: center; gap: 13px; }
+.mp-tools { display: flex; align-items: center; gap: 15px; }
 
 .mp-iconbtn {
-  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--mp-linea);
+  width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--mp-linea);
   background: #fff; color: var(--mp-tinta); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background .15s, border-color .15s;
@@ -144,7 +151,7 @@ body.dashboard-page { background: #FAFDFF; }
 .mp-iconbtn:focus-visible { outline: 2px solid var(--mp-marino); outline-offset: 2px; }
 
 .mp-orden {
-  display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 15px;
+  display: flex; align-items: center; gap: 9px; height: 35px; padding: 0 15px;
   border-radius: 10px; border: 1px solid var(--mp-linea); background: #fff;
   font: inherit; font-size: 13.5px; font-weight: 500; color: var(--mp-tinta); cursor: pointer;
   white-space: nowrap;
@@ -154,16 +161,16 @@ body.dashboard-page { background: #FAFDFF; }
 /* Conmutador de vistas: el recuadro blanco se DESLIZA, no salta */
 .mp-views {
   position: relative; display: flex; align-items: center; gap: 0;
-  height: 38px; padding: 4px; border-radius: 10px;
+  height: 35px; padding: 3px; border-radius: 10px;
   border: 1px solid var(--mp-linea); background: #fff;
 }
 .mp-views__slider {
-  position: absolute; top: 4px; left: 4px; width: 30px; height: 28px;
+  position: absolute; top: 3px; left: 3px; width: 30px; height: 27px;
   background: var(--mp-fondo); border-radius: 7px;
   transition: transform .26s cubic-bezier(.4, 0, .2, 1);
 }
 .mp-views__btn {
-  position: relative; z-index: 1; width: 30px; height: 28px; border: none; background: none;
+  position: relative; z-index: 1; width: 30px; height: 27px; border: none; background: none;
   cursor: pointer; color: var(--mp-suave); display: flex; align-items: center; justify-content: center;
   transition: color .2s;
 }
@@ -192,24 +199,26 @@ body.dashboard-page { background: #FAFDFF; }
 .mp-puntos-h { display: inline-flex; color: #6B7A83; transform: rotate(90deg); }
 
 /* ── Vista tarjetas ──────────────────────────────────────── */
-/* 172px es lo que hace falta para que entren CINCO por fila a la anchura
-   del frame (1440px menos el panel), que es como está dibujado. */
-.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 18px; }
+/* Todo lo de aquí sale de medir screens_ref/mis_planes (Card view).png
+   píxel a píxel: la tarjeta es 180x225 y entran CINCO por fila en los 984
+   que quedan entre el margen izquierdo y el panel (5x180 + 4x21). */
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); column-gap: 21px; row-gap: 20px; }
 .mp-card {
-  position: relative; overflow: hidden; border-radius: 16px; padding: 14px;
-  min-height: 200px; cursor: pointer; border: 1px solid transparent;
+  position: relative; overflow: hidden; border-radius: 6px; padding: 12px;
+  min-height: 225px; cursor: pointer; border: 1px solid transparent;
   transition: transform .14s, box-shadow .14s, border-color .14s;
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; flex-direction: column; gap: 0;
+  color: var(--mp-negro);
 }
 .mp-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(13, 31, 39, .13); }
 .mp-card[aria-selected="true"] { border-color: var(--mp-marino); box-shadow: 0 0 0 2px rgba(6, 39, 56, .16); }
 .mp-card:focus-visible { outline: 2px solid var(--mp-marino); outline-offset: 2px; }
-/* El cuarto de círculo decorativo de la esquina inferior izquierda.
-   En los frames es grande: ocupa casi toda la anchura de la tarjeta y
-   la curva sube hasta media altura, así que se dimensiona en % y no en
-   píxeles para que acompañe a la tarjeta al estrecharse. */
+/* El cuarto de elipse de la esquina inferior izquierda. Ajustando su
+   borde derecho en el frame sale un semieje horizontal de 135 sobre 180
+   (75%) y uno vertical de unos 118 sobre 225 (53%). Antes estaba en
+   86% x 62%, bastante más grande. */
 .mp-card__deco {
-  position: absolute; left: 0; bottom: 0; width: 86%; height: 62%;
+  position: absolute; left: 0; bottom: 0; width: 76%; height: 53%;
   border-top-right-radius: 100%; pointer-events: none;
 }
 /* Sube el contenido por encima del adorno. Se excluye el menú de tres
@@ -221,42 +230,51 @@ body.dashboard-page { background: #FAFDFF; }
    como la rejilla iguala alturas, estiraba TODAS las de la fila. El
    nombre completo queda en el title y en el panel de la derecha. */
 .mp-card__t {
-  margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.22; padding-right: 20px;
+  margin: 3px 0 0; font-size: 15.7px; font-weight: 700; line-height: 20px; padding-right: 26px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.mp-card__linea { display: flex; align-items: center; gap: 5px; font-size: 11.2px; color: #33454e; line-height: 1.35; }
-/* Las dos pastillas caben en una sola línea a 185px, como en el frame */
-.mp-card__pills { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.mp-card__pill {
-  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 11px;
-  background: #fff; font-size: 10px; font-weight: 600; white-space: nowrap;
+/* La fila de la fecha va en gris; las de importe y modificación heredan
+   de aquí pero se pintan en azul y un punto más grandes. */
+.mp-card__linea { display: flex; align-items: center; gap: 5px; font-size: 7.9px; color: #7F7A85; line-height: 16px; margin-top: 5px; }
+/* Las dos pastillas caben en una sola línea a 180px, como en el frame */
+.mp-card__pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+.mp-card__pill, .mp-card__rol {
+  display: inline-flex; align-items: center; height: 16px; padding: 0 7px; border-radius: 999px;
+  font-size: 8.1px; font-weight: 500; white-space: nowrap; line-height: 1;
 }
-.mp-card__rol {
-  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 11px;
-  background: var(--mp-azul); color: #fff; font-size: 10px; font-weight: 600; white-space: nowrap;
-}
+.mp-card__pill { gap: 4px; background: #fff; color: var(--mp-negro); }
+.mp-card__rol  { gap: 5px; background: var(--mp-azul); color: #fff; }
+/* Los tres puntos miden 3x12 y caen en x=162 de una tarjeta de 180. Con
+   el botón de 24 centrado sobre ellos, eso son 4 px al borde derecho. */
 .mp-card__menu {
-  position: absolute; top: 11px; right: 9px; z-index: 2; width: 24px; height: 24px;
-  border: none; background: none; cursor: pointer; color: #33454e; border-radius: 6px;
+  position: absolute; top: 17px; right: 4px; z-index: 2; width: 24px; height: 24px;
+  border: none; background: none; cursor: pointer; color: var(--mp-negro); border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
 }
 .mp-card__menu:hover { background: rgba(255, 255, 255, .6); }
-.mp-rotulo { font-size: 10.4px; font-weight: 600; color: #33454e; margin-top: 5px; line-height: 1.2; }
+.mp-rotulo { font-size: 9.7px; font-weight: 500; color: var(--mp-negro); margin-top: 7px; line-height: 13px; }
+/* Los tres rótulos no llevan el mismo aire encima en el frame: 9 tras las
+   pastillas, 7 tras los avatares y 4 tras un importe. Se distinguen por
+   el hermano anterior en vez de por nth-of-type, que no dice nada. */
+.mp-card__pills + .mp-rotulo { margin-top: 9px; }
+.mp-avatares + .mp-rotulo    { margin-top: 5px; }
+.mp-card__val + .mp-rotulo   { margin-top: 4px; }
 /* Importe y fecha de la tarjeta, en el azul del diseño */
-.mp-card__val { font-weight: 600; color: var(--mp-azul); }
+.mp-card__val { font-size: 9.2px; font-weight: 600; color: var(--mp-azul); margin-top: 0; }
 
 /* Avatares. En las TARJETAS van solapados; en el PANEL, separados. */
 .mp-avatares { display: flex; align-items: center; }
-.mp-avatares > * { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; margin-left: -7px; overflow: hidden; flex-shrink: 0; }
+.mp-avatares > * { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; margin-left: -6px; overflow: hidden; flex-shrink: 0; }
 .mp-avatares > *:first-child { margin-left: 0; }
+.mp-card .mp-avatares { margin-top: 2px; }
 /* En el panel: 24x24 separados 2 px y con la misma sangría de 12 que los
    iconos de los datos, para que la columna quede a plomo. */
 .mp-side .mp-avatares { gap: 2px; padding-left: 12px; }
 .mp-side .mp-avatares > * { width: 24px; height: 24px; margin-left: 0; border-width: 0; }
-.mp-av { background: #F5B93F; color: #0E2A33; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+.mp-av { background: #F5B93F; color: #0E2A33; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
 .mp-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mp-av--mas { background: #fff; color: #33454e; font-size: 9.5px; }
+.mp-av--mas { background: #F5F5F5; color: var(--mp-negro); font-size: 8px; }
 
 /* ── Vista mapa ──────────────────────────────────────────── */
 .mp-mapa { position: relative; height: 620px; border-radius: 14px; overflow: hidden; border: 1px solid var(--mp-linea); background: #e8eef2; }
