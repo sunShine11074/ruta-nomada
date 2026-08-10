@@ -67,7 +67,11 @@
 
     var esProp = p.rol === 'propietario';
 
+    /* Dos bloques y no uno: lo que va dentro de .mp-ficha__scroll se
+       desplaza si no cabe, y .mp-acciones queda fuera, pegado al fondo del
+       panel. Los botones tienen que verse siempre sin buscarlos. */
     host.innerHTML =
+      '<div class="mp-ficha__scroll">' +
       '<div class="mp-cover">' + portada +
         // La chapita de la esquina es la marca del sitio, como en los frames
         '<span class="mp-cover__badge"><img src="img/logo.png" alt="" width="17" height="17"></span>' +
@@ -76,7 +80,10 @@
       '<h2 class="mp-side__t">' + esc(p.nombre) + '</h2>' +
 
       '<div class="mp-grupo"><p class="mp-grupo__t">Destino:</p>' +
-        '<span class="mp-dato">' + (ICO.ubicacion || '') + esc(p.destino || '—') + '</span>' +
+        // Chincheta y no marcador: en el frame el nombre del destino
+        // lleva la chincheta y el marcador rojo se reserva para la
+        // cuenta de sitios, que es lo que de verdad hay en el mapa.
+        '<span class="mp-dato">' + (ICO.chincheta || '') + esc(p.destino || '—') + '</span>' +
         '<span class="mp-dato">' + (ICO.brujula || '') + esc(coords) + '</span>' +
         '<span class="mp-dato">' + (ICO.sitios || '') + p.lugares + ' sitios añadidos</span>' +
       '</div>' +
@@ -101,21 +108,31 @@
       '<div class="mp-grupo"><p class="mp-grupo__t">Última modificación</p>' +
         '<span class="mp-dato">' + (ICO.lapiz || '') + '<b>' + esc(p.modifGuion) + '</b></span>' +
       '</div>' +
+      '</div>' +
 
+      /* Los dos botones miden 145x35 y el texto NO puede partirse, así
+         que sólo caben dos piezas: un icono y una etiqueta. En el de
+         editar el icono es el pen-to-square, que ya dibuja su propio
+         recuadro —no hace falta ponerle otro detrás—. En el de borrar la
+         papelera va DENTRO del aro que se rellena de amarillo, no al
+         lado: con las dos piezas separadas el texto se iba a dos líneas.
+         El aro mide 26 de fuera a fuera (r 11,5 + 1,5 de trazo), y de ahí
+         sale data-len = 2·π·11,5 = 72,26, que es lo que recorre la
+         animación de la pulsación. */
       '<div class="mp-acciones">' +
         '<a class="mp-btn" href="plan.php?id=' + p.id + '">' +
-          '<span class="mp-btn__caja">' + (ICO.lapizBlanco || '') + '</span>Editar plan</a>' +
+          (ICO.lapizBlanco || '') + '<span>Editar plan</span></a>' +
         '<button type="button" class="mp-btn" id="mpDel" ' +
           'aria-describedby="mpDelAyuda">' +
-          '<span class="mp-btn__caja">' + (ICO.papelera || '') + '</span>' +
-          (esProp ? 'Eliminar plan' : 'Salir del plan') +
           '<span class="mp-btn__aro">' +
-            '<svg width="26" height="26" viewBox="0 0 36 36" style="position:absolute;inset:0;transform:rotate(-90deg)">' +
-              '<circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="3"></circle>' +
-              '<circle data-fill="1" data-len="94.2" cx="18" cy="18" r="15" fill="none" stroke="#f0b429" ' +
-                'stroke-width="3" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="94.2"></circle>' +
+            '<svg width="26" height="26" viewBox="0 0 26 26" style="position:absolute;inset:0;transform:rotate(-90deg)">' +
+              '<circle cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="3"></circle>' +
+              '<circle data-fill="1" data-len="72.26" cx="13" cy="13" r="11.5" fill="none" stroke="#f0b429" ' +
+                'stroke-width="3" stroke-linecap="round" stroke-dasharray="72.26" stroke-dashoffset="72.26"></circle>' +
             '</svg>' +
+            (ICO.papelera || '') +
           '</span>' +
+          '<span>' + (esProp ? 'Eliminar plan' : 'Salir del plan') + '</span>' +
         '</button>' +
         '<span class="mp-ayuda" id="mpDelAyuda">Mantén pulsado para ' + (esProp ? 'eliminar' : 'salir') + '</span>' +
       '</div>';

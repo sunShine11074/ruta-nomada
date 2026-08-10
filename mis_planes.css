@@ -32,11 +32,14 @@
    que ocupa su contenido; al scrollear asomaría el gris de style.css. */
 body.dashboard-page { background: #FAFDFF; }
 
-/* Reserva siempre el hueco de la barra de desplazamiento. La vista de
-   tarjetas es alta y la de tabla no, así que al cambiar de vista aparecía
-   y desaparecía la barra y TODA la página daba un salto de 15px hacia los
-   lados, controles incluidos. */
-html { scrollbar-gutter: stable; }
+/* NO se pone scrollbar-gutter: stable, y conviene explicar por qué, para
+   que no vuelva. Reservaba el hueco de la barra aunque no hiciera falta,
+   y ese hueco sale del ancho del bloque contenedor de los elementos
+   fixed: el panel de la derecha, que pide right:15px, acababa a 15px del
+   hueco vacío y por tanto a 30px del borde de la ventana, con una franja
+   muerta al lado. Sin la regla el panel queda a 15px del borde cuando no
+   hay barra y a 15px de la barra cuando la hay, que es lo que pide el
+   diseño y lo que hace resultados.php. */
 
 .mp {
   /* Medidas del frame (1440x810), en píxeles absolutos y NO en
@@ -45,7 +48,7 @@ html { scrollbar-gutter: stable; }
      aire que lo rodea. */
   --mp-topbar: 56px;   /* alto real de includes/topbar.php, que es fixed */
   --mp-aire:   15px;   /* separación del panel: arriba, derecha y abajo */
-  --mp-panel:  348px;  /* ancho del panel */
+  --mp-panel:  350px;  /* ancho del panel, trazo incluido */
   --mp-sep:    41px;   /* hueco entre el contenido y el panel */
   /* Lo que hay que reservar a la derecha para que nada pase por debajo */
   --mp-reserva: calc(var(--mp-panel) + var(--mp-aire) + var(--mp-sep));
@@ -77,15 +80,46 @@ html { scrollbar-gutter: stable; }
   right: var(--mp-aire);
   bottom: var(--mp-aire);
   width: var(--mp-panel);
-  overflow-y: auto; overscroll-behavior: contain;
-  background: #fff; border: 1px solid var(--mp-linea); border-radius: 18px;
-  box-shadow: 0 10px 34px rgba(13, 31, 39, .07); padding: 16px;
+  /* Tres franjas: paginador arriba, ficha en medio y botones abajo. El
+     panel entero NO se desplaza (overflow:hidden); sólo lo hace la franja
+     de en medio, y sólo si hace falta. Así «Editar plan» y «Eliminar
+     plan» están siempre a la vista: antes caían en el px 744 de una caja
+     de 724 y había que buscarlos con la rueda dentro del panel, que es
+     justo lo que se quería quitar al fijarlo. */
+  display: flex; flex-direction: column; overflow: hidden;
+  /* Trazo de 10 px medido del frame; el radio de 18 también sale de ahí
+     (en la esquina de arriba el borde recto arranca justo en x=18).
+     Con padding de 10 el contenido mide 310, que es lo que ocupan la
+     portada y los dos botones (145 + 20 + 145). */
+  background: #fff; border: 10px solid #EEEEEE; border-radius: 18px;
+  /* Abajo 6 y no 10: es lo que deja el frame bajo la línea de ayuda, y
+     son justo los píxeles que faltaban para que la ficha entre entera y
+     no aparezca barra. */
+  box-shadow: 0 10px 34px rgba(13, 31, 39, .07); padding: 10px 10px 6px;
+  /* El 1.6 que hereda de style.css inflaba cada línea de dato a 24 px
+     teniendo la letra 14; sólo eso se comía medio panel. */
+  line-height: 1.25;
   z-index: 20;
 }
-/* Cuando ya no cabe al lado, el panel vuelve al flujo y se pone debajo */
+.mp-side > .mp-pager { flex-shrink: 0; }
+/* min-height:0 es imprescindible: sin él un hijo flex nunca encoge por
+   debajo de su contenido y la franja de en medio empujaría los botones
+   fuera del panel otra vez, esta vez sin barra con la que rescatarlos. */
+.mp-ficha { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.mp-ficha__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* Barra fina y discreta: es un detalle interior de la tarjeta, no la
+   barra de la página. */
+.mp-ficha__scroll::-webkit-scrollbar { width: 7px; }
+.mp-ficha__scroll::-webkit-scrollbar-thumb { background: #d5dee5; border-radius: 5px; }
+.mp-ficha__scroll::-webkit-scrollbar-thumb:hover { background: #b9c6cf; }
+
+/* Cuando ya no cabe al lado, el panel vuelve al flujo y se pone debajo.
+   Ahí no hay altura que repartir, así que se deshace el reparto en
+   franjas y todo crece con la página. */
 @media (max-width: 1180px) {
   .mp-wrap { padding-right: 28px; }
-  .mp-side { position: static; width: auto; margin-top: 22px; max-height: none; }
+  .mp-side { position: static; width: auto; margin-top: 22px; max-height: none; display: block; overflow: visible; }
+  .mp-ficha, .mp-ficha__scroll { display: block; overflow: visible; min-height: 0; }
 }
 
 /* ── Cabecera ────────────────────────────────────────────── */
@@ -216,8 +250,10 @@ html { scrollbar-gutter: stable; }
 .mp-avatares { display: flex; align-items: center; }
 .mp-avatares > * { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; margin-left: -7px; overflow: hidden; flex-shrink: 0; }
 .mp-avatares > *:first-child { margin-left: 0; }
-.mp-side .mp-avatares { gap: 5px; }
-.mp-side .mp-avatares > * { width: 27px; height: 27px; margin-left: 0; border-width: 0; }
+/* En el panel: 24x24 separados 2 px y con la misma sangría de 12 que los
+   iconos de los datos, para que la columna quede a plomo. */
+.mp-side .mp-avatares { gap: 2px; padding-left: 12px; }
+.mp-side .mp-avatares > * { width: 24px; height: 24px; margin-left: 0; border-width: 0; }
 .mp-av { background: #F5B93F; color: #0E2A33; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
 .mp-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mp-av--mas { background: #fff; color: #33454e; font-size: 9.5px; }
@@ -231,42 +267,92 @@ html { scrollbar-gutter: stable; }
 .mp-zoom button:hover { background: var(--mp-fondo); }
 
 /* ── Panel derecho ───────────────────────────────────────── */
-.mp-pager { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 auto 13px; width: fit-content; padding: 4px; border: 1px solid var(--mp-linea); border-radius: 20px; }
-.mp-pager button { width: 28px; height: 28px; border-radius: 50%; border: none; background: none; cursor: pointer; color: var(--mp-tinta); display: flex; align-items: center; justify-content: center; }
-.mp-pager button:hover:not(:disabled) { background: var(--mp-fondo); }
-.mp-pager button:disabled { opacity: .3; cursor: default; }
-.mp-pager__n { font-size: 11.5px; font-weight: 600; color: var(--mp-suave); padding: 0 8px; white-space: nowrap; }
+/* Paginador: 82x27, círculos de 23 a 2 px de los bordes. El
+   space-between los pega a los extremos sin cuentas: los 2 px de padding
+   son los 2 px del frame. */
+.mp-pager {
+  width: 82px; height: 27px; margin: 0 auto 8px; padding: 2px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: #EEEEEE; border: none; border-radius: 999px;
+}
+.mp-pager button {
+  width: 23px; height: 23px; padding: 0; border: none; border-radius: 50%;
+  background: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mp-pager button:disabled { opacity: .35; cursor: default; }
+.mp-pager__n { flex: 1; text-align: center; font-size: 8px; font-weight: 500; color: #0B0B0B; line-height: 1; white-space: nowrap; }
 
-.mp-cover { position: relative; height: 168px; border-radius: 13px; overflow: hidden; background: #dfe6ec; }
+/* El radio de la portada es 5 y no 13: medido en las dos esquinas
+   izquierdas del frame, donde el recto empieza a los 4-5 px. */
+.mp-cover { position: relative; height: 170px; border-radius: 5px; overflow: hidden; background: #dfe6ec; }
 .mp-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mp-cover__grad { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 700; color: rgba(255, 255, 255, .9); }
 .mp-cover__badge { position: absolute; top: 9px; left: 9px; width: 26px; height: 26px; border-radius: 8px; background: rgba(255, 255, 255, .92); display: flex; align-items: center; justify-content: center; }
 
-.mp-chip { display: inline-flex; align-items: center; padding: 3px 11px; border-radius: 9px; font-size: 11px; font-weight: 600; color: #fff; margin: 11px 0 6px; }
-.mp-side__t { margin: 0 0 14px; font-size: 25px; font-weight: 700; line-height: 1.15; }
-.mp-grupo { margin-bottom: 13px; }
-.mp-grupo__t { margin: 0 0 6px; font-size: 13.4px; font-weight: 600; }
-.mp-dato { display: flex; align-items: center; gap: 8px; font-size: 12.6px; color: #33454e; padding: 2px 0; }
+/* Etiqueta temporal: 61x14 con las puntas completamente redondeadas */
+.mp-chip {
+  display: inline-flex; align-items: center; height: 14px; padding: 0 8px;
+  border-radius: 999px; font-size: 8px; font-weight: 600; line-height: 1;
+  color: #fff; margin: 10px 0 0;
+}
+/* «Nuestro viaje a Ensenada» mide 297 de los 310 disponibles a 26 px, o
+   sea que el frame va al límite: cualquier nombre más largo parte en dos
+   líneas. Se limita a dos y no a una porque este panel es el sitio donde
+   el nombre completo importa; el corte a la tercera línea evita que un
+   nombre kilométrico empuje la ficha sin fondo. */
+.mp-side__t {
+  margin: 3px 0 0; font-size: 26px; font-weight: 700; line-height: 1.15;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Ritmo vertical calcado del frame: 13 px entre grupos y 9 tras el
+   título, que va más pegado. Los números salen de medir el .png a nivel
+   de píxel, no de tantear. */
+.mp-grupo { margin-top: 13px; }
+.mp-side__t + .mp-grupo { margin-top: 9px; }
+.mp-grupo__t { margin: 0 0 1px; font-size: 15px; font-weight: 600; line-height: 1.2; }
+
+/* Una fila de dato mide 22 px de alto —el paso medido entre iconos del
+   frame— con el icono en una ranura FIJA de 16. El ancho de dibujo va de
+   10,4 (marcador) a 14,6 (transferencia); sin la ranura, cada línea de
+   texto empezaría en una x distinta. El propio SVG se encarga de
+   centrarse y no deformarse: preserveAspectRatio es xMidYMid meet por
+   omisión, así que al forzarle 16 de ancho escala uniforme y sobra aire
+   a los lados. */
+.mp-dato { display: flex; align-items: center; gap: 5px; font-size: 14px; line-height: 22px; color: #33454e; padding-left: 12px; }
+.mp-dato > svg { flex: 0 0 16px; }
 .mp-dato b { font-weight: 600; color: var(--mp-azul); }
 .mp-dato small { color: var(--mp-suave); font-size: 11.2px; }
 .mp-vacio { color: #9aa7ae; font-style: italic; }
 
-.mp-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+/* flex-shrink:0 — los botones no ceden altura: lo que sobra se lo come la
+   franja de en medio, que para eso lleva barra. */
+/* Dos botones de 145 separados 20: 145+20+145 = 310, el ancho del
+   contenido. Por eso la rejilla no lleva anchos: 1fr y 1fr sobre 310 dan
+   145 clavados. */
+/* column-gap y NO gap: la rejilla tiene dos filas —botones y ayuda— y un
+   gap de 20 se colaba también entre ellas, veinte píxeles de aire
+   invisible que empujaban el panel hacia abajo. */
+.mp-acciones { display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 0; margin-top: 15px; flex-shrink: 0; }
 .mp-btn {
   font-family: 'Poppins', system-ui, sans-serif;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px 10px; border-radius: 12px; border: none; background: var(--mp-marino);
-  color: #fff; font-size: 13.6px; font-weight: 600; cursor: pointer; text-decoration: none;
+  height: 35px; padding: 0 8px; border-radius: 7px; border: none; background: var(--mp-marino);
+  color: #fff; font-size: 13.6px; font-weight: 600; line-height: 1; cursor: pointer; text-decoration: none;
   user-select: none; touch-action: none; box-shadow: 0 3px 10px rgba(6, 39, 56, .25);
+  /* El texto en una sola línea es un requisito del diseño, no un
+     adorno: en dos líneas el botón crece y deja de medir 35. */
+  white-space: nowrap;
 }
+.mp-btn > span { white-space: nowrap; }
 .mp-btn:hover { background: #0a3a52; }
 .mp-btn:focus-visible { outline: 2px solid #f0b429; outline-offset: 2px; }
+/* El aro es a la vez el marco que se rellena de amarillo y el hueco
+   donde vive la papelera. */
 .mp-btn__aro { position: relative; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-/* El icono del botón va dentro de un cuadrado redondeado más claro,
-   igual que en profile.php y en el frame. */
-.mp-btn__caja { width: 26px; height: 26px; border-radius: 8px; background: rgba(255, 255, 255, .16); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 /* La ayuda cuelga SOLO del botón de la derecha */
-.mp-ayuda { grid-column: 2; font-size: 9.5px; color: var(--mp-suave); text-align: center; margin-top: 2px; }
+.mp-ayuda { grid-column: 2; font-size: 9px; color: var(--mp-suave); text-align: center; margin-top: 6px; line-height: 1.2; }
 
 /* ── Estados generales ───────────────────────────────────── */
 .mp-empty { text-align: center; padding: 64px 20px; color: var(--mp-suave); }

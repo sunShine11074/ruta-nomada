@@ -12,6 +12,15 @@
 //  USO:  ico('calendario', 14)                 → 14x14, color heredado
 //        ico('papelera', 18, '#ffffff')        → color fijo
 //        ico('lupa', 16, 'currentColor', 'mi-clase')
+//
+//  DOS MEDIDAS DISTINTAS, Y LA DIFERENCIA IMPORTA
+//  ico() dimensiona el LIENZO: ico('brujula', 14) da un cuadrado de
+//  14x14. Pero el dibujo no llena el lienzo —el chevrón ocupa 256 de las
+//  640 unidades de ancho— así que el trazo acaba midiendo lo que quiera.
+//  icoAlto() dimensiona el DIBUJO: recorta el viewBox a la tinta y pide
+//  una altura concreta; el ancho sale del propio trazado. Es lo que hace
+//  falta cuando el diseño dice «14 px de alto» o «chevrón de 7x11», que
+//  hablan de lo que se ve, no de la caja que lo contiene.
 // ============================================================
 
 /** Trazados de Font Awesome 7.3.1, lienzo 0 0 640 640. */
@@ -59,6 +68,64 @@ function icoPaths(): array
         'puntos'      => 'M320 208C289.1 208 264 182.9 264 152C264 121.1 289.1 96 320 96C350.9 96 376 121.1 376 152C376 182.9 350.9 208 320 208zM320 432C350.9 432 376 457.1 376 488C376 518.9 350.9 544 320 544C289.1 544 264 518.9 264 488C264 457.1 289.1 432 320 432zM376 320C376 350.9 350.9 376 320 376C289.1 376 264 350.9 264 320C264 289.1 289.1 264 320 264C350.9 264 376 289.1 376 320z',
         'papelera'    => 'M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z',
     ];
+}
+
+/**
+ * Caja de tinta de cada trazado dentro del lienzo de 640x640, en
+ * [x, y, ancho, alto]. NO están escritas a mano: salen de medir cada
+ * <path> con getBBox() en el navegador, que es el único que sabe dónde
+ * acaba de verdad una curva de Bézier. Si algún día se añade un icono
+ * nuevo hay que medirlo igual; a ojo no se acierta.
+ */
+function icoCaja(string $nombre): ?array
+{
+    static $c = [
+        'lupa'        => [64, 64, 512, 512.1],
+        'ordenar'     => [63.9, 96, 480.1, 448],
+        'lista'       => [64, 112, 512, 416],
+        'rejilla'     => [96, 96, 448, 448],
+        'chincheta'   => [176, 64, 288, 512],
+        'chevronIzq'  => [160, 95.9, 256.1, 448.2],
+        'chevronDer'  => [224.4, 95.9, 256.1, 448.2],
+        'ubicacion'   => [127.9, 64, 384.1, 515],
+        'brujula'     => [64, 64, 512, 512],
+        'calendario'  => [96, 64, 448, 480],
+        'cerdito'     => [80, 32, 512, 544],
+        'recibo'      => [128, 64, 384, 512],
+        'transferir'  => [24, 55.9, 591.9, 528],
+        'lapiz'       => [64, 69.3, 506.7, 506.7],
+        'manoDinero'  => [32, 48, 576.1, 528],
+        'propietario' => [32, 96, 576, 448.1],
+        'invitado'    => [48, 80, 544, 432],
+        'puntos'      => [264, 96, 112, 448],
+        'papelera'    => [96, 48, 448, 528],
+    ];
+    return $c[$nombre] ?? null;
+}
+
+/**
+ * Icono dimensionado por la ALTURA DE LO QUE SE VE. El viewBox se
+ * recorta a la caja de tinta y el ancho se deduce del trazado, así que
+ * icoAlto('transferir', 13) da exactamente 13 px de dibujo alto y los
+ * 14,6 de ancho que le tocan por proporción.
+ *
+ * Como el ancho cambia de un icono a otro, quien los ponga en columna
+ * necesita una ranura de ancho fijo con el icono centrado; si no, cada
+ * línea de texto arranca en una x distinta.
+ */
+function icoAlto(string $nombre, float $alto, string $color = 'currentColor', string $clase = ''): string
+{
+    $paths = icoPaths();
+    $caja  = icoCaja($nombre);
+    if (!isset($paths[$nombre]) || $caja === null) return '';
+    [$x, $y, $w, $h] = $caja;
+    $ancho = round($alto * $w / $h, 2);
+    $c = $clase !== '' ? ' class="' . htmlspecialchars($clase, ENT_QUOTES, 'UTF-8') . '"' : '';
+    return '<svg' . $c . ' width="' . $ancho . '" height="' . $alto . '" viewBox="'
+         . $x . ' ' . $y . ' ' . $w . ' ' . $h . '" fill="'
+         . htmlspecialchars($color, ENT_QUOTES, 'UTF-8')
+         . '" aria-hidden="true" focusable="false" style="flex-shrink:0;display:block"><path d="'
+         . $paths[$nombre] . '"/></svg>';
 }
 
 /**

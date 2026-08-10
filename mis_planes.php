@@ -250,11 +250,11 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
     <?php if ($planes): ?>
     <aside class="mp-side" id="mpPanel" aria-live="polite">
       <div class="mp-pager">
-        <button type="button" id="mpPrev" aria-label="Plan anterior"><?= ico('chevronIzq', 13) ?></button>
+        <button type="button" id="mpPrev" aria-label="Plan anterior"><?= icoAlto('chevronIzq', 11, '#0B0B0B') ?></button>
         <span class="mp-pager__n" id="mpPagerN">1 de <?= count($planes) ?></span>
-        <button type="button" id="mpNext" aria-label="Plan siguiente"><?= ico('chevronDer', 13) ?></button>
+        <button type="button" id="mpNext" aria-label="Plan siguiente"><?= icoAlto('chevronDer', 11, '#0B0B0B') ?></button>
       </div>
-      <div id="mpFicha"></div>
+      <div class="mp-ficha" id="mpFicha"></div>
     </aside>
     <?php endif; ?>
   </div>
@@ -291,17 +291,20 @@ window.MP_PLANES = <?= json_encode(array_map(function ($p) {
     ];
 }, $planes), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 window.MP_CSRF = <?= json_encode($csrf) ?>;
+// Medidos del frame: 14 px de alto todos menos el de la transferencia,
+// que va a 13. Por eso icoAlto() y no ico(): lo que el diseño mide es el
+// dibujo, y el lienzo cuadrado de 640 no dice nada de él.
 window.MP_ICONOS = <?= json_encode([
-    'ubicacion'   => ico('ubicacion', 13),
-    'brujula'     => ico('brujula', 13),
-    'sitios'      => ico('ubicacion', 13, '#FA003F'),
-    'calendario'  => ico('calendario', 13),
-    'cerdito'     => ico('cerdito', 13, '#1B4FD8'),
-    'recibo'      => ico('recibo', 13, '#1B4FD8'),
-    'transferir'  => ico('transferir', 13, '#1B4FD8'),
-    'lapiz'       => ico('lapiz', 13, '#1B4FD8'),
-    'lapizBlanco' => ico('lapiz', 14, '#ffffff'),
-    'papelera'    => ico('papelera', 14, '#ffffff'),
+    'chincheta'   => icoAlto('chincheta', 14),
+    'brujula'     => icoAlto('brujula', 14),
+    'sitios'      => icoAlto('ubicacion', 14, '#FA003F'),
+    'calendario'  => icoAlto('calendario', 14),
+    'cerdito'     => icoAlto('cerdito', 14, '#1B4FD8'),
+    'recibo'      => icoAlto('recibo', 14, '#1B4FD8'),
+    'transferir'  => icoAlto('transferir', 13, '#1B4FD8'),
+    'lapiz'       => icoAlto('lapiz', 14, '#1B4FD8'),
+    'lapizBlanco' => icoAlto('lapiz', 16, '#ffffff'),
+    'papelera'    => icoAlto('papelera', 14, '#ffffff'),
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script>
