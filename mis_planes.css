@@ -178,25 +178,46 @@ body.dashboard-page { background: #FAFDFF; }
 .mp-views__btn:focus-visible { outline: 2px solid var(--mp-marino); outline-offset: 2px; border-radius: 9px; }
 
 /* ── Vista tabla ─────────────────────────────────────────── */
-/* Ocho columnas sin partir no siempre caben. Sin este contenedor, las
-   últimas —fecha de creación y el menú— quedaban cortadas y fuera de
-   alcance en cuanto un nombre largo ensanchaba la tabla. */
-.mp-tablawrap { overflow-x: auto; border-radius: 14px; }
-.mp-tabla { width: 100%; min-width: 940px; border-collapse: collapse; background: #fff; border: 1px solid var(--mp-linea); border-radius: 14px; overflow: hidden; }
-.mp-tabla th {
-  text-align: left; font-size: 13.5px; font-weight: 600; color: var(--mp-tinta);
-  padding: 15px 16px; background: var(--mp-fondo); border-bottom: 1px solid var(--mp-linea); white-space: nowrap;
+/* Medidas de screens_ref/mis_planes (table view).png: trazo y separadores
+   de 2 px en #EEEEEE, cabecera de 38 con fondo #F5F7F9 y filas de 48.
+   El contenedor sigue con overflow-x por si la ventana se estrecha: sin
+   él, las últimas columnas quedaban cortadas y fuera de alcance. */
+.mp-tablawrap { overflow-x: auto; border-radius: 6px; }
+.mp-tabla {
+  width: 100%; min-width: 940px; background: #fff;
+  /* separate y no collapse: con collapse el navegador ignora el
+     border-radius de la tabla y las esquinas salen en pico. */
+  border-collapse: separate; border-spacing: 0;
+  border: 2px solid #EEEEEE; border-radius: 6px; overflow: hidden;
+  /* fixed para que manden los anchos del colgroup; con auto, un nombre
+     largo se llevaría por delante el reparto medido del frame. */
+  table-layout: fixed;
 }
-.mp-tabla td { padding: 14px 16px; font-size: 13.8px; border-bottom: 1px solid var(--mp-linea); vertical-align: middle; white-space: nowrap; }
+.mp-tabla th {
+  height: 38px; padding: 0 15px; text-align: left; white-space: nowrap;
+  font-size: 15px; font-weight: 500; color: #0B0B0B;
+  background: #F5F7F9; border-bottom: 2px solid #EEEEEE;
+}
+.mp-tabla td {
+  height: 48px; padding: 0 15px; font-size: 14px; color: #000;
+  border-bottom: 2px solid #EEEEEE; vertical-align: middle; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* De la tercera en adelante van centradas, cabecera y celda; las dos
+   primeras, alineadas a la izquierda. Se ve en el frame porque el
+   rótulo y el dato comparten centro aunque midan distinto. */
+.mp-tabla th:nth-child(n+3), .mp-tabla td:nth-child(n+3) { text-align: center; padding: 0 8px; }
 .mp-tabla tbody tr { cursor: pointer; transition: background .13s; }
-/* Filas alternas, como en el frame */
-.mp-tabla tbody tr:nth-child(even) { background: #FAFCFD; }
+/* Sin filas alternas: en el frame TODAS son blancas. */
 .mp-tabla tbody tr:hover { background: #F1F7FB; }
 .mp-tabla tbody tr[aria-selected="true"] { background: #E9F2FA; }
 .mp-tabla tbody tr:last-child td { border-bottom: none; }
-.mp-td-nombre { font-weight: 500; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+/* Nombre y destino van un punto más grandes que el resto de la fila,
+   tal como está dibujado: 15 frente a 14. */
+.mp-td-nombre, .mp-tabla td:nth-child(2) { font-size: 15px; }
+.mp-td-nombre { font-weight: 500; }
 /* El mismo icono de tres puntos, tumbado para la tabla */
-.mp-puntos-h { display: inline-flex; color: #6B7A83; transform: rotate(90deg); }
+.mp-puntos-h { display: inline-flex; color: #0B0B0B; transform: rotate(90deg); }
 
 /* ── Vista tarjetas ──────────────────────────────────────── */
 /* Todo lo de aquí sale de medir screens_ref/mis_planes (Card view).png
@@ -277,12 +298,40 @@ body.dashboard-page { background: #FAFDFF; }
 .mp-av--mas { background: #F5F5F5; color: var(--mp-negro); font-size: 8px; }
 
 /* ── Vista mapa ──────────────────────────────────────────── */
-.mp-mapa { position: relative; height: 620px; border-radius: 14px; overflow: hidden; border: 1px solid var(--mp-linea); background: #e8eef2; }
+/* Medidas de screens_ref/mis_planes (Map view).png: trazo de 3 px en
+   #EEEEEE, radio 6 y una sombra suave que se difumina unos 17 px por los
+   cuatro lados.
+   El alto NO va fijo: en el frame el mapa llega hasta 40 px del fondo de
+   la ventana, que es el padding inferior de .mp-wrap. 226 = los 186 en
+   los que empieza el mapa + esos 40. A 810 de alto da los 584 del frame
+   y en una pantalla más alta crece en vez de dejar un hueco muerto. */
+.mp-mapa {
+  position: relative; height: calc(100vh - 226px); min-height: 420px;
+  border-radius: 6px; overflow: hidden; border: 3px solid #EEEEEE;
+  background: #e8eef2; box-shadow: 0 2px 16px rgba(13, 31, 39, .16);
+}
 .mp-mapa__lienzo { position: absolute; inset: 0; }
-.mp-zoom { position: absolute; right: 14px; bottom: 14px; z-index: 5; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; box-shadow: 0 3px 12px rgba(13, 31, 39, .28); }
-.mp-zoom button { width: 40px; height: 40px; border: none; background: #fff; cursor: pointer; color: var(--mp-tinta); font-size: 21px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-.mp-zoom button + button { border-top: 1px solid var(--mp-linea); }
-.mp-zoom button:hover { background: var(--mp-fondo); }
+/* El control de zoom es una píldora de 35x79 con las puntas redondas del
+   todo, a 15 px del borde interior del mapa. */
+.mp-zoom {
+  position: absolute; right: 15px; bottom: 15px; z-index: 5;
+  display: flex; flex-direction: column; width: 35px;
+  border-radius: 999px; overflow: hidden; background: #fff;
+  box-shadow: 0 3px 12px rgba(13, 31, 39, .28);
+}
+.mp-zoom button {
+  width: 35px; height: 39px; border: none; background: #fff; cursor: pointer;
+  color: #212529; font-size: 22px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+/* La raya que separa los dos botones no llega a los bordes: queda metida
+   4 px por cada lado, así que no puede ser un border del botón. */
+.mp-zoom button + button { height: 40px; position: relative; }
+.mp-zoom button + button::before {
+  content: ''; position: absolute; top: 0; left: 4px; right: 4px;
+  height: 1px; background: #C2CBCE;
+}
+.mp-zoom button:hover { background: #F3F6F8; }
 
 /* ── Panel derecho ───────────────────────────────────────── */
 /* Paginador: 82x27, círculos de 23 a 2 px de los bordes. El

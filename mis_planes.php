@@ -174,6 +174,15 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
       <div class="mp-vista" data-vista="tabla">
         <div class="mp-tablawrap">
         <table class="mp-tabla">
+          <!-- Anchos despejados de los centros de cada columna en el
+               frame. Van en colgroup y no en los th porque con
+               table-layout:fixed el navegador sólo mira la primera fila,
+               y aquí queda a la vista lo que ocupa cada una. -->
+          <colgroup>
+            <col style="width:20%"><col style="width:16%"><col style="width:17%">
+            <col style="width:9.5%"><col style="width:11%"><col style="width:9.5%">
+            <col style="width:13%"><col style="width:4%">
+          </colgroup>
           <thead>
             <tr>
               <th>Nombre del plan</th><th>Destino</th><th>Fechas de inicio y fin</th>
@@ -194,7 +203,7 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
               <td><?= h(mpFecha($p['creado_en'])) ?></td>
               <!-- Puntos en HORIZONTAL aquí y en vertical en las tarjetas,
                    como en los frames. Es el mismo icono girado. -->
-              <td style="text-align:right"><span class="mp-puntos-h"><?= ico('puntos', 15) ?></span></td>
+              <td><span class="mp-puntos-h"><?= icoAlto('puntos', 14) ?></span></td>
             </tr>
           <?php endforeach; ?>
           </tbody>

@@ -270,24 +270,59 @@
               'C176 276.5 223.9 333.9 288 348.4L288 544C288 561.7 302.3 576 320 576C337.7 576 352 561.7 352 544L352 348.4z' +
               'M328 160C297.1 160 272 185.1 272 216C272 229.3 261.3 240 248 240C234.7 240 224 229.3 224 216' +
               'C224 158.6 270.6 112 328 112C341.3 112 352 122.7 352 136C352 149.3 341.3 160 328 160z';
+    // Caja de tinta del trazado dentro del lienzo de 640x640, y grosor
+    // del contorno EN UNIDADES DEL TRAZADO.
+    var CAJA = { x: 176, y: 64, w: 288, h: 512 }, TRAZO = 22;
+
+    /* Icono como SVG en un data: URI y no como google.maps.Symbol.
+       El Symbol interpreta strokeWeight en PÍXELES DE PANTALLA, no en
+       unidades del trazado: los 22 que había aquí no daban el contorno
+       fino de 1 px que se pretendía, sino un borde blanco de 22 px que
+       se tragaba entero un pin de 15x27. De ahí que en el mapa no se
+       viera ningún pin.
+       Con el SVG el grosor va en unidades del viewBox y lo escala el
+       propio SVG, que es determinista y no depende de cómo interprete
+       Google sus campos. El viewBox se agranda TRAZO/2 por cada lado
+       porque la mitad del contorno cae fuera del dibujo y si no, se
+       recorta. paint-order deja el relleno encima, así que el cuerpo
+       rojo conserva sus 15x27 exactos y el blanco queda por fuera. */
     function simbolo(sel) {
+      var alto = sel ? 32 : 27;              // alto del cuerpo rojo, del frame
+      var k = alto / CAJA.h, m = TRAZO / 2;
+      var vb = [CAJA.x - m, CAJA.y - m, CAJA.w + TRAZO, CAJA.h + TRAZO];
+      var an = vb[2] * k, al = vb[3] * k;
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vb.join(' ') + '"' +
+                ' width="' + an + '" height="' + al + '">' +
+                '<path d="' + PIN + '" fill="' + (sel ? '#0E2A33' : '#FA003F') + '"' +
+                ' stroke="#ffffff" stroke-width="' + TRAZO + '" stroke-linejoin="round"' +
+                ' paint-order="stroke"/></svg>';
       return {
-        path: PIN, fillColor: sel ? '#0E2A33' : '#FA003F', fillOpacity: 1,
-        strokeColor: '#ffffff', strokeWeight: 22,
-        scale: sel ? 0.062 : 0.052, anchor: new google.maps.Point(320, 576)
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+        scaledSize: new google.maps.Size(an, al),
+        // La punta del pin está en (320,576) del trazado
+        anchor: new google.maps.Point((320 - vb[0]) * k, (576 - vb[1]) * k)
       };
     }
     window.__mpSimbolo = simbolo;   // lo necesita marcarPin()
     P.forEach(function (p, i) {
       if (p.lat === null || p.lng === null) return;
-      var mk = new google.maps.Marker({
-        position: { lat: p.lat, lng: p.lng }, map: mapa,
-        icon: simbolo(false),
-        title: p.nombre                     // el nombre al pasar por encima
-      });
-      mk.addListener('click', function () { seleccionar(i, 'mapa'); });
-      marcadores.push({ i: i, mk: mk });
+      try {
+        var mk = new google.maps.Marker({
+          position: { lat: p.lat, lng: p.lng }, map: mapa,
+          icon: simbolo(false),
+          title: p.nombre                   // el nombre al pasar por encima
+        });
+        mk.addListener('click', function () { seleccionar(i, 'mapa'); });
+        marcadores.push({ i: i, mk: mk });
+      } catch (err) {
+        // Si Google retira Marker algún día, que se sepa por qué está
+        // vacío el mapa en vez de quedarse callado.
+        console.error('[Ruta Nómada] No se pudo crear el pin de "' + p.nombre + '":', err);
+      }
     });
+    if (!marcadores.length) {
+      console.error('[Ruta Nómada] El mapa se creó pero no hay ningún pin. Planes con coordenadas: ' + con.length);
+    }
     var b = new google.maps.LatLngBounds();
     con.forEach(function (p) { b.extend({ lat: p.lat, lng: p.lng }); });
     mapa.fitBounds(b, 60);
