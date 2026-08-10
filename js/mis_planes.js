@@ -14,8 +14,11 @@
   if (!P.length) return;
 
   var sel = 0;               // índice del plan seleccionado
-  var vista = 'tabla';
   var mapa = null, marcadores = [], mapaListo = false;
+  // Zoom con el que se abre el mapa sobre el plan elegido: a 11 se ve la
+  // ciudad del destino con algo de alrededor. Después manda el usuario,
+  // porque cambiar de plan sólo desplaza el mapa y no toca el zoom.
+  var ZOOM_PLAN = 11;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -232,19 +235,45 @@
   }
 
   /* ── Conmutador de vistas ──────────────────────────────── */
+  // El paso se mide del propio botón: si mañana cambia su anchura en el
+  // CSS, el recuadro sigue cuadrando sin tocar este archivo.
+  function colocarDeslizante(btn) {
+    var botones = Array.prototype.slice.call(document.querySelectorAll('.mp-views__btn'));
+    var sl = $('mpSlider');
+    if (sl && btn) sl.style.transform = 'translateX(' + (botones.indexOf(btn) * btn.offsetWidth) + 'px)';
+  }
+
   function cambiarVista(v, btn) {
-    vista = v;
     document.querySelectorAll('.mp-vista').forEach(function (el) {
       el.classList.toggle('mp-oculto', el.getAttribute('data-vista') !== v);
     });
-    var botones = Array.prototype.slice.call(document.querySelectorAll('.mp-views__btn'));
-    botones.forEach(function (b) { b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); });
-    // El paso se mide del propio botón: si mañana cambia su anchura en
-    // el CSS, el recuadro sigue cuadrando sin tocar este archivo.
-    var sl = $('mpSlider');
-    if (sl) sl.style.transform = 'translateX(' + (botones.indexOf(btn) * btn.offsetWidth) + 'px)';
+    document.querySelectorAll('.mp-views__btn').forEach(function (b) {
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    colocarDeslizante(btn);
     if (v === 'mapa') montarMapa();
   }
+
+  /* La vista de partida NO está escrita aquí: se lee del botón que trae
+     aria-selected="true" en mis_planes.php, que es el mismo sitio donde
+     se decide qué .mp-vista arranca sin .mp-oculto. Cambiarla es mover
+     ese atributo y esa clase, sin tocar este archivo.
+     El recuadro se coloca con la transición apagada: si no, al cargar la
+     página se le vería deslizarse desde el primer botón hasta el que
+     toca, que es un movimiento que nadie ha pedido. */
+  (function vistaInicial() {
+    var btn = document.querySelector('.mp-views__btn[aria-selected="true"]');
+    if (!btn) return;
+    var sl = $('mpSlider');
+    if (sl) {
+      var antes = sl.style.transition;
+      sl.style.transition = 'none';
+      colocarDeslizante(btn);
+      void sl.offsetWidth;                 // fuerza el reflujo antes de devolverla
+      sl.style.transition = antes;
+    }
+    if (btn.getAttribute('data-vista') === 'mapa') montarMapa();
+  })();
 
   /* ── Mapa ──────────────────────────────────────────────── */
   function montarMapa() {
@@ -259,8 +288,16 @@
     var con = P.filter(function (p) { return p.lat !== null && p.lng !== null; });
     if (!con.length) { nodo.innerHTML = '<p style="padding:24px;color:#6B7A83">Ningún plan tiene coordenadas todavía.</p>'; return; }
 
+    /* Encuadre sobre el plan SELECCIONADO y no sobre todos. Un
+       fitBounds de todos parece buena idea hasta que los planes están
+       repartidos por el mundo: con cuatro destinos en México y uno en
+       Madrid, el mapa se abría hasta cruzar el Atlántico y los cinco
+       pines quedaban apelotonados en dos manchas diminutas.
+       Si el plan elegido no tiene coordenadas se cae al primero que sí
+       las tenga, que ya está filtrado en `con`. */
+    var foco = (P[sel] && P[sel].lat !== null && P[sel].lng !== null) ? P[sel] : con[0];
     mapa = new google.maps.Map(nodo, {
-      center: { lat: con[0].lat, lng: con[0].lng }, zoom: 5,
+      center: { lat: foco.lat, lng: foco.lng }, zoom: ZOOM_PLAN,
       disableDefaultUI: true, clickableIcons: false
     });
     // Pin propio en vez del marcador rojo de Google: es el map-pin del
@@ -323,9 +360,6 @@
     if (!marcadores.length) {
       console.error('[Ruta Nómada] El mapa se creó pero no hay ningún pin. Planes con coordenadas: ' + con.length);
     }
-    var b = new google.maps.LatLngBounds();
-    con.forEach(function (p) { b.extend({ lat: p.lat, lng: p.lng }); });
-    mapa.fitBounds(b, 60);
     mapaListo = true;
     marcarPin();
   }

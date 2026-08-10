@@ -153,8 +153,8 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
       </button>
       <div class="mp-views" role="tablist" aria-label="Forma de ver los planes">
         <span class="mp-views__slider" id="mpSlider"></span>
-        <button type="button" class="mp-views__btn" role="tab" data-vista="tabla"  aria-selected="true"  aria-label="Ver como lista"><?= ico('lista', 16) ?></button>
-        <button type="button" class="mp-views__btn" role="tab" data-vista="rejilla" aria-selected="false" aria-label="Ver como tarjetas"><?= ico('rejilla', 16) ?></button>
+        <button type="button" class="mp-views__btn" role="tab" data-vista="tabla"  aria-selected="false" aria-label="Ver como lista"><?= ico('lista', 16) ?></button>
+        <button type="button" class="mp-views__btn" role="tab" data-vista="rejilla" aria-selected="true"  aria-label="Ver como tarjetas"><?= ico('rejilla', 16) ?></button>
         <button type="button" class="mp-views__btn" role="tab" data-vista="mapa"   aria-selected="false" aria-label="Ver en el mapa"><?= ico('chincheta', 16) ?></button>
       </div>
     </div>
@@ -171,7 +171,7 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
       <?php else: ?>
 
       <!-- ═══ Vista tabla ═══ -->
-      <div class="mp-vista" data-vista="tabla">
+      <div class="mp-vista mp-oculto" data-vista="tabla">
         <div class="mp-tablawrap">
         <table class="mp-tabla">
           <!-- Anchos despejados de los centros de cada columna en el
@@ -212,7 +212,7 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
       </div>
 
       <!-- ═══ Vista tarjetas ═══ -->
-      <div class="mp-vista mp-oculto" data-vista="rejilla">
+      <div class="mp-vista" data-vista="rejilla">
         <div class="mp-grid">
         <?php foreach ($planes as $i => $p):
             $c = $paleta[$i % 10];   // la 11.ª repite la dupla de la 1.ª
