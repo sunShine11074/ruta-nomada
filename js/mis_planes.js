@@ -1,0 +1,320 @@
+/* ============================================================
+   js/mis_planes.js — Mis planes | Ruta Nómada
+
+   Una sola fuente de verdad: el índice del plan seleccionado. Tabla,
+   tarjetas, mapa y paginador son cuatro maneras de moverlo, y el panel
+   derecho es lo único que lo lee. Así no hay que sincronizar cada vista
+   con las demás: todas escriben en el mismo sitio.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var P = window.MP_PLANES || [];
+  var ICO = window.MP_ICONOS || {};
+  if (!P.length) return;
+
+  var sel = 0;               // índice del plan seleccionado
+  var vista = 'tabla';
+  var mapa = null, marcadores = [], mapaListo = false;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ── Selección ─────────────────────────────────────────── */
+  function seleccionar(i, origen) {
+    if (i < 0 || i >= P.length) return;
+    sel = i;
+    document.querySelectorAll('[data-idx]').forEach(function (el) {
+      el.setAttribute('aria-selected', Number(el.getAttribute('data-idx')) === i ? 'true' : 'false');
+    });
+    pintarFicha();
+    pintarPager();
+    marcarPin();
+    // Si el cambio vino del panel o del mapa, traer a la vista el
+    // elemento correspondiente de la lista para no perderlo de vista.
+    if (origen !== 'lista') {
+      var el = document.querySelector('.mp-vista:not(.mp-oculto) [data-idx="' + i + '"]');
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    if (origen !== 'mapa' && mapa) centrarEn(i);
+  }
+
+  function pintarPager() {
+    var n = $('mpPagerN');
+    if (n) n.textContent = (sel + 1) + ' de ' + P.length;
+    var a = $('mpPrev'), b = $('mpNext');
+    if (a) a.disabled = sel === 0;
+    if (b) b.disabled = sel === P.length - 1;
+  }
+
+  /* ── Ficha del panel ───────────────────────────────────── */
+  function pintarFicha() {
+    var p = P[sel];
+    var host = $('mpFicha');
+    if (!host) return;
+
+    var portada = p.portTipo === 'img'
+      ? '<img src="' + esc(p.portVal) + '" alt="" onerror="this.style.display=\'none\'">'
+      : '<span class="mp-cover__grad" style="background:linear-gradient(135deg,#0E2A33,#3e7986)">' + esc(p.portVal) + '</span>';
+
+    var coords = (p.lat !== null && p.lng !== null)
+      ? '[Lat: ' + p.lat.toFixed(7) + ', Lng: ' + p.lng.toFixed(7) + ']'
+      : 'Sin coordenadas';
+
+    var esProp = p.rol === 'propietario';
+
+    host.innerHTML =
+      '<div class="mp-cover">' + portada +
+        // La chapita de la esquina es la marca del sitio, como en los frames
+        '<span class="mp-cover__badge"><img src="img/logo.png" alt="" width="17" height="17"></span>' +
+      '</div>' +
+      '<span class="mp-chip" style="background:' + esc(p.estColor) + '">' + esc(p.estTexto) + '</span>' +
+      '<h2 class="mp-side__t">' + esc(p.nombre) + '</h2>' +
+
+      '<div class="mp-grupo"><p class="mp-grupo__t">Destino:</p>' +
+        '<span class="mp-dato">' + (ICO.ubicacion || '') + esc(p.destino || '—') + '</span>' +
+        '<span class="mp-dato">' + (ICO.brujula || '') + esc(coords) + '</span>' +
+        '<span class="mp-dato">' + (ICO.sitios || '') + p.lugares + ' sitios añadidos</span>' +
+      '</div>' +
+
+      '<div class="mp-grupo"><p class="mp-grupo__t">Fechas de inicio y fin:</p>' +
+        '<span class="mp-dato">' + (ICO.calendario || '') + esc(p.fechas) + '</span>' +
+      '</div>' +
+
+      '<div class="mp-grupo"><p class="mp-grupo__t">Participantes:</p>' + p.avatares + '</div>' +
+
+      '<div class="mp-grupo"><p class="mp-grupo__t">Presupuesto y gastos:</p>' +
+        '<span class="mp-dato">' + (ICO.cerdito || '') +
+          (p.presup ? '<b>' + esc(p.presup) + '</b> <small>Presupuesto asignado</small>'
+                    : '<span class="mp-vacio">Sin presupuesto asignado</span>') + '</span>' +
+        '<span class="mp-dato">' + (ICO.recibo || '') +
+          (p.nGastos ? '<b>' + p.nGastos + ' gastos</b> <small>Gastos definidos</small>'
+                     : '<span class="mp-vacio">Sin gastos registrados</span>') + '</span>' +
+        (p.nGastos ? '<span class="mp-dato">' + (ICO.transferir || '') +
+          '<b>' + esc(p.totGastos) + '</b> <small>Total de gastos</small></span>' : '') +
+      '</div>' +
+
+      '<div class="mp-grupo"><p class="mp-grupo__t">Última modificación</p>' +
+        '<span class="mp-dato">' + (ICO.lapiz || '') + '<b>' + esc(p.modifGuion) + '</b></span>' +
+      '</div>' +
+
+      '<div class="mp-acciones">' +
+        '<a class="mp-btn" href="plan.php?id=' + p.id + '">' +
+          '<span class="mp-btn__caja">' + (ICO.lapizBlanco || '') + '</span>Editar plan</a>' +
+        '<button type="button" class="mp-btn" id="mpDel" ' +
+          'aria-describedby="mpDelAyuda">' +
+          '<span class="mp-btn__caja">' + (ICO.papelera || '') + '</span>' +
+          (esProp ? 'Eliminar plan' : 'Salir del plan') +
+          '<span class="mp-btn__aro">' +
+            '<svg width="26" height="26" viewBox="0 0 36 36" style="position:absolute;inset:0;transform:rotate(-90deg)">' +
+              '<circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="3"></circle>' +
+              '<circle data-fill="1" data-len="94.2" cx="18" cy="18" r="15" fill="none" stroke="#f0b429" ' +
+                'stroke-width="3" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="94.2"></circle>' +
+            '</svg>' +
+          '</span>' +
+        '</button>' +
+        '<span class="mp-ayuda" id="mpDelAyuda">Mantén pulsado para ' + (esProp ? 'eliminar' : 'salir') + '</span>' +
+      '</div>';
+
+    enlazarBorrado();
+  }
+
+  /* ── Borrado por pulsación ─────────────────────────────────
+     Mismo mecanismo que el «Guardar cambios» de profile.php (aro SVG,
+     stroke-dashoffset, requestAnimationFrame), con tres diferencias que
+     pide el que la acción sea destructiva:
+       · cinco segundos en vez de dos,
+       · sólo el botón primario del ratón y sólo el puntero principal —
+         sin esto, un segundo dedo apoyado en la pantalla también
+         arrancaría el relleno,
+       · setPointerCapture, para que soltar fuera del botón cancele de
+         verdad en lugar de dejar la animación colgada.
+     Y un camino de teclado, que el original no tiene: Enter o Espacio
+     mantenidos rellenan igual.                                        */
+  var HOLD_MS = 5000;
+  var motor = null;
+
+  function enlazarBorrado() {
+    var btn = $('mpDel');
+    if (!btn) return;
+    btn.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || !e.isPrimary) return;
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      empezar(btn);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+      btn.addEventListener(ev, function () { soltar(); });
+    });
+    btn.addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); empezar(btn); }
+    });
+    btn.addEventListener('keyup', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') soltar();
+    });
+    btn.addEventListener('blur', function () { soltar(); });
+  }
+
+  function empezar(btn) {
+    soltar(true);
+    var aro = btn.querySelector('[data-fill]');
+    if (!aro) return;
+    var len = parseFloat(aro.getAttribute('data-len')) || 94.2;
+    var t0 = performance.now();
+    var m = { aro: aro, len: len, vivo: true, raf: null, p: 0 };
+    (function paso(now) {
+      if (!m.vivo) return;
+      m.p = Math.min((now - t0) / HOLD_MS, 1);
+      aro.style.strokeDashoffset = String(len * (1 - m.p));
+      if (m.p >= 1) { m.vivo = false; motor = null; confirmar(); return; }
+      m.raf = requestAnimationFrame(paso);
+    })(t0);
+    motor = m;
+  }
+
+  function soltar(silencio) {
+    var m = motor;
+    if (!m) return;
+    if (m.raf) cancelAnimationFrame(m.raf);
+    m.vivo = false; motor = null;
+    if (silencio) return;
+    var aro = m.aro, len = m.len, p = m.p, t0 = performance.now();
+    var dur = Math.max(160, p * 420);
+    (function volver(now) {
+      var k = Math.min((now - t0) / dur, 1);
+      aro.style.strokeDashoffset = String(len * (1 - p * (1 - k)));
+      if (k < 1) requestAnimationFrame(volver);
+    })(t0);
+  }
+
+  function confirmar() {
+    var p = P[sel];
+    var btn = $('mpDel');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+    fetch('api/plan_delete.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan_id: p.id, csrf: window.MP_CSRF })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.error) || 'Error');
+        // Recargar es lo honesto: se han ido tarjeta, fila, pin y la
+        // numeración del paginador. Reconstruirlo a mano en el cliente
+        // sería más código y más sitios donde equivocarse.
+        location.reload();
+      })
+      .catch(function () {
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+        alert('No se pudo completar la operación. Inténtalo de nuevo.');
+      });
+  }
+
+  /* ── Conmutador de vistas ──────────────────────────────── */
+  function cambiarVista(v, btn) {
+    vista = v;
+    document.querySelectorAll('.mp-vista').forEach(function (el) {
+      el.classList.toggle('mp-oculto', el.getAttribute('data-vista') !== v);
+    });
+    var botones = Array.prototype.slice.call(document.querySelectorAll('.mp-views__btn'));
+    botones.forEach(function (b) { b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); });
+    // El paso se mide del propio botón: si mañana cambia su anchura en
+    // el CSS, el recuadro sigue cuadrando sin tocar este archivo.
+    var sl = $('mpSlider');
+    if (sl) sl.style.transform = 'translateX(' + (botones.indexOf(btn) * btn.offsetWidth) + 'px)';
+    if (v === 'mapa') montarMapa();
+  }
+
+  /* ── Mapa ──────────────────────────────────────────────── */
+  function montarMapa() {
+    if (mapaListo) return;
+    if (!window.google || !google.maps) {
+      // Todavía descargando: reintentar cuando Google avise.
+      if (window.mpMapsReady) window.mpMapsReady.then(function () { montarMapa(); });
+      return;
+    }
+    var nodo = $('mpMapa');
+    if (!nodo) return;
+    var con = P.filter(function (p) { return p.lat !== null && p.lng !== null; });
+    if (!con.length) { nodo.innerHTML = '<p style="padding:24px;color:#6B7A83">Ningún plan tiene coordenadas todavía.</p>'; return; }
+
+    mapa = new google.maps.Map(nodo, {
+      center: { lat: con[0].lat, lng: con[0].lng }, zoom: 5,
+      disableDefaultUI: true, clickableIcons: false
+    });
+    // Pin propio en vez del marcador rojo de Google: es el map-pin del
+    // diseño, dibujado como SVG para que el color y el tamaño sean los
+    // del frame y no los que Google decida.
+    var PIN = 'M352 348.4C416.1 333.9 464 276.5 464 208C464 128.5 399.5 64 320 64C240.5 64 176 128.5 176 208' +
+              'C176 276.5 223.9 333.9 288 348.4L288 544C288 561.7 302.3 576 320 576C337.7 576 352 561.7 352 544L352 348.4z' +
+              'M328 160C297.1 160 272 185.1 272 216C272 229.3 261.3 240 248 240C234.7 240 224 229.3 224 216' +
+              'C224 158.6 270.6 112 328 112C341.3 112 352 122.7 352 136C352 149.3 341.3 160 328 160z';
+    function simbolo(sel) {
+      return {
+        path: PIN, fillColor: sel ? '#0E2A33' : '#FA003F', fillOpacity: 1,
+        strokeColor: '#ffffff', strokeWeight: 22,
+        scale: sel ? 0.062 : 0.052, anchor: new google.maps.Point(320, 576)
+      };
+    }
+    window.__mpSimbolo = simbolo;   // lo necesita marcarPin()
+    P.forEach(function (p, i) {
+      if (p.lat === null || p.lng === null) return;
+      var mk = new google.maps.Marker({
+        position: { lat: p.lat, lng: p.lng }, map: mapa,
+        icon: simbolo(false),
+        title: p.nombre                     // el nombre al pasar por encima
+      });
+      mk.addListener('click', function () { seleccionar(i, 'mapa'); });
+      marcadores.push({ i: i, mk: mk });
+    });
+    var b = new google.maps.LatLngBounds();
+    con.forEach(function (p) { b.extend({ lat: p.lat, lng: p.lng }); });
+    mapa.fitBounds(b, 60);
+    mapaListo = true;
+    marcarPin();
+  }
+
+  // El pin seleccionado se distingue por color y tamaño, no dando
+  // saltos: un marcador rebotando sin parar cansa la vista y además
+  // BOUNCE no se detiene solo.
+  function marcarPin() {
+    if (!mapaListo) return;
+    marcadores.forEach(function (m) {
+      var s = m.i === sel;
+      m.mk.setZIndex(s ? 999 : 1);
+      m.mk.setIcon(window.__mpSimbolo ? window.__mpSimbolo(s) : null);
+    });
+  }
+  function centrarEn(i) {
+    var p = P[i];
+    if (!mapa || p.lat === null || p.lng === null) return;
+    mapa.panTo({ lat: p.lat, lng: p.lng });
+  }
+
+  /* ── Enlaces ───────────────────────────────────────────── */
+  document.addEventListener('click', function (e) {
+    var v = e.target.closest ? e.target.closest('.mp-views__btn') : null;
+    if (v) { cambiarVista(v.getAttribute('data-vista'), v); return; }
+    // El menú de tres puntos no debe arrastrar la selección de la tarjeta
+    if (e.target.closest && e.target.closest('.mp-card__menu')) { e.stopPropagation(); return; }
+    var fila = e.target.closest ? e.target.closest('[data-idx]') : null;
+    if (fila) seleccionar(Number(fila.getAttribute('data-idx')), 'lista');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var fila = e.target.closest ? e.target.closest('[data-idx]') : null;
+    if (fila) { e.preventDefault(); seleccionar(Number(fila.getAttribute('data-idx')), 'lista'); }
+  });
+  if ($('mpPrev')) $('mpPrev').addEventListener('click', function () { seleccionar(sel - 1, 'pager'); });
+  if ($('mpNext')) $('mpNext').addEventListener('click', function () { seleccionar(sel + 1, 'pager'); });
+  // Zoom del mapa. Los controles nativos van desactivados
+  // (disableDefaultUI) porque el diseño trae los suyos.
+  if ($('mpZoomIn'))  $('mpZoomIn').addEventListener('click',  function () { if (mapa) mapa.setZoom(mapa.getZoom() + 1); });
+  if ($('mpZoomOut')) $('mpZoomOut').addEventListener('click', function () { if (mapa) mapa.setZoom(mapa.getZoom() - 1); });
+
+  seleccionar(0, 'lista');
+})();

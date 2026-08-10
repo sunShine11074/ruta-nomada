@@ -214,7 +214,11 @@ CREATE TABLE `viajes_usuario` (
   KEY `plan_id` (`plan_id`),
   CONSTRAINT `viajes_usuario_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `viajes_usuario_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`),
-  CONSTRAINT `viajes_usuario_ibfk_3` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`)
+  -- SET NULL y no CASCADE: viajes_usuario es el historial de destinos
+  -- guardados. Al borrar un plan sólo se rompe el vínculo, no se pierde
+  -- el recuerdo del destino. Sin cláusula era RESTRICT y habría hecho
+  -- fallar api/plan_delete.php en cuanto plan_id dejara de ser NULL.
+  CONSTRAINT `viajes_usuario_ibfk_3` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `ai_uso` (

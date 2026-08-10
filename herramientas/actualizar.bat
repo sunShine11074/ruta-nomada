@@ -60,6 +60,11 @@ if not exist "basedatos\actualizar_bd.sql" (
 echo   1/2  Actualizando la base de datos...
 echo.
 "%MYSQL%" -u root %BASE% -e "source basedatos/actualizar_bd.sql"
+if not errorlevel 1 (
+    REM Deja viajes_usuario.plan_id en SET NULL para que se puedan borrar
+    REM planes. Es idempotente: si ya esta, no hace nada.
+    "%MYSQL%" -u root %BASE% -e "source basedatos/migrate_borrar_plan.sql"
+)
 if errorlevel 1 (
     echo.
     echo   [X] MySQL devolvio un error.

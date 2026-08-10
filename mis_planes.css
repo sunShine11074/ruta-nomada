@@ -1,0 +1,273 @@
+/* ============================================================
+   mis_planes.css — Mis planes | Ruta Nómada
+
+   TIPOGRAFÍA
+   El diseño pide Mona Sans para todo salvo los dos botones del panel,
+   que van en Poppins. Mona Sans no está en Google Fonts (es de GitHub,
+   licencia OFL), así que se declara aquí con @font-face apuntando a
+   fonts/. Mientras no estén los .woff2 la pila cae a Poppins, que ya
+   carga el proyecto: la página se ve bien y el día que aparezcan los
+   archivos no hay que tocar ni una regla más.
+   ============================================================ */
+
+/* Mona Sans 2.0.27 (github/mona-sans), licencia SIL OFL 1.1.
+   Se usa la VARIABLE y no las cuatro estáticas: 137 KB en una petición
+   frente a 242 KB en cuatro, y además da todos los pesos de 200 a 900 en
+   vez de sólo cuatro. El archivo original se llama
+   MonaSansVF[opsz,wght].woff2; se renombró porque los corchetes hay que
+   escaparlos en la URL y no aportan nada.
+   El eje opsz es el tamaño óptico: los navegadores lo ajustan solos con
+   font-optical-sizing (auto por defecto), así que el título de 46 px y
+   los rótulos de 11 px reciben cada uno el trazo que les corresponde. */
+@font-face {
+  font-family: 'Mona Sans';
+  src: url('fonts/MonaSans.woff2') format('woff2-variations'),
+       url('fonts/MonaSans.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* El fondo de la página. Va en body y no en .mp porque .mp sólo mide lo
+   que ocupa su contenido; al scrollear asomaría el gris de style.css. */
+body.dashboard-page { background: #FAFDFF; }
+
+/* Reserva siempre el hueco de la barra de desplazamiento. La vista de
+   tarjetas es alta y la de tabla no, así que al cambiar de vista aparecía
+   y desaparecía la barra y TODA la página daba un salto de 15px hacia los
+   lados, controles incluidos. */
+html { scrollbar-gutter: stable; }
+
+.mp {
+  /* Medidas del frame (1440x810), en píxeles absolutos y NO en
+     proporción: un margen de 15px es 15px en cualquier pantalla; lo que
+     debe adaptarse es el ancho del panel y cuándo deja de caber, no el
+     aire que lo rodea. */
+  --mp-topbar: 56px;   /* alto real de includes/topbar.php, que es fixed */
+  --mp-aire:   15px;   /* separación del panel: arriba, derecha y abajo */
+  --mp-panel:  348px;  /* ancho del panel */
+  --mp-sep:    41px;   /* hueco entre el contenido y el panel */
+  /* Lo que hay que reservar a la derecha para que nada pase por debajo */
+  --mp-reserva: calc(var(--mp-panel) + var(--mp-aire) + var(--mp-sep));
+
+  --mp-tinta:    #0D1F27;
+  --mp-suave:    #6B7A83;
+  --mp-linea:    #E4EBEF;
+  --mp-fondo:    #F7FAFC;
+  --mp-marino:   #062738;
+  --mp-azul:     #1B4FD8;
+  --mp-verde:    #36BE3B;
+  --mp-naranja:  #FFA500;
+  --mp-rojo:     #FA003F;
+  font-family: 'Mona Sans', 'Poppins', system-ui, -apple-system, sans-serif;
+  color: var(--mp-tinta);
+}
+
+/* ── Estructura: contenido + panel FIJO ──────────────────── */
+/* El panel va fixed y fuera del flujo, así que el contenido reserva su
+   sitio con padding-right. Antes era sticky y crecía con su contenido:
+   los botones de abajo quedaban fuera de la pantalla y había que
+   scrollear la página entera para llegar a ellos. Ahora el panel se
+   ancla arriba y abajo y es su interior el que se desplaza. */
+.mp-wrap { padding: 0 var(--mp-reserva) 40px 28px; }
+.mp-main { min-width: 0; }
+.mp-side {
+  position: fixed;
+  top: calc(var(--mp-topbar) + var(--mp-aire));
+  right: var(--mp-aire);
+  bottom: var(--mp-aire);
+  width: var(--mp-panel);
+  overflow-y: auto; overscroll-behavior: contain;
+  background: #fff; border: 1px solid var(--mp-linea); border-radius: 18px;
+  box-shadow: 0 10px 34px rgba(13, 31, 39, .07); padding: 16px;
+  z-index: 20;
+}
+/* Cuando ya no cabe al lado, el panel vuelve al flujo y se pone debajo */
+@media (max-width: 1180px) {
+  .mp-wrap { padding-right: 28px; }
+  .mp-side { position: static; width: auto; margin-top: 22px; max-height: none; }
+}
+
+/* ── Cabecera ────────────────────────────────────────────── */
+/* Los tres controles se alinean con el borde derecho del CONTENIDO, que
+   queda 41px antes del panel. Antes la cabecera ocupaba todo el ancho y
+   los botones se iban encima de la columna del panel. */
+.mp-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  padding: 22px var(--mp-reserva) 20px 28px;
+}
+@media (max-width: 1180px) { .mp-head { padding-right: 28px; } }
+.mp-title { margin: 0; font-size: 46px; font-weight: 700; letter-spacing: -.02em; }
+.mp-tools { display: flex; align-items: center; gap: 13px; }
+
+.mp-iconbtn {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--mp-linea);
+  background: #fff; color: var(--mp-tinta); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s;
+}
+.mp-iconbtn:hover { background: var(--mp-fondo); border-color: #cfdae1; }
+.mp-iconbtn:focus-visible { outline: 2px solid var(--mp-marino); outline-offset: 2px; }
+
+.mp-orden {
+  display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 15px;
+  border-radius: 10px; border: 1px solid var(--mp-linea); background: #fff;
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--mp-tinta); cursor: pointer;
+  white-space: nowrap;
+}
+.mp-orden:hover { background: var(--mp-fondo); }
+
+/* Conmutador de vistas: el recuadro blanco se DESLIZA, no salta */
+.mp-views {
+  position: relative; display: flex; align-items: center; gap: 0;
+  height: 38px; padding: 4px; border-radius: 10px;
+  border: 1px solid var(--mp-linea); background: #fff;
+}
+.mp-views__slider {
+  position: absolute; top: 4px; left: 4px; width: 30px; height: 28px;
+  background: var(--mp-fondo); border-radius: 7px;
+  transition: transform .26s cubic-bezier(.4, 0, .2, 1);
+}
+.mp-views__btn {
+  position: relative; z-index: 1; width: 30px; height: 28px; border: none; background: none;
+  cursor: pointer; color: var(--mp-suave); display: flex; align-items: center; justify-content: center;
+  transition: color .2s;
+}
+.mp-views__btn[aria-selected="true"] { color: var(--mp-tinta); }
+.mp-views__btn:focus-visible { outline: 2px solid var(--mp-marino); outline-offset: 2px; border-radius: 9px; }
+
+/* ── Vista tabla ─────────────────────────────────────────── */
+/* Ocho columnas sin partir no siempre caben. Sin este contenedor, las
+   últimas —fecha de creación y el menú— quedaban cortadas y fuera de
+   alcance en cuanto un nombre largo ensanchaba la tabla. */
+.mp-tablawrap { overflow-x: auto; border-radius: 14px; }
+.mp-tabla { width: 100%; min-width: 940px; border-collapse: collapse; background: #fff; border: 1px solid var(--mp-linea); border-radius: 14px; overflow: hidden; }
+.mp-tabla th {
+  text-align: left; font-size: 13.5px; font-weight: 600; color: var(--mp-tinta);
+  padding: 15px 16px; background: var(--mp-fondo); border-bottom: 1px solid var(--mp-linea); white-space: nowrap;
+}
+.mp-tabla td { padding: 14px 16px; font-size: 13.8px; border-bottom: 1px solid var(--mp-linea); vertical-align: middle; white-space: nowrap; }
+.mp-tabla tbody tr { cursor: pointer; transition: background .13s; }
+/* Filas alternas, como en el frame */
+.mp-tabla tbody tr:nth-child(even) { background: #FAFCFD; }
+.mp-tabla tbody tr:hover { background: #F1F7FB; }
+.mp-tabla tbody tr[aria-selected="true"] { background: #E9F2FA; }
+.mp-tabla tbody tr:last-child td { border-bottom: none; }
+.mp-td-nombre { font-weight: 500; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+/* El mismo icono de tres puntos, tumbado para la tabla */
+.mp-puntos-h { display: inline-flex; color: #6B7A83; transform: rotate(90deg); }
+
+/* ── Vista tarjetas ──────────────────────────────────────── */
+/* 172px es lo que hace falta para que entren CINCO por fila a la anchura
+   del frame (1440px menos el panel), que es como está dibujado. */
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 18px; }
+.mp-card {
+  position: relative; overflow: hidden; border-radius: 16px; padding: 14px;
+  min-height: 200px; cursor: pointer; border: 1px solid transparent;
+  transition: transform .14s, box-shadow .14s, border-color .14s;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.mp-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(13, 31, 39, .13); }
+.mp-card[aria-selected="true"] { border-color: var(--mp-marino); box-shadow: 0 0 0 2px rgba(6, 39, 56, .16); }
+.mp-card:focus-visible { outline: 2px solid var(--mp-marino); outline-offset: 2px; }
+/* El cuarto de círculo decorativo de la esquina inferior izquierda.
+   En los frames es grande: ocupa casi toda la anchura de la tarjeta y
+   la curva sube hasta media altura, así que se dimensiona en % y no en
+   píxeles para que acompañe a la tarjeta al estrecharse. */
+.mp-card__deco {
+  position: absolute; left: 0; bottom: 0; width: 86%; height: 62%;
+  border-top-right-radius: 100%; pointer-events: none;
+}
+/* Sube el contenido por encima del adorno. Se excluye el menú de tres
+   puntos: su regla propia lo pone en absolute y esta, por ser más
+   específica, se lo pisaba y lo devolvía al flujo, robando 24px de alto
+   a cada tarjeta. */
+.mp-card > *:not(.mp-card__deco):not(.mp-card__menu) { position: relative; z-index: 1; }
+/* Dos líneas y punto. Un nombre de 128 caracteres estiraba su tarjeta y,
+   como la rejilla iguala alturas, estiraba TODAS las de la fila. El
+   nombre completo queda en el title y en el panel de la derecha. */
+.mp-card__t {
+  margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.22; padding-right: 20px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mp-card__linea { display: flex; align-items: center; gap: 5px; font-size: 11.2px; color: #33454e; line-height: 1.35; }
+/* Las dos pastillas caben en una sola línea a 185px, como en el frame */
+.mp-card__pills { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.mp-card__pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 11px;
+  background: #fff; font-size: 10px; font-weight: 600; white-space: nowrap;
+}
+.mp-card__rol {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 11px;
+  background: var(--mp-azul); color: #fff; font-size: 10px; font-weight: 600; white-space: nowrap;
+}
+.mp-card__menu {
+  position: absolute; top: 11px; right: 9px; z-index: 2; width: 24px; height: 24px;
+  border: none; background: none; cursor: pointer; color: #33454e; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.mp-card__menu:hover { background: rgba(255, 255, 255, .6); }
+.mp-rotulo { font-size: 10.4px; font-weight: 600; color: #33454e; margin-top: 5px; line-height: 1.2; }
+/* Importe y fecha de la tarjeta, en el azul del diseño */
+.mp-card__val { font-weight: 600; color: var(--mp-azul); }
+
+/* Avatares. En las TARJETAS van solapados; en el PANEL, separados. */
+.mp-avatares { display: flex; align-items: center; }
+.mp-avatares > * { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; margin-left: -7px; overflow: hidden; flex-shrink: 0; }
+.mp-avatares > *:first-child { margin-left: 0; }
+.mp-side .mp-avatares { gap: 5px; }
+.mp-side .mp-avatares > * { width: 27px; height: 27px; margin-left: 0; border-width: 0; }
+.mp-av { background: #F5B93F; color: #0E2A33; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+.mp-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-av--mas { background: #fff; color: #33454e; font-size: 9.5px; }
+
+/* ── Vista mapa ──────────────────────────────────────────── */
+.mp-mapa { position: relative; height: 620px; border-radius: 14px; overflow: hidden; border: 1px solid var(--mp-linea); background: #e8eef2; }
+.mp-mapa__lienzo { position: absolute; inset: 0; }
+.mp-zoom { position: absolute; right: 14px; bottom: 14px; z-index: 5; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; box-shadow: 0 3px 12px rgba(13, 31, 39, .28); }
+.mp-zoom button { width: 40px; height: 40px; border: none; background: #fff; cursor: pointer; color: var(--mp-tinta); font-size: 21px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.mp-zoom button + button { border-top: 1px solid var(--mp-linea); }
+.mp-zoom button:hover { background: var(--mp-fondo); }
+
+/* ── Panel derecho ───────────────────────────────────────── */
+.mp-pager { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 auto 13px; width: fit-content; padding: 4px; border: 1px solid var(--mp-linea); border-radius: 20px; }
+.mp-pager button { width: 28px; height: 28px; border-radius: 50%; border: none; background: none; cursor: pointer; color: var(--mp-tinta); display: flex; align-items: center; justify-content: center; }
+.mp-pager button:hover:not(:disabled) { background: var(--mp-fondo); }
+.mp-pager button:disabled { opacity: .3; cursor: default; }
+.mp-pager__n { font-size: 11.5px; font-weight: 600; color: var(--mp-suave); padding: 0 8px; white-space: nowrap; }
+
+.mp-cover { position: relative; height: 168px; border-radius: 13px; overflow: hidden; background: #dfe6ec; }
+.mp-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-cover__grad { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 700; color: rgba(255, 255, 255, .9); }
+.mp-cover__badge { position: absolute; top: 9px; left: 9px; width: 26px; height: 26px; border-radius: 8px; background: rgba(255, 255, 255, .92); display: flex; align-items: center; justify-content: center; }
+
+.mp-chip { display: inline-flex; align-items: center; padding: 3px 11px; border-radius: 9px; font-size: 11px; font-weight: 600; color: #fff; margin: 11px 0 6px; }
+.mp-side__t { margin: 0 0 14px; font-size: 25px; font-weight: 700; line-height: 1.15; }
+.mp-grupo { margin-bottom: 13px; }
+.mp-grupo__t { margin: 0 0 6px; font-size: 13.4px; font-weight: 600; }
+.mp-dato { display: flex; align-items: center; gap: 8px; font-size: 12.6px; color: #33454e; padding: 2px 0; }
+.mp-dato b { font-weight: 600; color: var(--mp-azul); }
+.mp-dato small { color: var(--mp-suave); font-size: 11.2px; }
+.mp-vacio { color: #9aa7ae; font-style: italic; }
+
+.mp-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.mp-btn {
+  font-family: 'Poppins', system-ui, sans-serif;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 10px; border-radius: 12px; border: none; background: var(--mp-marino);
+  color: #fff; font-size: 13.6px; font-weight: 600; cursor: pointer; text-decoration: none;
+  user-select: none; touch-action: none; box-shadow: 0 3px 10px rgba(6, 39, 56, .25);
+}
+.mp-btn:hover { background: #0a3a52; }
+.mp-btn:focus-visible { outline: 2px solid #f0b429; outline-offset: 2px; }
+.mp-btn__aro { position: relative; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* El icono del botón va dentro de un cuadrado redondeado más claro,
+   igual que en profile.php y en el frame. */
+.mp-btn__caja { width: 26px; height: 26px; border-radius: 8px; background: rgba(255, 255, 255, .16); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* La ayuda cuelga SOLO del botón de la derecha */
+.mp-ayuda { grid-column: 2; font-size: 9.5px; color: var(--mp-suave); text-align: center; margin-top: 2px; }
+
+/* ── Estados generales ───────────────────────────────────── */
+.mp-empty { text-align: center; padding: 64px 20px; color: var(--mp-suave); }
+.mp-oculto { display: none !important; }
