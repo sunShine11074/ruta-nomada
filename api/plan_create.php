@@ -32,20 +32,30 @@ if ($fi && $ff && $ff < $fi) { $t = $fi; $fi = $ff; $ff = $t; }
 $priv = in_array($in['privacidad'] ?? '', ['solo', 'amigos', 'publico'], true) ? $in['privacidad'] : 'solo';
 
 $db = getDB();
-$db->beginTransaction();
+
+// El plan y su fila de propietario los crea sp_crear_plan
+// (basedatos/rutinas.sql) dentro de una transacción PROPIA: no puede
+// existir un plan sin dueño ni llamando al SQL a mano. Por eso aquí ya
+// no se abre transacción alrededor —el procedimiento hace COMMIT—.
 try {
-    $stmt = $db->prepare(
-        'INSERT INTO planes (usuario_id, nombre, destino, lat, lng, fecha_inicio, fecha_fin, privacidad, estado)
-         VALUES (?,?,?,?,?,?,?,?, "activo")'
-    );
+    $stmt = $db->prepare('CALL sp_crear_plan(?,?,?,?,?,?,?,?)');
     $stmt->execute([$userId, $nombre, $destino, $lat, $lng, $fi, $ff, $priv]);
-    $planId = (int)$db->lastInsertId();
+    $planId = (int)($stmt->fetch()['id'] ?? 0);
+    $stmt->closeCursor();
+    if ($planId <= 0) throw new RuntimeException('sp_crear_plan no devolvió id');
+} catch (Throwable $e) {
+    error_log('plan_create: ' . $e->getMessage());
+    apiFail('No se pudo crear el plan.', 500);
+}
 
-    $db->prepare('INSERT INTO plan_miembros (plan_id, usuario_id, rol) VALUES (?,?, "propietario")')
-       ->execute([$planId, $userId]);
-
-    // Importación opcional del borrador del planificador anterior (localStorage)
+// Importación opcional del borrador del planificador anterior
+// (localStorage). Va en SU PROPIA transacción, después del plan: si el
+// borrador viene corrupto, el plan sobrevive vacío y el error queda en
+// el log — mejor que perder también el plan, como pasaba cuando todo
+// compartía transacción.
+try {
     if (!empty($in['draft']['days']) && is_array($in['draft']['days'])) {
+        $db->beginTransaction();
         $ins = $db->prepare(
             'INSERT INTO plan_items (plan_id, dia, orden, nombre, categoria, hora, precio, nota)
              VALUES (?,?,?,?,?,?,?,?)'
@@ -64,13 +74,12 @@ try {
             }
             $dia++;
         }
+        $db->commit();
     }
-
-    $db->commit();
 } catch (Throwable $e) {
-    $db->rollBack();
-    error_log('plan_create: ' . $e->getMessage());
-    apiFail('No se pudo crear el plan.', 500);
+    if ($db->inTransaction()) $db->rollBack();
+    error_log('plan_create (borrador): ' . $e->getMessage());
+    // El plan ya existe; se sigue sin los items del borrador.
 }
 
 // Invitaciones por correo (fuera de la transacción; el correo puede fallar sin abortar)

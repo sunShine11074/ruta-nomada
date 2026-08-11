@@ -203,6 +203,43 @@ if ($pdo) {
                 . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
             : linea('ok', 'plan_items tiene las columnas de horario y gasto');
     }
+
+    // ── Rutinas: funciones, procedimientos y triggers ────────
+    // Igual que con las tablas, la lista NO va escrita a mano: se lee
+    // de basedatos/rutinas.sql, que es el archivo canónico. Si mañana
+    // se añade una rutina, esta comprobación se entera sola.
+    $sqlRut = @file_get_contents($raiz . '/basedatos/rutinas.sql');
+    if ($sqlRut === false) {
+        linea('aviso', 'No se pudo leer basedatos/rutinas.sql para saber qué rutinas esperar');
+    } else {
+        preg_match_all('/CREATE\s+(FUNCTION|PROCEDURE|TRIGGER)\s+`?([A-Za-z_][A-Za-z0-9_]*)`?/i', $sqlRut, $m);
+        $espRut = [];
+        foreach ($m[1] as $i => $tipo) $espRut[strtoupper($tipo)][] = $m[2][$i];
+
+        $hayRut = $pdo->query(
+            "SELECT ROUTINE_TYPE t, ROUTINE_NAME n FROM information_schema.ROUTINES
+              WHERE ROUTINE_SCHEMA = DATABASE()
+              UNION ALL
+             SELECT 'TRIGGER', TRIGGER_NAME FROM information_schema.TRIGGERS
+              WHERE TRIGGER_SCHEMA = DATABASE()"
+        )->fetchAll();
+        $vivas = [];
+        foreach ($hayRut as $r) $vivas[strtoupper($r['t'])][] = $r['n'];
+
+        $faltanRut = [];
+        foreach ($espRut as $tipo => $nombres) {
+            foreach (array_diff($nombres, $vivas[$tipo] ?? []) as $n) $faltanRut[] = strtolower($tipo) . ' ' . $n;
+        }
+        if ($faltanRut) {
+            linea('falla', 'Faltan ' . count($faltanRut) . ' rutinas: ' . implode(', ', $faltanRut),
+                'Sin ellas fallan el registro, crear/borrar planes y mis_planes.php.' . "\n"
+                . 'Se instalan sin perder datos (o con doble clic en herramientas\actualizar.bat):' . "\n"
+                . '    mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"');
+        } else {
+            $n = count($espRut['FUNCTION'] ?? []) + count($espRut['PROCEDURE'] ?? []) + count($espRut['TRIGGER'] ?? []);
+            linea('ok', 'Están las ' . $n . ' rutinas de rutinas.sql (funciones, procedimientos y triggers)');
+        }
+    }
 }
 
 // ── 4. Salida a internet desde PHP ──────────────────────────

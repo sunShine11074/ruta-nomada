@@ -30,38 +30,27 @@ $in = apiBody();
 csrfCheck($in);
 
 $planId = (int)($in['plan_id'] ?? 0);
-// 'lector' como mínimo: cualquier miembro puede llamar. Lo que ocurre
-// después depende del rol REAL que devuelva planAccess, no de lo que
-// diga el navegador.
+// 'lector' como mínimo: cualquier miembro puede llamar. planAccess()
+// cubre sesión y CSRF; el rol que decide entre borrar y salir lo
+// vuelve a resolver sp_borrar_plan DENTRO de la base con
+// fn_rol_en_plan — dos capas, y ninguna se fía del navegador.
 $acc = planAccess($planId, 'lector');
 $userId = (int)$acc['user_id'];
-$db = getDB();
 
-// ── Invitado: sale del plan y no toca nada más ──────────────
-if ($acc['rol'] !== 'propietario') {
-    $st = $db->prepare('DELETE FROM plan_miembros WHERE plan_id = ? AND usuario_id = ?');
-    $st->execute([$planId, $userId]);
-    apiJson(['ok' => true, 'accion' => 'salida']);
-}
-
-// ── Propietario: borrado completo ───────────────────────────
-$db->beginTransaction();
+// La lógica entera vive en sp_borrar_plan (basedatos/rutinas.sql):
+// propietario → transacción que desvincula viajes_usuario y borra el
+// plan (el trigger trg_plan_borrado deja constancia en planes_borrados
+// antes de que la fila desaparezca); editor o lector → sólo quita su
+// fila de plan_miembros. Devuelve la acción como result set.
 try {
-    // viajes_usuario.plan_id es RESTRICT: si alguna fila apunta a este
-    // plan, el DELETE fallaría. Hoy nunca ocurre porque destino.php
-    // guarda esa fila sin plan_id, pero desvincularlo antes cuesta una
-    // sentencia y evita que el borrado empiece a fallar el día que esa
-    // columna se empiece a rellenar.
-    $db->prepare('UPDATE viajes_usuario SET plan_id = NULL WHERE plan_id = ?')->execute([$planId]);
-
-    $st = $db->prepare('DELETE FROM planes WHERE id = ?');
-    $st->execute([$planId]);
-
-    $db->commit();
+    $st = getDB()->prepare('CALL sp_borrar_plan(?,?)');
+    $st->execute([$planId, $userId]);
+    $accion = (string)($st->fetch()['accion'] ?? '');
+    $st->closeCursor();
+    if ($accion === '') throw new RuntimeException('sp_borrar_plan no devolvió acción');
 } catch (Throwable $e) {
-    $db->rollBack();
     error_log('[plan_delete] ' . $e->getMessage());
     apiFail('No se pudo eliminar el plan. Inténtalo de nuevo.', 500);
 }
 
-apiJson(['ok' => true, 'accion' => 'borrado']);
+apiJson(['ok' => true, 'accion' => $accion]);

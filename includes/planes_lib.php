@@ -2,12 +2,12 @@
 // ============================================================
 //  includes/planes_lib.php — Datos de Mis planes | Ruta Nómada
 //
-//  Reúne en TRES consultas todo lo que piden la tabla, las tarjetas, el
-//  mapa y el panel derecho. La versión anterior usaba subconsultas
-//  correlacionadas (una por fila para contar lugares, otra para contar
-//  miembros): con seis planes daba igual, pero al añadir orden y filtros
-//  la lista crece y ese patrón se paga por cada plan. Aquí se agrupa una
-//  sola vez por tabla y se cruza en PHP.
+//  Los datos los sirve sp_planes_usuario (basedatos/rutinas.sql) en un
+//  solo CALL con DOS result sets: los planes con sus agregados —estado
+//  temporal, sitios y total de gastos, calculados por las funciones
+//  fn_estado_plan, fn_sitios_plan y fn_total_gastos— y los miembros
+//  para los avatares. Aquí queda lo que es presentación: los colores
+//  del estado, el cruce de miembros y el orden elegido.
 //
 //  Son tres y no una porque mezclar en la misma consulta varios COUNT
 //  sobre tablas distintas multiplica las filas entre sí: contar lugares
@@ -26,12 +26,25 @@
  */
 function planEstadoTemporal(?string $ini, ?string $fin): array
 {
-    if (!$ini) return ['por', 'Por suceder', '#36BE3B'];
+    if (!$ini) return planEstadoDatos('por');
     $hoy = date('Y-m-d');
     $fin = $fin ?: $ini;
-    if ($hoy < $ini) return ['por',       'Por suceder', '#36BE3B'];
-    if ($hoy > $fin) return ['expirado',  'Expirado',    '#FA003F'];
-    return                  ['sucediendo','Sucediendo',  '#FFA500'];
+    if ($hoy < $ini) return planEstadoDatos('por');
+    if ($hoy > $fin) return planEstadoDatos('expirado');
+    return planEstadoDatos('sucediendo');
+}
+
+/**
+ * Texto y color de una clave de estado. La clave la calcula la base
+ * (fn_estado_plan); el texto y el color son presentación y viven aquí.
+ */
+function planEstadoDatos(string $clave): array
+{
+    return match ($clave) {
+        'sucediendo' => ['sucediendo', 'Sucediendo',  '#FFA500'],
+        'expirado'   => ['expirado',   'Expirado',    '#FA003F'],
+        default      => ['por',        'Por suceder', '#36BE3B'],
+    };
 }
 
 /** Las diez duplas de color de las tarjetas, en el orden del diseño. */
@@ -58,57 +71,32 @@ function planPaleta(): array
  */
 function planesDeUsuario(PDO $db, int $userId, string $orden = 'proximos'): array
 {
-    // ── 1. Los planes y su rol ──────────────────────────────
-    $st = $db->prepare(
-        'SELECT p.id, p.nombre, p.destino, p.lat, p.lng,
-                p.fecha_inicio, p.fecha_fin, p.portada_url, p.presupuesto,
-                p.creado_en, p.updated_at, m.rol
-           FROM planes p
-           JOIN plan_miembros m ON m.plan_id = p.id AND m.usuario_id = ?'
-    );
+    // Un CALL, dos result sets. El primero trae los planes con el rol
+    // y los agregados que calculan las funciones de la base; el
+    // segundo, los miembros de todos esos planes con el propietario
+    // primero. nextRowset() salta del uno al otro y closeCursor()
+    // suelta el resultado del CALL antes de la siguiente consulta.
+    $st = $db->prepare('CALL sp_planes_usuario(?)');
     $st->execute([$userId]);
     $planes = $st->fetchAll();
+    $st->nextRowset();
+    $filasMiembros = $st->fetchAll();
+    $st->closeCursor();
+
     if (!$planes) return [];
 
-    $ids = array_column($planes, 'id');
-    $ph  = implode(',', array_fill(0, count($ids), '?'));
-
-    // ── 2. Cuántos lugares tiene cada plan ──────────────────
-    $st = $db->prepare("SELECT plan_id, COUNT(*) n FROM plan_items WHERE plan_id IN ($ph) GROUP BY plan_id");
-    $st->execute($ids);
-    $lugares = array_column($st->fetchAll(), 'n', 'plan_id');
-
-    // ── 3. Gastos: cuántos y cuánto ─────────────────────────
-    $st = $db->prepare("SELECT plan_id, COUNT(*) n, COALESCE(SUM(monto),0) total
-                          FROM plan_gastos WHERE plan_id IN ($ph) GROUP BY plan_id");
-    $st->execute($ids);
-    $gastos = [];
-    foreach ($st->fetchAll() as $g) $gastos[$g['plan_id']] = $g;
-
-    // ── 4. Miembros con su foto, para los avatares ──────────
-    // Una sola consulta para todos los planes; se agrupa en PHP. El orden
-    // pone al propietario primero para que su cara abra la fila.
-    $st = $db->prepare(
-        "SELECT mm.plan_id, mm.rol, u.id AS uid, u.nombre, u.foto_perfil
-           FROM plan_miembros mm
-           JOIN usuarios u ON u.id = mm.usuario_id
-          WHERE mm.plan_id IN ($ph)
-          ORDER BY mm.plan_id, FIELD(mm.rol,'propietario','editor','lector'), u.nombre"
-    );
-    $st->execute($ids);
     $miembros = [];
-    foreach ($st->fetchAll() as $m) $miembros[$m['plan_id']][] = $m;
+    foreach ($filasMiembros as $m) $miembros[$m['plan_id']][] = $m;
 
-    // ── 5. Cruce ────────────────────────────────────────────
     foreach ($planes as &$p) {
-        $id = (int)$p['id'];
-        $p['lugares']  = (int)($lugares[$id] ?? 0);
-        $p['n_gastos'] = (int)($gastos[$id]['n'] ?? 0);
-        $p['total_gastos'] = (float)($gastos[$id]['total'] ?? 0);
-        $p['miembros'] = $miembros[$id] ?? [];
-        $p['n_miembros'] = count($p['miembros']);
+        $p['lugares']      = (int)$p['lugares'];
+        $p['n_gastos']     = (int)$p['n_gastos'];
+        $p['total_gastos'] = (float)$p['total_gastos'];
+        $p['miembros']     = $miembros[(int)$p['id']] ?? [];
+        $p['n_miembros']   = count($p['miembros']);
+        // La clave viene de fn_estado_plan; aquí sólo se viste.
         [$p['est_clave'], $p['est_texto'], $p['est_color']] =
-            planEstadoTemporal($p['fecha_inicio'], $p['fecha_fin']);
+            planEstadoDatos((string)$p['est_clave']);
     }
     unset($p);
 
