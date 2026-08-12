@@ -5,7 +5,7 @@
 
 /* ── Tokens ────────────────────────────────────────────────── */
 :root {
-    --teal-900:  #f7007b;   /* cambie esto a un rosita muy fuerte, pero devolver al teal #062738; si se lee este mensaje*/
+    --teal-900:  #062738;   /* cambie esto a un rosita muy fuerte, pero devolver al teal #062738; si se lee este mensaje*/
     --teal-800:  #2b5760;
     --teal-700:  #3e7986;
     --cream:     #EAF0F6;
