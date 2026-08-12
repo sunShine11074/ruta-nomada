@@ -4,6 +4,7 @@
 // ============================================================
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
@@ -36,7 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
     $terms            = !empty($_POST['terms']);
 
     // Validación básica del lado del servidor
-    if (empty($nombre) || empty($email) || empty($password) || empty($confirm_password)) {
+    if (!csrfValido()) {
+        $error_form = 'La sesión del formulario caducó. Vuelve a intentarlo.';
+    } elseif (empty($nombre) || empty($email) || empty($password) || empty($confirm_password)) {
         $error_form = 'Por favor, completa todos los campos.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
@@ -166,6 +169,8 @@ $prefill_email  = htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8');
         <?php endif; ?>
 
         <form method="POST" action="register.php" novalidate>
+            <?= csrfCampo() ?>
+
 
             <div class="field">
                 <label class="field__label" for="nombre">Nombre</label>

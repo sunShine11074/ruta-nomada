@@ -7,6 +7,8 @@
 // ============================================================
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/intentos.php';
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
     header('Location: inicio.php');
@@ -31,41 +33,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
     $remember = !empty($_POST['remember']);
 
     // Validación básica
-    if (empty($email) || empty($password)) {
+    if (!csrfValido()) {
+        // Pasa de verdad cuando la pestaña lleva horas abierta y la
+        // sesión de PHP ya caducó. Se pide reintentar, no se acusa a
+        // nadie: el formulario recargado ya trae un token nuevo.
+        $error_form = 'La sesión del formulario caducó. Vuelve a intentarlo.';
+    } elseif (empty($email) || empty($password)) {
         $error_form = 'Por favor, completa todos los campos.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
     } else {
         try {
-            $db   = getDB();
-            $stmt = $db->prepare('SELECT id, nombre, email, password_hash, divisa FROM usuarios WHERE email = ? LIMIT 1');
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
+            $db = getDB();
+            $ip = ipCliente();
 
-            if ($user && password_verify($password, $user['password_hash'])) {
-                // Login exitoso
-                session_regenerate_id(true);
-                $_SESSION['user'] = [
-                    'id'     => $user['id'],
-                    'nombre' => $user['nombre'],
-                    'email'  => $user['email'],
-                    'divisa' => $user['divisa'] ?: 'MXN',
-                ];
-                if ($remember) {
-                    // Cookie de 30 días (simplificado — en producción usa token seguro)
-                    setcookie('remember_email', $email, time() + 60 * 60 * 24 * 30, '/', '', true, true);
-                }
-                // Retorno pendiente (p. ej. una invitación a un plan)
-                $destino_login = $_SESSION['despues_de_login'] ?? 'inicio.php';
-                unset($_SESSION['despues_de_login']);
-                // Solo rutas internas simples (sin esquemas ni //)
-                if (!preg_match('/^[a-z_]+\.php(\?[a-zA-Z0-9_=&]*)?$/', $destino_login)) {
-                    $destino_login = 'inicio.php';
-                }
-                header('Location: ' . $destino_login);
-                exit;
+            // ── Freno a la fuerza bruta ──────────────────────
+            // Se comprueba ANTES de tocar la contraseña: si hay que
+            // frenar, no se gasta un password_verify ni se revela nada.
+            if (loginBloqueado($db, $email, $ip)) {
+                $error_form = 'Demasiados intentos fallidos. Espera unos minutos '
+                            . 'antes de volver a probar, o restablece tu contraseña.';
             } else {
-                $error_form = 'Correo o contraseña incorrectos. Intenta de nuevo.';
+                $stmt = $db->prepare('SELECT id, nombre, email, password_hash, divisa FROM usuarios WHERE email = ? LIMIT 1');
+                $stmt->execute([$email]);
+                $user = $stmt->fetch();
+
+                $acertado = $user && password_verify($password, $user['password_hash']);
+                // Queda constancia SIEMPRE, acierte o falle: los aciertos
+                // son los que limpian el contador de esa cuenta.
+                loginRegistrar($db, $email, $ip, $acertado);
+
+                if ($acertado) {
+                    // Login exitoso
+                    session_regenerate_id(true);
+                    $_SESSION['user'] = [
+                        'id'     => $user['id'],
+                        'nombre' => $user['nombre'],
+                        'email'  => $user['email'],
+                        'divisa' => $user['divisa'] ?: 'MXN',
+                    ];
+                    if ($remember) {
+                        // Cookie de 30 días (simplificado — en producción usa token seguro)
+                        setcookie('remember_email', $email, time() + 60 * 60 * 24 * 30, '/', '', true, true);
+                    }
+                    // Retorno pendiente (p. ej. una invitación a un plan)
+                    $destino_login = $_SESSION['despues_de_login'] ?? 'inicio.php';
+                    unset($_SESSION['despues_de_login']);
+                    // Solo rutas internas simples (sin esquemas ni //)
+                    if (!preg_match('/^[a-z_]+\.php(\?[a-zA-Z0-9_=&]*)?$/', $destino_login)) {
+                        $destino_login = 'inicio.php';
+                    }
+                    header('Location: ' . $destino_login);
+                    exit;
+                } else {
+                    $error_form = 'Correo o contraseña incorrectos. Intenta de nuevo.';
+                }
             }
         } catch (RuntimeException $e) {
             $error_db = $e->getMessage();
@@ -170,6 +192,8 @@ $prefill_email = htmlspecialchars(
         <?php endif; ?>
 
         <form method="POST" action="login.php" novalidate>
+            <?= csrfCampo() ?>
+
 
             <!-- Email -->
             <div class="field">

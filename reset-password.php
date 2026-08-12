@@ -4,6 +4,7 @@
 // ============================================================
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
@@ -47,7 +48,9 @@ if (!$db_check['ok']) {
         $password         = $_POST['password'] ?? '';
         $confirm_password = $_POST['confirm_password'] ?? '';
 
-        if (!$token_valid) {
+        if (!csrfValido()) {
+            $error_form = 'La sesión del formulario caducó. Vuelve a intentarlo.';
+        } elseif (!$token_valid) {
             $error_form = 'El enlace es inválido o ha expirado. Solicita uno nuevo.';
         } elseif (empty($password) || empty($confirm_password)) {
             $error_form = 'Por favor, completa ambos campos.';
@@ -161,6 +164,8 @@ if (!$db_check['ok']) {
             <?php endif; ?>
 
             <form method="POST" action="reset-password.php" novalidate>
+                <?= csrfCampo() ?>
+
 
                 <input type="hidden" name="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="email" value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>">
