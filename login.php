@@ -184,7 +184,7 @@ $prefill_email = htmlspecialchars(
                         placeholder="ana@rutanomada.mx"
                         value="<?= $prefill_email ?>"
                         autocomplete="email"
-                        <?= $error_db ?  : '' ?>
+                        <?= $error_db ? 'disabled' : '' ?>
                     >
                 </div>
             </div>
@@ -201,7 +201,7 @@ $prefill_email = htmlspecialchars(
                         name="password"
                         placeholder="Ingresa tu contraseña"
                         autocomplete="current-password"
-                        <?= $error_db ?  : '' ?>
+                        <?= $error_db ? 'disabled' : '' ?>
                     >
                     <button type="button" class="field__toggle-pw" aria-label="Mostrar contraseña" onclick="togglePassword('password', this)">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -217,7 +217,7 @@ $prefill_email = htmlspecialchars(
                         name="remember"
                         class="checkbox-input"
                         <?= !empty($_POST['remember']) ? 'checked' : '' ?>
-                        <?= $error_db ?  : '' ?>
+                        <?= $error_db ? 'disabled' : '' ?>
                     >
                     <span class="checkbox-custom"></span>
                     Recordar mi contraseña
@@ -229,7 +229,7 @@ $prefill_email = htmlspecialchars(
             <button
                 type="submit"
                 class="btn-primary"
-                <?= $error_db ?  : '' ?>
+                <?= $error_db ? 'disabled' : '' ?>
             >
                 Ingresar &nbsp;→
             </button>

@@ -76,7 +76,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
             if (strpos($e->getMessage(), 'EMAIL_DUPLICADO') !== false) {
                 $error_form = 'El correo electrónico ya está registrado. Intenta iniciar sesión.';
             } else {
-                $error_db = 'Error al registrar el usuario: ' . $e->getMessage();
+                // El detalle va al registro del servidor, nunca a la pantalla:
+                // traía el nombre de la tabla, la columna y el motor. db.php ya
+                // aplica este criterio y aquí se estaba deshaciendo.
+                error_log('register.php: ' . $e->getMessage());
+                // $error_form y no $error_db a propósito: la conexión ya se
+                // comprobó al cargar la página, así que lo que falla aquí es
+                // casi siempre el dato. Con $error_db el formulario se
+                // deshabilita y la persona se queda sin poder corregir.
+                $error_form = 'No se pudo crear la cuenta. Revisa los datos e inténtalo de nuevo.';
             }
         }
     }
