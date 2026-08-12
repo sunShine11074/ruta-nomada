@@ -40,3 +40,4 @@ RENM: Ya ví el rosita mexicano del login. Ah si! Preguntaba si te aparecia mi n
 
 
 YAM: No, no aparece tu nombre en terminal, solo me aparece en los graphs. 
+RENM: Oh! Troyanos.
