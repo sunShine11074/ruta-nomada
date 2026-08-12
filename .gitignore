@@ -21,6 +21,13 @@ includes/pexels_config.php
 *.tar.gz
 *.tgz
 
+# ── Fotos que suben las personas ─────────────────────────────
+# Son datos de quien usa la aplicacion, no del proyecto. La carpeta si
+# se versiona -con un .gitkeep- porque api/fotos.php escribe ahi y no
+# deberia tener que crearla en la primera subida.
+img/portadas/*
+!img/portadas/.gitkeep
+
 # ── Caché generada en tiempo de ejecución ────────────────────
 cache/
 

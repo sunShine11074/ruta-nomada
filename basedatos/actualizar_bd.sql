@@ -121,7 +121,30 @@ CREATE TABLE IF NOT EXISTS `ruta_uso` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- ── 4. Comprobación ─────────────────────────────────────────
+-- ── 4. Las fotos que sube cada persona ──────────────────────
+-- La galeria de "Tus fotos" de la ventana Cambiar foto. Es del
+-- USUARIO y no del plan: el frame dice "Tus fotos", asi que una foto
+-- subida para un viaje se puede reutilizar en otro.
+--
+-- Guarda la RUTA relativa (img/portadas/xxx.jpg), no la imagen. El
+-- archivo vive en disco; la base solo apunta.
+--
+-- ON DELETE CASCADE: si se borra la cuenta, sus fotos dejan de estar
+-- listadas. Los archivos sueltos hay que limpiarlos aparte, y por eso
+-- api/fotos.php borra el archivo ANTES de borrar la fila.
+
+CREATE TABLE IF NOT EXISTS `usuario_fotos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `ruta` varchar(255) NOT NULL COMMENT 'relativa a la raiz del proyecto',
+  `subida_en` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_usuario_fecha` (`usuario_id`, `subida_en`),
+  CONSTRAINT `fk_usuariofotos_user` FOREIGN KEY (`usuario_id`)
+    REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── 5. Comprobación ─────────────────────────────────────────
 -- Si todo salió bien, esto imprime 5 columnas nuevas y 3 tablas nuevas.
 
 SELECT

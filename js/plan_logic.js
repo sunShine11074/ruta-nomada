@@ -295,6 +295,103 @@ class Component extends DCLogic {
       else if (onOk) onOk(j);
     }).catch(err => console.warn('[plan] ' + endpoint + ':', err));
   }
+  // ── Fotos propias: listar, subir y borrar ────────────────
+  // Se piden al abrir la ventana en la pestaña "Tus fotos" y despues
+  // de cada subida. No se guardan entre aperturas: son pocas y la
+  // consulta es una linea con indice.
+  _fotoCargarMias() {
+    if (!this.PLAN_ID) return;
+    fetch('api/fotos.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'listar' })
+    })
+      .then(r => r.json())
+      .then(j => { if (j && j.ok) this.setState({ fotoMisFotos: j.fotos || [] }); })
+      .catch(() => {});
+  }
+
+  // Abre el selector de archivos del sistema. El <input type="file"> se
+  // crea al vuelo y no vive en la plantilla: el runtime dc repinta el
+  // arbol al cambiar de estado y se llevaria por delante el archivo ya
+  // elegido.
+  _fotoPedirArchivos() {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/jpeg,image/png,image/webp';
+    inp.multiple = true;
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+    inp.addEventListener('change', () => {
+      const files = Array.from(inp.files || []);
+      document.body.removeChild(inp);
+      if (files.length) this._fotoSubirVarias(files);
+    });
+    inp.click();
+  }
+
+  _fotoSubirVarias(files) {
+    this.setState({ fotoCargando: true, fotoError: '' });
+    // En serie y no en paralelo: son subidas de varios MB y lanzarlas
+    // todas a la vez satura la conexion y no acaba antes.
+    const siguiente = (i) => {
+      if (i >= files.length) {
+        this.setState({ fotoCargando: false });
+        this._fotoCargarMias();
+        return;
+      }
+      this._fotoSubirUna(files[i])
+        .then(() => siguiente(i + 1))
+        .catch((msg) => {
+          this.setState({ fotoCargando: false, fotoError: msg || 'No se pudo subir la imagen.' });
+        });
+    };
+    siguiente(0);
+  }
+
+  // Reduce la imagen ANTES de mandarla y la convierte a JPEG.
+  //
+  // POR QUE EN EL NAVEGADOR Y NO EN EL SERVIDOR
+  // Porque GD esta desactivada en este XAMPP (;extension=gd en
+  // php.ini) y activarla obligaria a cada persona del equipo a tocar
+  // su configuracion. Ademas asi viajan muchos menos bytes: una foto
+  // de movil de 8 MB sale de aqui por debajo de 1.
+  _fotoSubirUna(file) {
+    const MAX = 1600;
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const escala = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * escala));
+        const h = Math.max(1, Math.round(img.height * escala));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const cx = cv.getContext('2d');
+        // Fondo blanco antes de dibujar: los PNG con transparencia se
+        // volverian negros al pasar a JPEG, que no admite alfa.
+        cx.fillStyle = '#ffffff';
+        cx.fillRect(0, 0, w, h);
+        cx.drawImage(img, 0, 0, w, h);
+        cv.toBlob((blob) => {
+          if (!blob) { reject('No se pudo procesar la imagen.'); return; }
+          const fd = new FormData();
+          fd.append('plan_id', this.PLAN_ID);
+          fd.append('action', 'subir');
+          fd.append('csrf', this.CSRF);
+          fd.append('imagen', blob, 'portada.jpg');
+          fetch('api/fotos.php', { method: 'POST', headers: { 'X-CSRF': this.CSRF }, body: fd })
+            .then(r => r.json())
+            .then(j => (j && j.ok) ? resolve(j.foto) : reject((j && j.error) || 'No se pudo subir la imagen.'))
+            .catch(() => reject('No se pudo conectar al subir la imagen.'));
+        }, 'image/jpeg', 0.85);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject('Ese archivo no es una imagen que se pueda abrir.'); };
+      img.src = url;
+    });
+  }
+
   // Elegir una foto de la rejilla: se aplica a la portada al momento y
   // se guarda. Se manda la version 'grande' y no la miniatura: la
   // miniatura es la de la rejilla y en la cabecera se veria borrosa.
@@ -306,6 +403,26 @@ class Component extends DCLogic {
     this.META.hero = f.grande;
     this.setState({ fotoSel: f.id });
     this._sync('plan_update.php', { portada_url: f.grande });
+  }
+  // Una foto propia se aplica igual que una de la web, pero su URL es
+  // relativa (img/portadas/xxx.jpg). Se guarda tal cual: plan.php la
+  // sirve desde la misma carpeta, asi que funciona sin dominio.
+  _fotoElegirMia(f) {
+    if (!f || !f.ruta) return;
+    this.META.hero = f.ruta;
+    this.setState({ fotoSel: 'm' + f.id });
+    this._sync('plan_update.php', { portada_url: f.ruta });
+  }
+  _fotoBorrarMia(f) {
+    if (!f || !this.PLAN_ID) return;
+    fetch('api/fotos.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'borrar', id: f.id })
+    })
+      .then(r => r.json())
+      .then(() => this._fotoCargarMias())
+      .catch(() => {});
   }
   _syncSubs() {
     clearTimeout(this._subsT);
@@ -2675,12 +2792,26 @@ class Component extends DCLogic {
     // guardará la elección ya exige rol 'editor'; esto evita abrir
     // una ventana que después no serviría de nada.
     V.fotoAbrir = this.puedeEditar
-      ? () => this.setState({ fotoModal: true, fotoTab: 'tus', fotoSel: null })
+      ? () => { this.setState({ fotoModal: true, fotoTab: 'tus', fotoSel: null }); this._fotoCargarMias(); }
       : V.noop;
     V.fotoCerrar = () => this.setState({ fotoModal: false });
     V.fotoQCambia = (e) => this.setState({ fotoQ: e.target.value });
     V.fotoQTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); V.fotoBuscar(); } };
-    V.fotoSubirClic = V.noop;   // fase 3
+    V.fotoSubirClic = () => this._fotoPedirArchivos();
+    // Galeria de fotos propias. Reutiliza la misma rejilla que los
+    // resultados de la web: mismas medidas, mismo borde de elegida.
+    V.fotoHayMias = (s.fotoMisFotos || []).length > 0;
+    V.fotoSinMias = !V.fotoHayMias;
+    V.fotoMiasVM = (s.fotoMisFotos || []).map(f => {
+      const elegida = s.fotoSel === ('m' + f.id);
+      return {
+        ruta: f.ruta,
+        borde: elegida ? '#3F52E3' : 'transparent',
+        insignia: elegida ? 'flex' : 'none',
+        elegir: () => this._fotoElegirMia(f),
+        borrar: () => this._fotoBorrarMia(f)
+      };
+    });
 
     // ── Buscar fotos en la web (Pexels, vía api/imagenes.php) ──
     V.fotoCargando = !!s.fotoCargando;
