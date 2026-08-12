@@ -1729,6 +1729,42 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
             <svg width="17" height="17" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M480 272C480 317.9 465.1 360.3 440 394.7L566.6 521.4C579.1 533.9 579.1 554.2 566.6 566.7C554.1 579.2 533.8 579.2 521.3 566.7L394.7 440C360.3 465.1 317.9 480 272 480C157.1 480 64 386.9 64 272C64 157.1 157.1 64 272 64C386.9 64 480 157.1 480 272zM272 416C351.5 416 416 351.5 416 272C416 192.5 351.5 128 272 128C192.5 128 128 192.5 128 272C128 351.5 192.5 416 272 416z"></path></svg>
           </button>
         </div>
+
+        <!-- Cuatro estados excluyentes: buscando, error, sin resultados
+             y la rejilla. Cada uno con su propio sc-if para que el
+             runtime no tenga que decidir dentro de la plantilla.
+             Medidas del frame "Buscar en la web 2": 3 columnas,
+             tarjeta 16:10, hueco 22.5 horizontal y 13.5 vertical, y la
+             primera fila 19.5 por debajo del buscador. -->
+        <sc-if value="{{ fotoCargando }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:40px 0 24px;text-align:center;font-size:13px;color:#6C757D">Buscando fotos…</p>
+        </sc-if>
+
+        <sc-if value="{{ fotoHayError }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:40px 0 24px;text-align:center;font-size:13px;color:#C0392B">{{ fotoError }}</p>
+        </sc-if>
+
+        <sc-if value="{{ fotoSinRes }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:40px 0 24px;text-align:center;font-size:13px;color:#6C757D">No encontramos fotos para esa búsqueda. Prueba con otras palabras.</p>
+        </sc-if>
+
+        <sc-if value="{{ fotoHayRes }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);column-gap:22.5px;row-gap:13.5px;margin-top:19.5px">
+            <sc-for list="{{ fotoResVM }}" as="fr" hint-placeholder-count="6">
+              <div style="position:relative;aspect-ratio:16/10;border-radius:6px;overflow:hidden;background:#D3D3D3;border:2px solid {{ fr.borde }};box-sizing:border-box">
+                <button onClick="{{ fr.elegir }}" title="{{ fr.autor }}" aria-label="{{ fr.autor }}" style="position:absolute;inset:0;width:100%;height:100%;padding:0;border:none;background:none;cursor:pointer;display:block">
+                  <img src="{{ fr.mini }}" alt="{{ fr.alt }}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">
+                </button>
+                <!-- Enlace al original. Pexels lo exige para poder usar
+                     su API gratuita, y de paso deja ver la foto entera. -->
+                <a href="{{ fr.pagina }}" target="_blank" rel="noopener noreferrer" title="{{ fr.autor }}" aria-label="Abrir el original: {{ fr.autor }}" style="position:absolute;top:7px;left:7px;width:26px;height:26px;border-radius:6px;background:rgba(255,255,255,.92);color:#0D1F27;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 1px 4px rgba(13,31,39,.22)" style-hover="background:#ffffff">
+                  <svg width="12" height="12" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M354.4 83.8C359.4 71.8 371.1 64 384 64L544 64C561.7 64 576 78.3 576 96L576 256C576 268.9 568.2 280.6 556.2 285.6C544.2 290.6 530.5 287.8 521.3 278.7L464 221.3L310.6 374.6C298.1 387.1 277.8 387.1 265.3 374.6C252.8 362.1 252.8 341.8 265.3 329.3L418.7 176L361.4 118.6C352.2 109.4 349.5 95.7 354.5 83.7zM64 240C64 195.8 99.8 160 144 160L224 160C241.7 160 256 174.3 256 192C256 209.7 241.7 224 224 224L144 224C135.2 224 128 231.2 128 240L128 496C128 504.8 135.2 512 144 512L400 512C408.8 512 416 504.8 416 496L416 416C416 398.3 430.3 384 448 384C465.7 384 480 398.3 480 416L480 496C480 540.2 444.2 576 400 576L144 576C99.8 576 64 540.2 64 496L64 240z"></path></svg>
+                </a>
+                <span style="position:absolute;top:7px;right:7px;display:{{ fr.insignia }};align-items:center;height:24px;padding:0 11px;border-radius:12px;background:#3F52E3;color:#ffffff;font-size:11.5px;font-weight:700;pointer-events:none">Selecciona</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
       </sc-if>
 
     </div>

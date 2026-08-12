@@ -136,7 +136,11 @@ class Component extends DCLogic {
       // resultados de la web y cuál está elegido.
       // Medidas del modal en Reportes_md/PLAN_cambiar_foto.md
       fotoModal: false, fotoTab: 'tus', fotoQ: '', fotoRes: [],
-      fotoSel: null, fotoCargando: false, fotoMisFotos: []
+      fotoSel: null, fotoCargando: false, fotoMisFotos: [],
+      // fotoBuscado distingue "aun no has buscado" de "buscaste y no
+      // hubo nada": son dos pantallas distintas y sin esto se
+      // confunden, porque las dos tienen la rejilla vacia.
+      fotoBuscado: false, fotoError: ''
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -290,6 +294,18 @@ class Component extends DCLogic {
       if (!j.ok) console.warn('[plan] ' + endpoint + ':', j.error);
       else if (onOk) onOk(j);
     }).catch(err => console.warn('[plan] ' + endpoint + ':', err));
+  }
+  // Elegir una foto de la rejilla: se aplica a la portada al momento y
+  // se guarda. Se manda la version 'grande' y no la miniatura: la
+  // miniatura es la de la rejilla y en la cabecera se veria borrosa.
+  //
+  // La URL de Pexels NO caduca, que es justo por lo que se eligio ese
+  // proveedor: portada_url se lee meses despues.
+  _fotoElegir(f) {
+    if (!f || !f.grande) return;
+    this.META.hero = f.grande;
+    this.setState({ fotoSel: f.id });
+    this._sync('plan_update.php', { portada_url: f.grande });
   }
   _syncSubs() {
     clearTimeout(this._subsT);
@@ -2664,8 +2680,50 @@ class Component extends DCLogic {
     V.fotoCerrar = () => this.setState({ fotoModal: false });
     V.fotoQCambia = (e) => this.setState({ fotoQ: e.target.value });
     V.fotoQTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); V.fotoBuscar(); } };
-    V.fotoBuscar = V.noop;      // fase 2
     V.fotoSubirClic = V.noop;   // fase 3
+
+    // ── Buscar fotos en la web (Pexels, vía api/imagenes.php) ──
+    V.fotoCargando = !!s.fotoCargando;
+    V.fotoError    = s.fotoError || '';
+    V.fotoHayError = !!s.fotoError;
+    V.fotoHayRes   = !s.fotoCargando && !s.fotoError && (s.fotoRes || []).length > 0;
+    // Sólo se avisa de "sin resultados" si de verdad se busco algo.
+    V.fotoSinRes   = !s.fotoCargando && !s.fotoError && !!s.fotoBuscado && (s.fotoRes || []).length === 0;
+    V.fotoResVM = (s.fotoRes || []).map(f => {
+      const elegida = s.fotoSel === f.id;
+      return {
+        mini: f.mini,
+        // El texto alternativo lo da Pexels; si viene vacio se usa lo
+        // buscado, que es mejor que dejarlo mudo para un lector de pantalla.
+        alt: f.alt || ('Foto de ' + (s.fotoQ || 'la búsqueda')),
+        autor: f.autor ? ('Foto de ' + f.autor + ' en Pexels') : 'Foto en Pexels',
+        pagina: f.pagina,
+        // #3F52E3 medido del borde de la tarjeta elegida en el frame
+        borde: elegida ? '#3F52E3' : 'transparent',
+        insignia: elegida ? 'flex' : 'none',
+        elegir: () => this._fotoElegir(f)
+      };
+    });
+    // NO usa _sync: ese es fuego-y-olvida y se traga los fallos en la
+    // consola. Aqui hay alguien mirando una rueda girar, asi que el
+    // error tiene que llegar a la pantalla.
+    V.fotoBuscar = () => {
+      const q = (this.state.fotoQ || '').trim();
+      if (!q || this.state.fotoCargando) return;
+      if (!this.PLAN_ID) return;
+      this.setState({ fotoCargando: true, fotoError: '', fotoBuscado: true, fotoRes: [] });
+      fetch('api/imagenes.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+        body: JSON.stringify({ plan_id: this.PLAN_ID, q: q })
+      })
+        .then(r => r.json())
+        .then(j => {
+          if (j && j.ok) this.setState({ fotoCargando: false, fotoRes: j.fotos || [] });
+          else this.setState({ fotoCargando: false, fotoError: (j && j.error) || 'No se pudo buscar.' });
+        })
+        .catch(() => this.setState({ fotoCargando: false, fotoError: 'No se pudo conectar. Revisa tu conexión.' }));
+    };
 
     // ── Selector de emojis (catálogo Unicode completo, js/emojis.js) ──
     // La rejilla NO se pinta aquí: la rellena _emoMontar() con HTML

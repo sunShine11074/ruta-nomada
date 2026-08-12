@@ -1,6 +1,6 @@
 # Plan de implementación — «Cambiar foto» del itinerario
 
-**Ruta Nómada · 12 de agosto de 2026 · fase 1 en curso**
+**Ruta Nómada · 12 de agosto de 2026 · fases 1 y 2 hechas, falta la 3**
 
 Ventana para cambiar la foto de portada de un itinerario, con dos
 orígenes: las fotos que sube la persona y una búsqueda de imágenes en
@@ -125,7 +125,7 @@ portada al cabo de un tiempo.
 
 ## 5. Fases
 
-### Fase 1 · El armazón del modal — 1 día
+### Fase 1 · El armazón del modal — HECHA
 
 - `plan_template.html:229`: el lápiz pasa a `onClick="{{ fotoAbrir }}"`.
 - Modal de 750 px centrado, con título, X de cerrar, las dos pestañas
@@ -137,7 +137,7 @@ portada al cabo de un tiempo.
 **Verificación:** abre y cierra, las pestañas conmutan, mide 750 y
 queda centrado tanto a 1440 como a 1920.
 
-### Fase 2 · «Buscar en la web» — 1½ días
+### Fase 2 · «Buscar en la web» — HECHA (Pexels)
 
 - `includes/pexels_config.php` gitignoreado, con su `.sample` al lado.
 - `api/imagenes.php` como proxy — **la clave nunca sale al navegador**,

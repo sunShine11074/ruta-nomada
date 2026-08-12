@@ -4,6 +4,7 @@ includes/mail_config.php
 includes/geo_config.php
 includes/ai_config.php
 includes/maps_config.php
+includes/pexels_config.php
 
 # ── Comprimidos — NUNCA versionar ────────────────────────────
 # Las reglas de arriba miran nombres de archivo, no MIRAN DENTRO de un
