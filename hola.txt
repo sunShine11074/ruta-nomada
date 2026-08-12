@@ -2,7 +2,7 @@ Hola! he creado este archivo para probar el git push, a ver si funciona con esto
 
 
 RENM: ¡hola! Quiero que veamos nuestros nombres cuando hagamos pull. Usemos este archivo para el testeo.
-RENM: Debí haber hecho 'git commit' y después 'git pull'. Veamos si funciona. Dime si viste mi nombre cuando hiciste 'git pull'.
+RENM: Debí haber hecho 'git commit' y después 'git pull'. Veamos si funciona. Dime si viste mi nombre cuando hiciste 'git push'.
             .''
   ._.-.___.' (`\
  //(        ( `'
