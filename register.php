@@ -5,6 +5,7 @@
 session_start();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/email_dominio.php';
 
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
@@ -43,6 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
         $error_form = 'Por favor, completa todos los campos.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
+    } elseif (!correoConDominioReal($email)) {
+        // Caza-erratas, no control de seguridad: sólo dice que ese
+        // dominio no tiene por dónde recibir correo. Ver el comentario
+        // largo de includes/email_dominio.php.
+        $error_form = 'El dominio «' . dominioDeCorreo($email) . '» no puede recibir correo. '
+                    . 'Revisa que esté bien escrito.';
     } elseif (strlen($password) < 6) {
         $error_form = 'La contraseña debe tener al menos 6 caracteres.';
     } elseif ($password !== $confirm_password) {
