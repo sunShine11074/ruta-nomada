@@ -10,3 +10,6 @@ RENM: Debí haber hecho 'git commit' y después 'git pull'. Veamos si funciona. 
 ' <' `\ ._/'\
    `   \     \
 ...
+
+YAM: Puedo ver el caballo (solo espero no sea el de troya). 
+pero no vi tu nombre cuando hice 'git pull', supongo que eso quisiste decir..?
