@@ -5,6 +5,21 @@ includes/geo_config.php
 includes/ai_config.php
 includes/maps_config.php
 
+# ── Comprimidos — NUNCA versionar ────────────────────────────
+# Las reglas de arriba miran nombres de archivo, no MIRAN DENTRO de un
+# .zip. Un comprimido del proyecto se lleva includes/*_config.php con
+# las claves reales aunque esos archivos esten ignorados sueltos, y en
+# un repositorio publico eso las deja a la vista de cualquiera.
+# Paso el 11/08/2026 con "RUTA NOMADA.zip": 50 MB con las cuatro claves
+# dentro. Para compartir el proyecto se clona el repositorio; no se
+# manda un comprimido.
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+
 # ── Caché generada en tiempo de ejecución ────────────────────
 cache/
 
