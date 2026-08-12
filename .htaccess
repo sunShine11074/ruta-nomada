@@ -1,0 +1,44 @@
+# ============================================================
+#   .htaccess — Que Apache no sirva lo que no es la aplicación
+#   Ruta Nómada
+#
+#   PARA QUÉ ES
+#   El proyecto vive dentro de htdocs, así que Apache entrega por
+#   HTTP todo lo que hay en la carpeta, no sólo las páginas. Aquí se
+#   cierran las tres cosas que no deberían poder descargarse.
+#
+#   QUÉ NECESITA
+#   AllowOverride All y mod_alias. XAMPP trae los dos activados de
+#   fábrica, así que no hay que tocar httpd.conf.
+#
+#   CÓMO COMPROBAR QUE FUNCIONA
+#     http://localhost/<carpeta>/.git/config          → debe dar 404
+#     http://localhost/<carpeta>/basedatos/rutinas.sql → debe dar 404
+#     http://localhost/<carpeta>/login.php             → debe dar 200
+# ============================================================
+
+# ── El repositorio de Git ────────────────────────────────────
+# Sin esta línea, .git/config responde 200 y desde fuera se puede
+# reconstruir el código entero y toda su historia. Es la fuga
+# clásica de los proyectos que se clonan dentro del directorio que
+# publica el servidor web, que es justo lo que hacemos todos aquí.
+RedirectMatch 404 "/\.git"
+
+# ── Guiones de la base de datos y documentación ──────────────
+# Apache no ejecuta los .sql ni los .md: los entrega tal cual, en
+# texto plano. No hay credenciales dentro, pero el esquema completo
+# de la base y los reportes internos no tienen por qué ser
+# descargables por cualquiera que acierte el nombre del archivo.
+RedirectMatch 404 "\.(sql|md)$"
+
+# ── Configuración con credenciales ───────────────────────────
+# Hoy no se filtran: PHP los ejecuta, devuelven un array y no
+# imprimen nada. Pero el día que PHP se caiga o se desactive,
+# Apache serviría el código fuente tal cual, con las claves dentro.
+# Cuesta tres líneas cerrarlo y cubre ese caso.
+#
+# Los *_config.sample.php NO coinciden con el patrón y siguen
+# accesibles, que es lo que se busca: no guardan ningún secreto.
+<FilesMatch "_config\.php$">
+    Require all denied
+</FilesMatch>
