@@ -16,3 +16,26 @@ YAM: PRUEBA#2 DE GIT PUSH "No me gustan los conejos, son unos animales bastante 
 
 YAM: Puedo ver el caballo (solo espero no sea el de troya). 
 pero no vi tu nombre cuando hice 'git pull', supongo que eso quisiste decir..?
+
+RENM: Ya ví el rosita mexicano del login. Ah si! Preguntaba si te aparecia mi nombre en la terminal después de 'git pull'. Otro ASCCI
+                                 |\    /|
+                              ___| \,,/_/
+                           ---__/ \/    \
+                          __--/     (D)  \
+                          _ -/    (_      \
+                         // /       \_ /  -\
+   __-------_____--___--/           / \_ O o)
+  /                                 /   \__/
+ /                                 /
+||          )                   \_/\
+||         /              _      /  |
+| |      /--______      ___\    /\  :
+| /   __-  - _/   ------    |  |   \ \
+ |   -  -   /                | |     \ )
+ |  |   -  |                 | )     | |
+  | |    | |                 | |    | |
+  | |    < |                 | |   |_/
+  < |    /__\                <  \
+  /__\                       /___\
+
+
