@@ -1694,7 +1694,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
   <div style="position:fixed;inset:0;z-index:941;display:flex;align-items:center;justify-content:center;padding:40px 35px;pointer-events:none">
   <div data-screen-label="Cambiar foto" role="dialog" aria-modal="true" aria-label="Cambiar foto" style="pointer-events:auto;width:750px;max-width:100%;max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:#ffffff;border-radius:10px;box-shadow:0 20px 60px rgba(14,42,51,.32);overflow:hidden;animation:rnSube .3s cubic-bezier(.22,1,.36,1)">
 
-    <div style="flex-shrink:0;padding:12px 30px 0">
+    <div style="flex-shrink:0;padding:22.5px 30px 0">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
         <h3 style="margin:0;font-size:21px;font-weight:700;color:#0D1F27;letter-spacing:-.2px;font-family:Poppins,sans-serif;line-height:1.05">Cambiar foto</h3>
         <button onClick="{{ fotoCerrar }}" aria-label="Cerrar" style="width:30px;height:30px;flex-shrink:0;margin-right:-10px;border:none;background:none;cursor:pointer;color:#495057;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:color .15s ease,background .15s ease" style-hover="background:#F1F3F5;color:#212529">
@@ -1708,11 +1708,11 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
       </div>
     </div>
 
-    <div style="flex:1;min-height:0;overflow-y:auto;padding:0 30px 22px">
+    <div style="flex:1;min-height:0;overflow-y:auto;padding:0 30px 30px">
 
       <sc-if value="{{ fotoEsTus }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:39px">
-          <img src="./img/subir-foto.png" alt="" style="width:282px;max-width:100%;height:auto;display:block">
+          <img src="./img/subir-foto.png" alt="" style="width:258px;max-width:100%;height:auto;display:block">
           <h4 style="margin:14px 0 0;font-size:20px;font-weight:700;color:#0D1F27;font-family:Poppins,sans-serif">Sube tus fotos</h4>
           <p style="margin:8px 0 0;font-size:13px;color:#6C757D">{{ fotoVacioTxt }}</p>
           <button onClick="{{ fotoSubirClic }}" style="margin-top:22px;width:308px;max-width:100%;height:38px;flex-shrink:0;border:none;border-radius:19px;background:#0E2A33;color:#ffffff;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .15s ease" style-hover="background:#16404E">
@@ -1723,9 +1723,9 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
       </sc-if>
 
       <sc-if value="{{ fotoEsWeb }}" hint-placeholder-val="{{ false }}">
-        <div style="display:flex;align-items:center;gap:16px;padding-top:28px">
+        <div style="display:flex;align-items:center;gap:16px;padding-top:26px">
           <input value="{{ fotoQ }}" onChange="{{ fotoQCambia }}" onKeyDown="{{ fotoQTecla }}" placeholder="La paz" aria-label="Buscar fotos en la web" style="flex:1;min-width:0;height:38px;box-sizing:border-box;margin:0;padding:0 16px;border:1px solid #DEE2E6;border-radius:8px;background:#ffffff;font-size:13px;font-family:inherit;color:#0D1F27;outline:none" style-focus="border-color:#0E2A33">
-          <button onClick="{{ fotoBuscar }}" aria-label="Buscar" style="width:45px;height:45px;flex-shrink:0;border:none;border-radius:50%;background:#0E2A33;color:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease" style-hover="background:#16404E">
+          <button onClick="{{ fotoBuscar }}" aria-label="Buscar" style="width:38px;height:38px;flex-shrink:0;border:none;border-radius:50%;background:#0E2A33;color:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease" style-hover="background:#16404E">
             <svg width="17" height="17" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M480 272C480 317.9 465.1 360.3 440 394.7L566.6 521.4C579.1 533.9 579.1 554.2 566.6 566.7C554.1 579.2 533.8 579.2 521.3 566.7L394.7 440C360.3 465.1 317.9 480 272 480C157.1 480 64 386.9 64 272C64 157.1 157.1 64 272 64C386.9 64 480 157.1 480 272zM272 416C351.5 416 416 351.5 416 272C416 192.5 351.5 128 272 128C192.5 128 128 192.5 128 272C128 351.5 192.5 416 272 416z"></path></svg>
           </button>
         </div>
