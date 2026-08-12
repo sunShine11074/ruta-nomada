@@ -226,7 +226,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
     <div style="position:relative;height:222px;background:#dfe6ec">
       <img src="{{ heroImg }}" alt="{{ destino }}" style="width:100%;height:100%;object-fit:cover;display:block">
       <div style="position:absolute;top:12px;right:14px;display:flex;gap:9px">
-        <button onClick="{{ noop }}" aria-label="Editar portada" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(14,42,51,.72);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s" style-hover="background:rgba(14,42,51,.92)"><svg width="19" height="19" viewBox="0 0 640 640" style="display:block;margin:auto"><path fill="#ffffff" d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg></button>
+        <button onClick="{{ fotoAbrir }}" aria-label="Editar portada" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(14,42,51,.72);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s" style-hover="background:rgba(14,42,51,.92)"><svg width="19" height="19" viewBox="0 0 640 640" style="display:block;margin:auto"><path fill="#ffffff" d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg></button>
         <button onClick="{{ heroMenuToggle }}" aria-label="Más acciones" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(14,42,51,.72);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffffff;font-size:16px;font-weight:700;line-height:1;transition:background .15s" style-hover="background:rgba(14,42,51,.92)">•••</button>
         <sc-if value="{{ heroMenuOpen }}" hint-placeholder-val="{{ false }}">
           <div onClick="{{ heroMenuClose }}" style="position:fixed;inset:0;z-index:479"></div>
@@ -1659,5 +1659,68 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
     </div>
   </div>
 </sc-if>
+
+<!-- ══════════════════════════════════════════════════════════════
+     CAMBIAR FOTO — la portada del itinerario
+     Se abre desde el lápiz que flota sobre la imagen de cabecera.
+
+     TODAS LAS MEDIDAS SALEN DE LOS FRAMES, NO DE LA VISTA:
+     screens_ref/Cambiar foto del itinerario (Tus fotos).png
+     screens_ref/Cambiar foto del itinerario (Buscar en la web).png
+     screens_ref/Cambiar foto del itinerario (Buscar en la web 2).png
+     Están anotadas en Reportes_md/PLAN_cambiar_foto.md
+
+       ancho 750  ·  padding 30  ·  radio 10  ·  centrado en ambos ejes
+       botón oscuro 308x38  ·  círculo de la lupa 45  ·  ilustración 282
+       subrayado de la pestaña activa #EDC13F
+
+     El ancho es el mismo en los tres estados; sólo cambia el alto, y
+     por eso el cuerpo scrollea con max-height y no la página.
+     ══════════════════════════════════════════════════════════════ -->
+<sc-if value="{{ fotoModal }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ fotoCerrar }}" style="position:fixed;inset:0;z-index:940;background:rgba(13,31,39,.45)"></div>
+  <div data-screen-label="Cambiar foto" role="dialog" aria-modal="true" aria-label="Cambiar foto" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:941;width:750px;max-width:calc(100vw - 40px);max-height:90vh;display:flex;flex-direction:column;background:#ffffff;border-radius:10px;box-shadow:0 20px 60px rgba(14,42,51,.32);overflow:hidden;animation:rnMenu .16s ease">
+
+    <div style="flex-shrink:0;padding:30px 30px 0">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <h3 style="margin:0;font-size:24px;font-weight:700;color:#0D1F27;letter-spacing:-.2px;font-family:Poppins,sans-serif;line-height:1.1">Cambiar foto</h3>
+        <button onClick="{{ fotoCerrar }}" aria-label="Cerrar" style="width:30px;height:30px;flex-shrink:0;border:none;background:none;cursor:pointer;color:#495057;border-radius:8px;display:flex;align-items:center;justify-content:center" style-hover="background:#F1F3F5;color:#0D1F27">
+          <svg width="17" height="17" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg>
+        </button>
+      </div>
+      <div style="display:flex;gap:26px;margin-top:14px">
+        <sc-for list="{{ fotoTabs }}" as="ft" hint-placeholder-count="2">
+          <button onClick="{{ ft.pick }}" style="border:none;background:none;cursor:pointer;padding:0 0 7px;font-size:13.5px;font-weight:600;color:{{ ft.color }};border-bottom:3px solid {{ ft.linea }};transition:color .15s ease,border-color .15s ease">{{ ft.etiqueta }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;padding:0 30px 30px">
+
+      <sc-if value="{{ fotoEsTus }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:22px">
+          <img src="./img/subir-foto.png" alt="" style="width:282px;max-width:100%;height:auto;display:block">
+          <h4 style="margin:12px 0 0;font-size:21px;font-weight:700;color:#0D1F27;font-family:Poppins,sans-serif">Sube tus fotos</h4>
+          <p style="margin:7px 0 0;font-size:13.5px;color:#6C757D">{{ fotoVacioTxt }}</p>
+          <button onClick="{{ fotoSubirClic }}" style="margin-top:22px;width:308px;max-width:100%;height:38px;flex-shrink:0;border:none;border-radius:19px;background:#0E2A33;color:#ffffff;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .15s ease" style-hover="background:#16404E">
+            <svg width="15" height="15" viewBox="0 0 640 640" fill="currentColor" style="flex-shrink:0;display:block"><path d="M352 173.3L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 173.3L246.6 214.7C234.1 227.2 213.8 227.2 201.3 214.7C188.8 202.2 188.8 181.9 201.3 169.4L297.3 73.4C309.8 60.9 330.1 60.9 342.6 73.4L438.6 169.4C451.1 181.9 451.1 202.2 438.6 214.7C426.1 227.2 405.8 227.2 393.3 214.7L352 173.3zM320 464C364.2 464 400 428.2 400 384L480 384C515.3 384 544 412.7 544 448L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 448C96 412.7 124.7 384 160 384L240 384C240 428.2 275.8 464 320 464zM464 488C477.3 488 488 477.3 488 464C488 450.7 477.3 440 464 440C450.7 440 440 450.7 440 464C440 477.3 450.7 488 464 488z"></path></svg>
+            Sube tus fotos
+          </button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ fotoEsWeb }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:16px;padding-top:20px">
+          <input value="{{ fotoQ }}" onChange="{{ fotoQCambia }}" onKeyDown="{{ fotoQTecla }}" placeholder="La paz" aria-label="Buscar fotos en la web" style="flex:1;min-width:0;height:38px;box-sizing:border-box;margin:0;padding:0 16px;border:1px solid #DEE2E6;border-radius:8px;background:#ffffff;font-size:13.5px;font-family:inherit;color:#0D1F27;outline:none" style-focus="border-color:#0E2A33">
+          <button onClick="{{ fotoBuscar }}" aria-label="Buscar" style="width:45px;height:45px;flex-shrink:0;border:none;border-radius:50%;background:#0E2A33;color:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease" style-hover="background:#16404E">
+            <svg width="17" height="17" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M480 272C480 317.9 465.1 360.3 440 394.7L566.6 521.4C579.1 533.9 579.1 554.2 566.6 566.7C554.1 579.2 533.8 579.2 521.3 566.7L394.7 440C360.3 465.1 317.9 480 272 480C157.1 480 64 386.9 64 272C64 157.1 157.1 64 272 64C386.9 64 480 157.1 480 272zM272 416C351.5 416 416 351.5 416 272C416 192.5 351.5 128 272 128C192.5 128 128 192.5 128 272C128 351.5 192.5 416 272 416z"></path></svg>
+          </button>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</sc-if>
+
 </div>
 </x-dc>

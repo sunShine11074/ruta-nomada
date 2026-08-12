@@ -131,7 +131,12 @@ class Component extends DCLogic {
       rvwOpen: {}, rvwShown: 5,
       // Selector de emojis: búsqueda, categoría activa, en qué día
       // está el lugar al que se reacciona y dónde colocar el panel
-      emoQ: '', emoCat: 0, emoDi: null, emoPos: null
+      emoQ: '', emoCat: 0, emoDi: null, emoPos: null,
+      // Cambiar la foto de portada: pestaña abierta, texto buscado,
+      // resultados de la web y cuál está elegido.
+      // Medidas del modal en Reportes_md/PLAN_cambiar_foto.md
+      fotoModal: false, fotoTab: 'tus', fotoQ: '', fotoRes: [],
+      fotoSel: null, fotoCargando: false, fotoMisFotos: []
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -2622,6 +2627,45 @@ class Component extends DCLogic {
         pick: () => { this.setState({ newListMenu: false }); this._addLista('check'); }
       }
     ];
+
+    // ── Cambiar la foto de portada ───────────────────────────
+    // Fase 1: el armazón. Subir y buscar llegan en las fases 2 y 3;
+    // hasta entonces sus botones no hacen nada a propósito.
+    // Medidas tomadas de screens_ref/Cambiar foto del itinerario (*).png
+    // y anotadas en Reportes_md/PLAN_cambiar_foto.md
+    V.fotoModal = !!s.fotoModal;
+    V.fotoEsTus = s.fotoTab !== 'web';
+    V.fotoEsWeb = s.fotoTab === 'web';
+    V.fotoQ = s.fotoQ || '';
+    // Sin fotos subidas todavía el frame dice esto; cuando la fase 3
+    // traiga la galería, el texto sólo aparece si sigue vacía.
+    V.fotoVacioTxt = (s.fotoMisFotos || []).length
+      ? 'Elige una de tus fotos'
+      : 'Aún no has subido ninguna foto';
+    V.fotoTabs = [
+      { clave: 'tus', etiqueta: 'Tus fotos' },
+      { clave: 'web', etiqueta: 'Buscar en la web' }
+    ].map(t => {
+      const activa = (s.fotoTab || 'tus') === t.clave;
+      return {
+        etiqueta: t.etiqueta,
+        // #EDC13F medido del subrayado en el frame
+        color: activa ? '#EDC13F' : '#212529',
+        linea: activa ? '#EDC13F' : 'transparent',
+        pick: () => this.setState({ fotoTab: t.clave })
+      };
+    });
+    // Sólo quien puede editar cambia la portada. El endpoint que
+    // guardará la elección ya exige rol 'editor'; esto evita abrir
+    // una ventana que después no serviría de nada.
+    V.fotoAbrir = this.puedeEditar
+      ? () => this.setState({ fotoModal: true, fotoTab: 'tus', fotoSel: null })
+      : V.noop;
+    V.fotoCerrar = () => this.setState({ fotoModal: false });
+    V.fotoQCambia = (e) => this.setState({ fotoQ: e.target.value });
+    V.fotoQTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); V.fotoBuscar(); } };
+    V.fotoBuscar = V.noop;      // fase 2
+    V.fotoSubirClic = V.noop;   // fase 3
 
     // ── Selector de emojis (catálogo Unicode completo, js/emojis.js) ──
     // La rejilla NO se pinta aquí: la rellena _emoMontar() con HTML
