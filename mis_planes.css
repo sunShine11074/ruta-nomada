@@ -355,7 +355,13 @@ body.dashboard-page { background: #FAFDFF; }
 .mp-cover { position: relative; height: 170px; border-radius: 5px; overflow: hidden; background: #dfe6ec; }
 .mp-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mp-cover__grad { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 700; color: rgba(255, 255, 255, .9); }
-.mp-cover__badge { position: absolute; top: 9px; left: 9px; width: 26px; height: 26px; border-radius: 8px; background: rgba(255, 255, 255, .92); display: flex; align-items: center; justify-content: center; }
+/* La marca sobre la portada, SIN plato blanco: igual que .rz-hero__logo
+   en resultados.css, que es el criterio del sitio.
+   El drop-shadow no es decorativo y no se puede quitar: sin el plato,
+   es lo unico que separa el logo de una foto clara. resultados.php usa
+   exactamente el mismo recurso por el mismo motivo. */
+.mp-cover__badge { position: absolute; top: 9px; left: 9px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+.mp-cover__badge img { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
 
 /* Etiqueta temporal: 61x14 con las puntas completamente redondeadas */
 .mp-chip {
