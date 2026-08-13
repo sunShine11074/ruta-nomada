@@ -66,7 +66,7 @@ if not errorlevel 1 (
     "%MYSQL%" -u root %BASE% -e "source basedatos/migrate_borrar_plan.sql"
 )
 if not errorlevel 1 (
-    REM Las 14 rutinas del proyecto: funciones, procedimientos y
+    REM Las 16 rutinas del proyecto: funciones, procedimientos y
     REM triggers. Tambien idempotente: cada una lleva su DROP delante.
     "%MYSQL%" -u root %BASE% -e "source basedatos/rutinas.sql"
 )
@@ -83,8 +83,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo   Listo. Arriba deben verse:  5 y 3  (tablas de rutas),
-echo   FUNCTION 4 y PROCEDURE 5, y triggers 5  (las rutinas).
+echo   Listo. Arriba deben verse:  5 columnas, 5 tablas y 3 columnas
+echo   mas en plan_invitaciones; y de rutinas, FUNCTION 5,
+echo   PROCEDURE 6 y TRIGGER 5.
 echo.
 echo   2/2  Comprobando la instalacion...
 echo.

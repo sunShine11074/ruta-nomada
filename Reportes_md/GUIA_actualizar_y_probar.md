@@ -79,6 +79,14 @@ por la clave que te pasaron, entre comillas.
 
 ### Paso 3 · Actualizar la base de datos
 
+> **El camino corto: doble clic en `herramientas\actualizar.bat`.**
+> Hace los tres trabajos seguidos —pone la base al día, instala las rutinas y
+> lanza el diagnóstico— y deja la ventana abierta para que leas el resultado.
+> Si te funciona, sáltate el resto de este paso y ve al paso 4.
+>
+> A mano son **dos** comandos, no uno, y ese es el error que se cuela: la base
+> y las rutinas viven en archivos distintos.
+
 **No importes `instalar.sql`**: ese archivo borra y vuelve a crear las tablas, y
 te llevarías por delante tus usuarios y tus planes. El que suma sin borrar es
 otro:
@@ -99,16 +107,27 @@ operador `<`. Así funciona igual en PowerShell, en CMD y en Git Bash.)*
 Al terminar imprime una línea de comprobación. Tiene que decir:
 
 ```
-columnas_nuevas_en_plan_items (deben ser 5)      5
-tablas_nuevas (deben ser 3)                      3
+columnas_nuevas_en_plan_items (deben ser 5)         5
+tablas_nuevas (deben ser 5)                         5
 columnas_nuevas_en_plan_invitaciones (deben ser 3)  3
 ```
 
-**Es seguro ejecutarlo dos veces.** Todo va con `IF NOT EXISTS`: lo que ya esté
-se queda como está, y no vacía ninguna tabla.
+**Y ahora el segundo comando, el que se olvida.** `actualizar_bd.sql` sólo trae
+tablas y columnas; las **rutinas** —funciones, procedimientos y
+disparadores— viven en otro archivo:
+
+```bash
+mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"
+```
+
+Tiene que imprimir `FUNCTION 5`, `PROCEDURE 6` y `TRIGGER 5`.
+
+**Los dos son seguros de ejecutar dos veces.** Todo va con `IF NOT EXISTS` o
+con su `DROP` delante: lo que ya esté se queda como está, y no se vacía ninguna
+tabla.
 
 Prefieres phpMyAdmin? Base `ruta_nomada` → pestaña *Importar* → elige
-`basedatos/actualizar_bd.sql` → *Continuar*.
+`basedatos/actualizar_bd.sql`, y repite con `basedatos/rutinas.sql`.
 
 ### Paso 4 · Comprobar que quedó todo
 
@@ -126,11 +145,19 @@ Lo único que importa de la última línea es que **los fallos sean 0**:
   24 correctos · 0 avisos · 0 fallos
 ```
 
-Los **avisos** `[!]` no son fallos: significan «esto no lo puedo probar porque
-falta una clave». Si decidiste no poner la de correo, verás un aviso ahí y la
-app funciona igual —sólo que las invitaciones no salen por correo y hay que
-pasar el enlace a mano—. Cada `[X]`, en cambio, sí hay que atenderlo, y trae
-debajo el comando que lo arregla.
+Los **avisos** `[!]` no son fallos: son cosas que la app sobrevive sin tener.
+El caso típico es **el correo**: si decides no poner `mail_config.php`, verás un
+aviso y todo lo demás va igual —sólo que las invitaciones no salen por correo y
+hay que pasar el enlace a mano, que es lo que la propia ventana te dice—.
+
+Cada `[X]`, en cambio, sí hay que atenderlo, y trae debajo el comando que lo
+arregla.
+
+> **Un aviso sobre los avisos.** Si te falta la tabla `intentos_login`, el
+> límite de intentos de contraseña queda **desactivado en silencio**:
+> `includes/intentos.php` falla en abierto a propósito, así que se puede probar
+> contraseñas sin freno y nada lo dice. Por eso conviene acabar el paso 4 con
+> **0 fallos** de verdad, no «casi».
 
 Números clave, por si quieres compararlos a ojo: **21 tablas** y **16 rutinas**
 (5 funciones, 6 procedimientos y 5 disparadores).
@@ -266,6 +293,8 @@ Con A, en **Gestiona tus compañeros de viaje**, pulsa la ✕ de una fila.
 | Los viajes nuevos nacen **sin foto** | Lo mismo | Paso 2 |
 | **«Sesión inválida. Recarga la página»** | El token de la página caducó | F5. Si sigue, cierra sesión y vuelve a entrar |
 | Al invitar: **«No se pudo preparar el enlace»** | Tu base no tiene las columnas nuevas | Paso 3 |
+| `Faltan N rutinas: function ..., procedure ...` | Las rutinas van en otro archivo | El **segundo** comando del paso 3: `rutinas.sql` |
+| `Faltan 1 tablas: intentos_login` | Tu copia es anterior al 13/08/2026 | `git pull` y repite el paso 3 entero |
 | La **✕** de invitar no aparece | No eres quien creó el viaje | Es lo correcto |
 | «Copiar enlace» no copia | Abriste por IP en vez de `localhost` | Abre por `http://localhost/...` |
 | El mapa sale gris | La clave de Maps | F12 → *Console*; el paso 4 explica cada error |
