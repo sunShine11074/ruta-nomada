@@ -24,39 +24,27 @@ if (empty($_SESSION['user'])) {
 $user     = $_SESSION['user'];
 $error_db = null;
 $categoria = $_GET['categoria'] ?? 'Cultura';
+$destinos = [];
 
-// ── Verificar conexión a BD ──────────────────────────────────
+// ── Verificar conexión a BD y Consultar Destinos ─────────────
 $db_check = checkDBConnection();
 if (!$db_check['ok']) {
     $error_db = $db_check['error'];
 } else {
     $db = getDB();
 
-    if($categoria === 'Cultura') {
-        $stmt = $db->prepare('SELECT * FROM destinos WHERE categoria = ? ORDER BY id');
-        $stmt->execute([$categoria]);
-    }
-    if($categoria === 'Romance') {
-        $stmt = $db->prepare('SELECT * FROM destinos WHERE categoria = ? ORDER BY id');
-        $stmt->execute([$categoria]);
-    }
-    if($categoria === 'Aventura') {
-        $stmt = $db->prepare('SELECT * FROM destinos WHERE categoria = ? ORDER BY id');
-        $stmt->execute([$categoria]);
-    }
-    if($categoria === 'Descubrimiento') {
-        $stmt = $db->prepare('SELECT * FROM destinos WHERE categoria = ? ORDER BY id');
-        $stmt->execute([$categoria]);
+    // Optimizamos la validación de categorías
+    $categorias_validas = ['Cultura', 'Romance', 'Aventura', 'Descubrimiento'];
+    if (!in_array($categoria, $categorias_validas)) {
+        $categoria = 'Cultura'; // Categoría por defecto si escriben algo raro en la URL
     }
 
+    $stmt = $db->prepare('SELECT * FROM destinos WHERE categoria = ? ORDER BY id');
+    $stmt->execute([$categoria]);
     $destinos = $stmt->fetchAll();
 }
 
-
-// ── Datos de ejemplo (reemplazar con consultas reales) ───────
-// Intentar leer destinos desde la base de datos; si falla, usar datos de ejemplo
-
-
+// ── Datos de ejemplo ─────────────────────────────────────────
 $recientes = [
     [
         'hace'   => 'Hace 2 días',
@@ -102,7 +90,7 @@ require_once __DIR__ . '/includes/user_topbar.php';
 ════════════════════════════════════════════════════════════ -->
 <div class="layout">
 
-    <!-- ── Sidebar ── -->
+    <!-- ── Sidebar (si lo tienes configurado, iría aquí) ── -->
 
     <!-- ── Contenido principal ── -->
     <main class="main-content">
@@ -119,15 +107,29 @@ require_once __DIR__ . '/includes/user_topbar.php';
         <?php endif; ?>
 
         <!-- ════════════════════════════════════════════════════════════
-             SECCIÓN HERO
+             SECCIÓN HERO (Con Carrusel CSS)
         ════════════════════════════════════════════════════════════ -->
         <section class="hero-section">
-            <div class="hero-background">
-                <div class="hero-gradient"></div>
+            <!-- Carrusel de fondo -->
+            <div class="hero-slider">
+                <!-- Cambia estas URLs por imágenes de tus destinos -->
+                <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=1920&q=80');"></div>
+                <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=1920&q=80');"></div>
+                <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80');"></div>
             </div>
             
+            <!-- Capa oscura para que el texto y el botón resalten -->
+            <div class="hero-gradient"></div>
+            
             <div class="hero-content">
-                <h1 class="hero-title">¡Tú próxima aventura comienza aquí!</h1>
+                <form class="hero-search" id="heroSearch" role="search">
+                    <input type="text" id="heroSearchInput" class="hero-search__input" placeholder="Explora tu próximo destino..." aria-label="Buscar destino" autocomplete="off">
+                    <button type="submit" class="hero-search__go" aria-label="Buscar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                    </button>
+                </form>
+
+                <h1 class="hero-title">¡Tu próxima aventura comienza aquí!</h1>
                 <p class="hero-subtitle">Planifica, cotiza y reserva viajes increíbles con la plataforma más completa para viajeros</p>
                 
                 <div class="hero-buttons">
@@ -173,6 +175,42 @@ require_once __DIR__ . '/includes/user_topbar.php';
 
     </main>
 </div><!-- /.layout -->
+
+<!-- ════════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════ -->
+<footer class="site-footer">
+    <div class="footer-container">
+        <!-- Columna 1: Logo y descripción -->
+        <div class="footer-col brand-col">
+            <img src="img/DERIVA EN BLANCO.png" alt="Logo Deriva" class="footer-logo">
+            <p>Descubre el mundo con nosotros. Creamos rutas, destinos y aventuras diseñadas especialmente a tu medida.</p>
+        </div>
+        
+        <!-- Columna 2: Contacto -->
+        <div class="footer-col contact-col">
+            <h3>Contacto</h3>
+            <ul>
+                <li><span>📍</span> Av. Jalisco y 59, San Luis Rio Colorado, Sonora</li>
+                <li><span>✉️</span> contacto@rutanomada.com</li>
+            </ul>
+        </div>
+        
+        <!-- Columna 3: Enlaces y Redes -->
+        <div class="footer-col social-col">
+            <h3>Síguenos</h3>
+            <div class="social-links">
+                <a href="#">Instagram</a>
+                <a href="#">Facebook</a>
+                <a href="#">TikTok</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer-bottom">
+        <p>&copy; <?php echo date('Y'); ?> Ruta Nómada / Deriva. Todos los derechos reservados.</p>
+    </div>
+</footer>
 
 <script src="js/topbar.js"></script>
 </body>

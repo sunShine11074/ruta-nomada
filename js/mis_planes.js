@@ -55,6 +55,124 @@
   }
 
   /* ── Ficha del panel ───────────────────────────────────── */
+  function moneyFmt(n) {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(Number(n) || 0);
+  }
+
+  function imprimirPlan(plan) {
+    if (!plan || !plan.id) return;
+
+    fetch('api/plan_get.php?id=' + encodeURIComponent(plan.id), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok || !j.plan) throw new Error('No se pudo cargar el plan.');
+
+        var planData = j.plan || {};
+        var items = Array.isArray(j.items) ? j.items : [];
+        var gastos = Array.isArray(j.gastos) ? j.gastos : [];
+        var presupuesto = Number(planData.presupuesto) || 0;
+        var costeItinerario = items.reduce(function (sum, item) {
+          return sum + (Number(item && item.precio) || 0);
+        }, 0);
+        var gastoTotal = gastos.reduce(function (sum, g) {
+          return sum + (Number(g && g.monto) || 0);
+        }, 0);
+        var restante = presupuesto - gastoTotal;
+        var head = planData.nombre || plan.nombre || 'Plan de viaje';
+        var destino = planData.destino || plan.destino || 'Destino no definido';
+        var fechas = (planData.fecha_inicio || planData.fecha_fin)
+          ? (planData.fecha_inicio || '') + ((planData.fecha_inicio && planData.fecha_fin && planData.fecha_inicio !== planData.fecha_fin) ? ' → ' + planData.fecha_fin : '')
+          : (plan.fechas || 'Fechas por definir');
+
+        var dayMap = {};
+        items.forEach(function (item) {
+          var dia = Number(item.dia) || 1;
+          if (!dayMap[dia]) dayMap[dia] = [];
+          dayMap[dia].push(item);
+        });
+
+        var dayHtml = Object.keys(dayMap).sort(function (a, b) { return Number(a) - Number(b); }).map(function (dia) {
+          var arr = dayMap[dia].slice().sort(function (a, b) { return Number(a.orden || 0) - Number(b.orden || 0); });
+          var rows = arr.map(function (item) {
+            var horario = item.hora || item.hora_fin ? ((item.hora || '') + (item.hora_fin ? ' - ' + item.hora_fin : '')) : 'Sin horario';
+            var precio = Number(item.precio) || 0;
+            return '<div class="row"><div><strong>' + esc(item.nombre || 'Lugar') + '</strong><div class="mini">' + esc(horario) + '</div></div><div class="amt">' + moneyFmt(precio) + '</div></div>';
+          }).join('');
+          return '<section class="day"><h3>Día ' + esc(dia) + '</h3>' + rows + '</section>';
+        }).join('');
+
+        var html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><title>' + esc(head) + '</title>' +
+          '<style>body{font-family:Arial,sans-serif;color:#12252d;margin:28px;background:#fff}h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:18px 0 10px}p{margin:6px 0}.meta{color:#4a606a;font-size:13px}.grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px;margin:20px 0 26px}.card{background:#f6f9fb;border:1px solid #dfe7eb;border-radius:10px;padding:12px 14px}.label{font-size:11px;color:#5d7881;text-transform:uppercase;letter-spacing:.08em}.value{margin-top:8px;font-size:20px;font-weight:700}.line{border-top:1px solid #e9eef1;padding-top:12px;margin-top:12px}.row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:9px 0;border-bottom:1px solid #eef2f4}.mini{font-size:12px;color:#56717d;margin-top:4px}.amt{font-weight:700;white-space:nowrap}.day{page-break-inside:avoid;margin-bottom:22px}.day h3{margin:0 0 8px}.@media print{body{margin:0}}</style></head><body>' +
+          '<h1>' + esc(head) + '</h1>' +
+          '<div class="meta">' + esc(destino) + ' · ' + esc(fechas) + '</div>' +
+          '<div class="grid">' +
+          '<div class="card"><div class="label">Presupuesto</div><div class="value">' + moneyFmt(presupuesto) + '</div></div>' +
+          '<div class="card"><div class="label">Gastos</div><div class="value">' + moneyFmt(gastoTotal) + '</div></div>' +
+          '<div class="card"><div class="label">Itinerario</div><div class="value">' + moneyFmt(costeItinerario) + '</div></div>' +
+          '<div class="card"><div class="label">Restante</div><div class="value">' + moneyFmt(restante) + '</div></div>' +
+          '</div>' +
+          '<div class="line"><h2>Resumen del viaje</h2>' +
+          '<div class="row"><span>Destino</span><strong>' + esc(destino) + '</strong></div>' +
+          '<div class="row"><span>Fechas</span><strong>' + esc(fechas) + '</strong></div>' +
+          '<div class="row"><span>Presupuesto</span><strong>' + moneyFmt(presupuesto) + '</strong></div>' +
+          '<div class="row"><span>Gastos definidos</span><strong>' + moneyFmt(gastoTotal) + '</strong></div>' +
+          '<div class="row"><span>Saldo restante</span><strong>' + moneyFmt(restante) + '</strong></div>' +
+          '</div>' +
+          '<div class="line"><h2>Itinerario</h2>' + (dayHtml || '<p>No hay actividades registradas.</p>') + '</div></body></html>';
+
+        var win = window.open('', '_blank', 'width=1100,height=900');
+        if (!win) return;
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(function () { try { win.print(); } catch (e) {} }, 300);
+      })
+      .catch(function () {
+        alert('No se pudo cargar el plan desde la base de datos para imprimir.');
+      });
+  }
+
+  function cerrarMenuPlan() {
+    document.querySelectorAll('.mp-card-menu').forEach(function (menu) { menu.remove(); });
+  }
+
+  function abrirMenuPlan(btn) {
+    if (!btn) return;
+    cerrarMenuPlan();
+    var card = btn.closest('.mp-card');
+    var idx = card ? Number(card.getAttribute('data-idx')) : -1;
+    var plan = P[idx];
+    if (!plan) return;
+
+    var menu = document.createElement('div');
+    menu.className = 'mp-card-menu';
+    menu.style.position = 'absolute';
+    menu.style.top = (btn.getBoundingClientRect().top + 8) + 'px';
+    menu.style.left = (btn.getBoundingClientRect().left - 120) + 'px';
+    menu.style.zIndex = '1000';
+    menu.style.width = '170px';
+    menu.style.background = '#ffffff';
+    menu.style.border = '1px solid #dfe7eb';
+    menu.style.borderRadius = '12px';
+    menu.style.boxShadow = '0 18px 36px rgba(14,42,51,.15)';
+    menu.style.padding = '8px';
+    menu.innerHTML = '<button type="button" class="mp-menuitem" data-print-plan="' + idx + '" style="display:block;width:100%;border:none;background:none;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:#0D1F27;">Imprimir plan</button>';
+    document.body.appendChild(menu);
+
+    var action = menu.querySelector('[data-print-plan]');
+    if (action) {
+      action.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        imprimirPlan(P[Number(action.getAttribute('data-print-plan'))]);
+        cerrarMenuPlan();
+      });
+    }
+  }
+
   function pintarFicha() {
     var p = P[sel];
     var host = $('mpFicha');
@@ -110,6 +228,8 @@
 
       '<div class="mp-grupo"><p class="mp-grupo__t">Última modificación</p>' +
         '<span class="mp-dato">' + (ICO.lapiz || '') + '<b>' + esc(p.modifGuion) + '</b></span>' +
+        '<button type="button" class="mp-btn mp-btn--print" data-print-plan="' + sel + '" style="margin-top:10px;width:100%;justify-content:center">' +
+          (ICO.lapizBlanco || '') + '<span>Imprimir plan</span></button>' +
       '</div>' +
       '</div>' +
 
@@ -139,6 +259,15 @@
         '</button>' +
         '<span class="mp-ayuda" id="mpDelAyuda">Mantén pulsado para ' + (esProp ? 'eliminar' : 'salir') + '</span>' +
       '</div>';
+
+    var printButton = host.querySelector('[data-print-plan]');
+    if (printButton) {
+      printButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        imprimirPlan(P[Number(printButton.getAttribute('data-print-plan'))]);
+      });
+    }
 
     enlazarBorrado();
   }
@@ -385,8 +514,16 @@
   document.addEventListener('click', function (e) {
     var v = e.target.closest ? e.target.closest('.mp-views__btn') : null;
     if (v) { cambiarVista(v.getAttribute('data-vista'), v); return; }
-    // El menú de tres puntos no debe arrastrar la selección de la tarjeta
-    if (e.target.closest && e.target.closest('.mp-card__menu')) { e.stopPropagation(); return; }
+    var menuBtn = e.target.closest ? e.target.closest('.mp-card__menu') : null;
+    if (menuBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      abrirMenuPlan(menuBtn);
+      return;
+    }
+    if (document.querySelector('.mp-card-menu') && (!e.target.closest || !e.target.closest('.mp-card-menu'))) {
+      cerrarMenuPlan();
+    }
     var fila = e.target.closest ? e.target.closest('[data-idx]') : null;
     if (fila) seleccionar(Number(fila.getAttribute('data-idx')), 'lista');
   });

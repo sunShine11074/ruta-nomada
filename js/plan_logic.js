@@ -60,7 +60,7 @@ class Component extends DCLogic {
       ],
       gastosOpen: true, expSort: 'fecha', budget: 9000, budgetEdit: false, budgetTxt: '',
       expFormOpen: false, expC: '', expM: '', expCat: 'Comida',
-      desglose: false, desgTab: 'cat', heroMenuOpen: false,
+      desglose: false, desgTab: 'cat', heroMenuOpen: false, allSecOpen: false,
       tplOpen: null, tplTab: 0, tplExp: {}, tplSel: {},
       dayItems: [
         [
@@ -2747,6 +2747,86 @@ class Component extends DCLogic {
   }
   componentWillUnmount() { clearTimeout(this._pulsoT); document.removeEventListener('visibilitychange', this._pulsoVis); document.removeEventListener('mousedown', this._pulsoActividad, true); document.removeEventListener('keydown', this._pulsoActividad, true); window.removeEventListener('keydown', this._esc); window.removeEventListener('keydown', this._modalTab); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
 
+  _printTripSummary() {
+    const s = this.state;
+    const days = Array.isArray(s.dayItems) ? s.dayItems : [];
+    const totalItin = days.reduce((tot, arr) => tot + (Array.isArray(arr) ? arr.reduce((sum, item) => sum + (Number(item && item.costo) || 0), 0) : 0), 0);
+    const totalGastos = (Array.isArray(s.gastos) ? s.gastos : []).reduce((tot, g) => tot + (Number(g && g.m) || 0), 0);
+    const presupuesto = Number(s.budget) || 0;
+    const resto = presupuesto - totalGastos;
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const money = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(Number(n) || 0);
+    const dayHtml = days.map((arr, di) => {
+      const label = this.DAYS && this.DAYS[di] ? this.DAYS[di].label : `Día ${di + 1}`;
+      const rows = (arr || []).map((item) => {
+        const name = item && item.name ? item.name : 'Lugar';
+        const horario = item && item.horario ? item.horario : 'Sin horario';
+        const travel = item && item.travel && item.travel.t ? ` · ${item.travel.t}` : '';
+        const costo = Number(item && item.costo) || 0;
+        return `
+          <div class="row">
+            <div class="name">${esc(name)}</div>
+            <div class="meta">${esc(horario)}${esc(travel)}</div>
+            <div class="amount">${money(costo)}</div>
+          </div>`;
+      }).join('');
+      return `
+        <section class="day">
+          <h3>${esc(label)}</h3>
+          ${rows || '<div class="empty">Sin actividades en este día.</div>'}
+        </section>`;
+    }).join('');
+
+    const html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${esc(this.META && this.META.titulo ? this.META.titulo : 'Resumen del viaje')}</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 24px; color: #12252d; background: #fff; }
+  .header { border-bottom: 2px solid #dfe7eb; padding-bottom: 18px; margin-bottom: 20px; }
+  h1 { font-size: 30px; margin: 0 0 8px; }
+  .meta { font-size: 14px; color: #4a606a; }
+  .summary { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; margin: 20px 0 26px; }
+  .card { background: #f6f9fb; border: 1px solid #dfe7eb; border-radius: 12px; padding: 12px 14px; }
+  .label { font-size: 11px; color: #5d7881; text-transform: uppercase; letter-spacing: .08em; }
+  .value { margin-top: 8px; font-size: 22px; font-weight: 700; }
+  .day { page-break-inside: avoid; margin-bottom: 24px; border-top: 1px solid #e7edf1; padding-top: 12px; }
+  .day h3 { margin: 0 0 12px; font-size: 20px; }
+  .row { display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eef2f4; }
+  .name { font-weight: 600; }
+  .meta { font-size: 12px; color: #56717d; }
+  .amount { text-align: right; font-weight: 700; }
+  .empty { color: #6a7d86; padding: 8px 0; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>${esc(this.META && this.META.titulo ? this.META.titulo : 'Resumen del viaje')}</h1>
+    <div class="meta">${esc(this.META && this.META.destino ? this.META.destino : '')} · ${esc(this.META && this.META.fechas ? this.META.fechas : '')}</div>
+  </div>
+  <div class="summary">
+    <div class="card"><div class="label">Presupuesto</div><div class="value">${money(presupuesto)}</div></div>
+    <div class="card"><div class="label">Gasto estimado</div><div class="value">${money(totalGastos || totalItin)}</div></div>
+    <div class="card"><div class="label">Itinerario</div><div class="value">${days.reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0)}</div></div>
+    <div class="card"><div class="label">Restante</div><div class="value">${money(resto)}</div></div>
+  </div>
+  ${dayHtml || '<div class="empty">No hay actividades guardadas en este viaje.</div>'}
+</body>
+</html>`;
+
+    const popup = window.open('', '_blank', 'width=1100,height=900');
+    if (!popup) return;
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => {
+      try { popup.print(); } catch (e) {}
+    }, 300);
+  }
+
   renderVals() {
     const s = this.state;
     const V = {};
@@ -2911,6 +2991,16 @@ class Component extends DCLogic {
     V.catOpen = s.catOpen; V.catLabel = s.catLabel; V.catRot = s.catOpen ? '180deg' : '0deg';
     V.toggleCat = () => this.setState({ catOpen: !s.catOpen, userMenu: false });
     V.catOpts = ['Ciudad', 'Hoteles', 'Restaurantes', 'Cosas que hacer'].map(t => ({ t, w: t === s.catLabel ? 600 : 400, pick: () => this.setState({ catLabel: t, catOpen: false }) }));
+    
+    // ── Hero menu (print, collapse sections) ──
+    V.heroMenuOpen = s.heroMenuOpen;
+    V.heroMenuToggle = () => this.setState({ heroMenuOpen: !s.heroMenuOpen });
+    V.heroMenuClose = () => this.setState({ heroMenuOpen: false });
+    V.heroMenuPrint = () => { this.setState({ heroMenuOpen: false }); this._printTripSummary(); };
+    V.allSecToggle = () => this.setState({ allSecOpen: !s.allSecOpen, heroMenuOpen: false });
+    V.allSecLabel = s.allSecOpen ? 'Contraer secciones' : 'Expandir secciones';
+    V.allSecRot = s.allSecOpen ? '180deg' : '0deg';
+    
     V.showNav = s.winW >= 1230; V.showBrandTxt = s.winW >= 640;
     V.searchW = s.winW >= 1230 ? '345px' : '220px';
     V.showCtaTxt = s.winW >= 1000; V.ctaPad = s.winW >= 1000 ? '8px 16px' : '8px 11px';

@@ -442,7 +442,6 @@ function e($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
       <!-- Tabs -->
       <div style="display:flex;gap:1.6rem;padding:0 2rem;border-bottom:1px solid #e6e9ee;margin:.6rem 0 0">
         <button id="tabPerfil" type="button" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:.7rem .1rem;font-weight:600;color:#062738;border-bottom:2.5px solid #062738;margin-bottom:-1px">Editar perfil</button>
-        <button id="tabFact" type="button" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:.7rem .1rem;font-weight:400;color:#6b7280;border-bottom:2.5px solid transparent;margin-bottom:-1px">Facturación</button>
         <button id="tabPass" type="button" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:.7rem .1rem;font-weight:400;color:#6b7280;border-bottom:2.5px solid transparent;margin-bottom:-1px">Cambiar Contraseña</button>
       </div>
 
@@ -603,15 +602,6 @@ function e($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
             <span style="font-size:.75rem;color:#9aa3ad;padding-left:.2rem">Mantén pulsado para guardar</span>
           </div>
         </div>
-      </div>
-
-      <!-- ───── TAB: FACTURACIÓN ───── -->
-      <div id="panelFact" style="display:none;padding:3.5rem 2rem 4rem;flex-direction:column;align-items:center;text-align:center">
-        <div style="width:74px;height:74px;border-radius:20px;background:#f1f4f7;display:flex;align-items:center;justify-content:center;color:#3e7986;margin-bottom:1.1rem">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-3 2-3-2-3 2V3Z"></path><path d="M9 8h6M9 12h4"></path></svg>
-        </div>
-        <h2 style="font-size:1.3rem;font-weight:700;color:#1a2e35;margin:0 0 .4rem">Próximamente</h2>
-        <p style="font-size:.92rem;color:#6b7280;max-width:420px;margin:0">Estamos preparando tu sección de facturación. Muy pronto podrás gestionar tus métodos de pago y descargar tus comprobantes desde aquí.</p>
       </div>
 
       <!-- ───── TAB: CAMBIAR CONTRASEÑA ───── -->

@@ -99,11 +99,7 @@ body.sidebar-collapsed .main-content { padding-left: 2rem !important; }
 }
 .tb-crearplan:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.45); transform: translateY(-1px); }
 
-.tb-bell {
-    background: none; border: none; cursor: pointer; padding: 6px;
-    border-radius: 8px; display: flex; transition: background .15s;
-}
-.tb-bell:hover { background: rgba(255,255,255,.1); }
+
 
 /* ── Avatar + dropdown ─────────────────────────────────────── */
 .tb-user { position: relative; }

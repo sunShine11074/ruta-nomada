@@ -214,7 +214,6 @@
   ════════════════════════════════════════════════════════════ */
   function bindTabs() {
     $('tabPerfil').addEventListener('click', function () { switchTab('perfil'); });
-    $('tabFact').addEventListener('click', function () { switchTab('facturacion'); });
     $('tabPass').addEventListener('click', function () { switchTab('password'); });
   }
 
@@ -224,13 +223,11 @@
 
     // Panels
     $('panelPerfil').style.display   = tab === 'perfil'      ? 'block' : 'none';
-    $('panelFact').style.display     = tab === 'facturacion'  ? 'flex'  : 'none';
     $('panelPass').style.display     = tab === 'password'     ? 'block' : 'none';
 
     // Tab buttons
     var tabs = [
       { btn: $('tabPerfil'),  active: tab === 'perfil' },
-      { btn: $('tabFact'),    active: tab === 'facturacion' },
       { btn: $('tabPass'),    active: tab === 'password' },
     ];
     tabs.forEach(function (t) {
