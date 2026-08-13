@@ -430,3 +430,5 @@ body.dashboard-page { background: #FAFDFF; }
 /* ── Estados generales ───────────────────────────────────── */
 .mp-empty { text-align: center; padding: 64px 20px; color: var(--mp-suave); }
 .mp-oculto { display: none !important; }
+
+/* El panel de la derecha se oculta en pantallas estrechas, y el contenido */
