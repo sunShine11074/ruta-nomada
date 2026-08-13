@@ -38,9 +38,15 @@ CREATE DATABASE ruta_nomada
 phpMyAdmin → base `ruta_nomada` → *Importar* → elige
 **`basedatos/instalar.sql`** → *Continuar*.
 
-Ese archivo crea las 15 tablas, el procedimiento almacenado y unos destinos de
-ejemplo. **Es el único que necesitas**: los `migrate_*.sql` son el historial de
-cómo fue creciendo el esquema y no hay que ejecutarlos por separado.
+Ese archivo crea las 21 tablas, las 16 rutinas (5 funciones, 6 procedimientos y
+5 disparadores) y unos destinos de ejemplo. **Es el único que necesitas si
+empiezas de cero**: los `migrate_*.sql` son el historial de cómo fue creciendo
+el esquema y no hay que ejecutarlos por separado.
+
+> **¿Ya tenías la base de una versión anterior?** Entonces NO importes
+> `instalar.sql`: te borraría los datos. Usa `basedatos/actualizar_bd.sql`, que
+> añade lo que falte sin tocar lo que ya está. El paso a paso, con qué probar
+> después, está en **`Reportes_md/GUIA_actualizar_y_probar.md`**.
 
 ### 4. Configura tus claves
 
@@ -51,10 +57,14 @@ quítales `.sample` al nombre y pon tus propias claves:
 |---|---|---|
 | `includes/maps_config.sample.php` | `includes/maps_config.php` | El mapa y la búsqueda de lugares |
 | `includes/ai_config.sample.php` | `includes/ai_config.php` | El asistente de IA |
+| `includes/pexels_config.sample.php` | `includes/pexels_config.php` | Las fotos de portada de los viajes |
+| `includes/geo_config.sample.php` | `includes/geo_config.php` | Las listas de país / estado / ciudad |
+| `includes/mail_config.sample.php` | `includes/mail_config.php` | Invitaciones y recuperación de contraseña |
 
 Cada `.sample` explica dónde sacar la clave. **La app arranca sin ellas**: sin
-la de Maps no verás el mapa, y sin la de Gemini el asistente responde en modo
-demostración. Todo lo demás funciona igual.
+la de Maps no verás el mapa, sin la de Gemini el asistente responde en modo
+demostración, y sin la de Pexels los viajes nuevos nacen sin foto de portada.
+Todo lo demás funciona igual.
 
 > Los archivos de configuración están en `.gitignore` **a propósito**. Nunca
 > subas tus claves al repositorio, y nunca las mandes dentro de un .zip.
@@ -70,11 +80,20 @@ Regístrate y listo. La base viene sin usuarios: cada quien crea el suyo.
 ### ¿Algo no jala?
 
 ```bash
-php herramientas/ai_test.php
+php herramientas/diagnostico.php
 ```
 
-Comprueba la clave de Gemini, te dice qué modelos acepta y hace una llamada de
-prueba.
+Revisa de una sentada lo que hace falta para que la app arranque: PHP y sus
+extensiones, los **cinco** archivos de configuración, la base de datos con
+todas sus tablas, columnas y rutinas, la salida a internet, y una llamada de
+prueba a cada servicio externo. Cada fallo viene con el comando que lo arregla.
+No toca nada: sólo lee.
+
+Para mirar únicamente el asistente de IA:
+
+```bash
+php herramientas/ai_test.php
+```
 
 ---
 
