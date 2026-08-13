@@ -5,7 +5,7 @@ cómo se relacionan entre sí.
 
 - **Motor:** MariaDB 10.4 (XAMPP) · todas las tablas en **InnoDB**
 - **Base:** `ruta_nomada`
-- **19 tablas** + 14 rutinas (documentadas aparte en
+- **21 tablas** + 36 rutinas (documentadas aparte en
   `REPORTE_rutinas_bd.md`)
 - **Script de creación:** `basedatos/instalar.sql`
 
@@ -18,15 +18,15 @@ listas flotando como basura invisible.
 
 ## 1. Las tablas de un vistazo
 
-Las 19 tablas se agrupan en **seis familias** según para qué sirven:
+Las 21 tablas se agrupan en **seis familias** según para qué sirven:
 
 | Familia | Tablas | Para qué |
 |---------|--------|----------|
-| Personas | `usuarios`, `password_resets` | Quién entra al sistema |
+| Personas | `usuarios`, `password_resets`, `intentos_login` | Quién entra al sistema |
 | Catálogo | `destinos`, `favoritos`, `viajes_usuario` | Destinos que ofrece la app |
 | El viaje | `planes`, `plan_items`, `plan_gastos` | El corazón del sistema |
 | Compartir | `plan_miembros`, `plan_invitaciones`, `plan_item_reacciones`, `plan_item_gasto` | Viajar acompañado |
-| Organizar | `plan_listas`, `plan_lista_items`, `plan_destinos` | Notas y pendientes |
+| Organizar | `plan_listas`, `plan_lista_items`, `plan_destinos`, `usuario_fotos` | Notas, pendientes y fotos propias |
 | Servicio | `tramo_cache`, `ruta_uso`, `ai_uso`, `planes_borrados` | Ahorro, control y auditoría |
 
 Con el contenido actual de la base:
@@ -425,9 +425,33 @@ cuando haya tiempo, no urgente.
 
 ---
 
+## 9 bis. Lo que se añadió después de este reporte
+
+**Dos tablas:**
+
+| Tabla | Para qué |
+|---|---|
+| `intentos_login` | El freno a la fuerza bruta del inicio de sesión. Guarda cada intento con su correo, su IP y si acertó |
+| `usuario_fotos` | La galería de «Tus fotos» de la ventana Cambiar foto. Guarda la **ruta** relativa, no la imagen: el archivo vive en `img/portadas/` |
+
+**Y seis columnas para la colaboración en tiempo real:**
+
+| Columna | Para qué |
+|---|---|
+| `planes.rev` | Testigo de cambio del viaje: sube con cualquier cambio y lo mueven 20 disparadores |
+| `planes.ver` | Versión del **nombre** del viaje, para el bloqueo optimista |
+| `plan_items.ver` | Versión de un lugar, para el bloqueo optimista |
+| `plan_miembros.visto_en` | Último latido de esa persona: el punto verde de los avatares |
+| `plan_invitaciones.usos` / `usos_max` | Para que el enlace de invitación sirva a varias personas |
+| `plan_invitaciones.token_claro` | El token legible del enlace de compartir, para poder volver a enseñarlo |
+
+El detalle está en `REPORTE_colaboracion.md`.
+
+---
+
 ## 10. Resumen para la evaluación
 
-**19 tablas, 22 claves foráneas, todas en InnoDB.** El diseño sigue las
+**21 tablas, 23 claves foráneas, todas en InnoDB.** El diseño sigue las
 formas normales: no hay datos repetidos entre tablas, cada dato vive en
 un solo sitio, y las relaciones de muchos a muchos se resuelven con
 tablas puente (`favoritos`, `plan_miembros`, `plan_destinos`,

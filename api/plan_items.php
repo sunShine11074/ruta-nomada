@@ -20,12 +20,18 @@ $db = getDB();
 $action = $in['action'] ?? '';
 
 // Item propio del plan (evita tocar items ajenos)
+//
+// Si no esta, la respuesta NO es un 404 seco: es un conflicto. Que el
+// lugar haya desaparecido entre que lo abriste y que guardaste es
+// exactamente el caso que esta fase existe para contar, y "El lugar no
+// existe en este plan" sonaria a fallo del programa cuando lo que pasa
+// es que alguien lo borro. conflicto() sabe decirlo con esas palabras.
 function ownItem(PDO $db, int $planId, int $id): array
 {
     $stmt = $db->prepare('SELECT * FROM plan_items WHERE id = ? AND plan_id = ? LIMIT 1');
     $stmt->execute([$id, $planId]);
     $it = $stmt->fetch();
-    if (!$it) apiFail('El lugar no existe en este plan.', 404);
+    if (!$it) conflicto($db, $id);
     return $it;
 }
 

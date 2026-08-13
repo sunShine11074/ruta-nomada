@@ -10,9 +10,10 @@
 //
 //  Revisa, en orden, todo lo que hace falta para que la aplicación
 //  arranque en una copia recién descargada: PHP y sus extensiones, los
-//  cuatro archivos de configuración, la base de datos con TODAS sus
-//  tablas y columnas, la salida a internet desde PHP, y una llamada de
-//  prueba a cada servicio externo.
+//  CINCO archivos de configuración, la base de datos con todas sus
+//  tablas, columnas, colaciones y rutinas, la carpeta donde se suben
+//  las fotos, la salida a internet desde PHP, y una llamada de prueba a
+//  cada servicio externo.
 //
 //  No toca nada: sólo lee y consulta.
 // ============================================================
@@ -241,11 +242,37 @@ if ($pdo) {
         $c = $pdo->query('SHOW COLUMNS FROM plan_items')->fetchAll(PDO::FETCH_COLUMN);
         if (!in_array('ver', $c, true)) $faltaTestigo[] = 'plan_items.ver';
     }
+    if (in_array('planes', $hay, true)) {
+        $c = $pdo->query('SHOW COLUMNS FROM planes')->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('ver', $c, true)) $faltaTestigo[] = 'planes.ver';
+    }
+    if (in_array('plan_miembros', $hay, true)) {
+        $c = $pdo->query('SHOW COLUMNS FROM plan_miembros')->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('visto_en', $c, true)) $faltaTestigo[] = 'plan_miembros.visto_en';
+    }
     $faltaTestigo
         ? linea('falla', 'Falta el testigo de cambio: ' . implode(', ', $faltaTestigo),
             'Sin él no se puede saber si un viaje cambió sin recargarlo entero.' . "\n"
             . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
-        : linea('ok', 'El testigo de cambio está puesto (planes.rev, plan_items.ver)');
+        : linea('ok', 'La colaboración tiene sus columnas (rev, ver, visto_en)');
+
+    // Colaciones. Mezclarlas NO es cosmético: comparar una columna
+    // utf8mb4_general_ci con un parámetro utf8mb4_unicode_ci revienta
+    // con "Illegal mix of collations", y ese error parece un fallo del
+    // PHP cuando no lo es. Siete tablas viejas se habían quedado atrás;
+    // actualizar_bd.sql las convierte, y esta línea vigila que no
+    // vuelva a pasar.
+    $mal = $pdo->query(
+        "SELECT TABLE_NAME FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+            AND TABLE_COLLATION <> 'utf8mb4_unicode_ci'"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $mal
+        ? linea('falla', count($mal) . ' tablas con otra colación: ' . implode(', ', $mal),
+            'Mezclar colaciones hace fallar comparaciones y procedimientos.' . "
+"
+            . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
+        : linea('ok', 'Las 21 tablas comparten colación (utf8mb4_unicode_ci)');
 
     // ── Rutinas: funciones, procedimientos y triggers ────────
     // Igual que con las tablas, la lista NO va escrita a mano: se lee

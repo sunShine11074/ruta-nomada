@@ -628,6 +628,9 @@ tecla o clic devuelva el ritmo a 5 s, que ya hacía la fase 3.
 
 ## 9. Fase 7 · Verificación, documentación y repositorio
 
+> **✅ HECHA el 13/08/2026, y encontró dos fallos reales.** Al final de la
+> sección.
+
 **½ día.**
 
 - Matriz de concurrencia con dos cuentas reales y dos navegadores: los nueve
@@ -641,6 +644,63 @@ tecla o clic devuelva el ritmo a 5 s, que ya hacía la fase 3.
 - Ampliar `REPORTE_rutinas_bd.md` con las rutinas nuevas y escribir
   `REPORTE_colaboracion.md`.
 - Copiar al repositorio, commit y push.
+
+---
+
+### Lo que encontró
+
+**La matriz de concurrencia: nueve de nueve.**
+
+| A hace \ B hace después | `update` | `move` | `del` |
+|---|---|---|---|
+| **`update`** | 409 | 409 | 409 |
+| **`move`** | 409 | 409 | 409 |
+| **`del`** | 409 | 409 | **200 en silencio** |
+
+De paso cambió una cosa: editar o mover un lugar que otra persona acaba de
+borrar daba un **404 seco** («El lugar no existe en este plan»), que suena a
+fallo del programa cuando lo que pasa es que alguien lo borró. Ahora contesta
+**conflicto**, con esas palabras.
+
+**⚠️ La comparación limpia-contra-migrada encontró DOS diferencias reales.**
+
+Es la comprobación que el plan señalaba como la que ya había mordido una vez,
+y volvió a morder:
+
+1. **Siete tablas se habían quedado en `utf8mb4_general_ci`** —`destinos`,
+   `favoritos`, `password_resets`, `plan_destinos`, `planes`, `usuarios` y
+   `viajes_usuario`— mientras una instalación limpia las crea en
+   `utf8mb4_unicode_ci`. **No es cosmético**: comparar una columna
+   `general_ci` con un parámetro `unicode_ci` revienta con
+   `"Illegal mix of collations"`, y el error parece un fallo del PHP cuando no
+   lo es. La propia cabecera de `instalar.sql` ya avisaba de esto.
+
+2. **El índice de `viajes_usuario.plan_id` se llamaba distinto** según la vía:
+   `plan_id` en una instalación limpia, `viajes_usuario_ibfk_3` en una
+   migrada, heredado de la clave foránea que `migrate_borrar_plan.sql` rehízo.
+
+Las dos se cierran en `actualizar_bd.sql`. La segunda necesitó soltar y volver
+a poner la clave foránea porque **MariaDB 10.4 no tiene `RENAME INDEX`**
+(comprobado: error de sintaxis). Todo se probó antes sobre una copia de la
+estructura real; `viajes_usuario` tenía 0 filas.
+
+Después de aplicarlas, la comparación da **idénticas** en los siete bloques:
+21 tablas, 160 columnas, 50 índices, 23 claves foráneas, 14 rutinas, 22
+disparadores y 21 colaciones.
+
+**El diagnóstico ahora vigila las dos.** Comprueba las columnas de la
+colaboración (`rev`, `ver`, `visto_en`) y que las 21 tablas compartan
+colación, para que ese desajuste no pueda volver a colarse sin que nadie lo
+note.
+
+### Documentación
+
+- `REPORTE_rutinas_bd.md` decía 14 rutinas; ahora documenta las **36** en una
+  sección nueva, con las dos trampas de MariaDB que decidieron el diseño.
+- `REPORTE_base_de_datos.md` decía 19 tablas; ahora **21**, con las dos nuevas
+  y las seis columnas de la colaboración.
+- `REPORTE_colaboracion.md` es nuevo: qué problema resuelve cada pieza, por
+  qué sondeo y no WebSockets, y qué **no** hace.
 
 ---
 
