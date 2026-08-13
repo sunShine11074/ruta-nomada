@@ -251,18 +251,18 @@ body.dashboard-page { background: #FAFDFF; }
    como la rejilla iguala alturas, estiraba TODAS las de la fila. El
    nombre completo queda en el title y en el panel de la derecha. */
 .mp-card__t {
-  margin: 3px 0 0; font-size: 19px; font-weight: 700; line-height: 24px; padding-right: 26px;
+  margin: 3px 0 0; font-size: 23px; font-weight: 700; line-height: 27px; padding-right: 26px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }
 /* La fila de la fecha va en gris; las de importe y modificación heredan
    de aquí pero se pintan en azul y un punto más grandes. */
-.mp-card__linea { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: #7F7A85; line-height: 16px; margin-top: 6px; }
+.mp-card__linea { display: flex; align-items: center; gap: 5px; font-size: 11.4px; color: #7F7A85; line-height: 16px; margin-top: 6px; }
 /* Las dos pastillas caben en una sola línea a 180px, como en el frame */
 .mp-card__pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .mp-card__pill, .mp-card__rol {
-  display: inline-flex; align-items: center; height: 19px; padding: 0 9px; border-radius: 999px;
-  font-size: 9.7px; font-weight: 500; white-space: nowrap; line-height: 1;
+  display: inline-flex; align-items: center; height: 22px; padding: 0 11px; border-radius: 999px;
+  font-size: 11.6px; font-weight: 500; white-space: nowrap; line-height: 1;
 }
 .mp-card__pill { gap: 4px; background: #fff; color: var(--mp-negro); }
 .mp-card__rol  { gap: 5px; background: var(--mp-azul); color: #fff; }
@@ -274,7 +274,7 @@ body.dashboard-page { background: #FAFDFF; }
   display: flex; align-items: center; justify-content: center;
 }
 .mp-card__menu:hover { background: rgba(255, 255, 255, .6); }
-.mp-rotulo { font-size: 11.6px; font-weight: 500; color: var(--mp-negro); margin-top: 8px; line-height: 15px; }
+.mp-rotulo { font-size: 13.9px; font-weight: 500; color: var(--mp-negro); margin-top: 8px; line-height: 16px; }
 /* Los tres rótulos no llevan el mismo aire encima en el frame: 9 tras las
    pastillas, 7 tras los avatares y 4 tras un importe. Se distinguen por
    el hermano anterior en vez de por nth-of-type, que no dice nada. */
@@ -282,7 +282,7 @@ body.dashboard-page { background: #FAFDFF; }
 .mp-avatares + .mp-rotulo    { margin-top: 8px; }
 .mp-card__val + .mp-rotulo   { margin-top: 6px; }
 /* Importe y fecha de la tarjeta, en el azul del diseño */
-.mp-card__val { font-size: 11px; font-weight: 600; color: var(--mp-azul); margin-top: 0; }
+.mp-card__val { font-size: 13.2px; font-weight: 600; color: var(--mp-azul); margin-top: 0; }
 
 /* Avatares. En las TARJETAS van solapados; en el PANEL, separados. */
 .mp-avatares { display: flex; align-items: center; }
@@ -293,9 +293,9 @@ body.dashboard-page { background: #FAFDFF; }
    iconos de los datos, para que la columna quede a plomo. */
 .mp-side .mp-avatares { gap: 2px; padding-left: 12px; }
 .mp-side .mp-avatares > * { width: 24px; height: 24px; margin-left: 0; border-width: 0; }
-.mp-av { background: #F5B93F; color: #0E2A33; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+.mp-av { background: #F5B93F; color: #0E2A33; display: flex; align-items: center; justify-content: center; font-size: 13.2px; font-weight: 700; }
 .mp-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mp-av--mas { background: #F5F5F5; color: var(--mp-negro); font-size: 9.5px; }
+.mp-av--mas { background: #F5F5F5; color: var(--mp-negro); font-size: 11.4px; }
 
 /* ── Vista mapa ──────────────────────────────────────────── */
 /* Medidas de screens_ref/mis_planes (Map view).png: trazo de 3 px en
