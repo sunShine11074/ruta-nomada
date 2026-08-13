@@ -33,7 +33,7 @@
 
 return [
     // Pega aquí tu clave. Es una cadena larga de letras y números.
-    'api_key' => 'PON-AQUI-TU-CLAVE-DE-PEXELS',
+    'api_key' => 'PON_AQUI_TU_CLAVE_DE_PEXELS',
 
     // Idioma de los resultados. Pexels admite es, en, pt, fr y otros.
     'idioma'  => 'es-ES',

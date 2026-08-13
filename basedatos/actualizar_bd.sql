@@ -29,6 +29,7 @@
 --     gasto_desc y gasto_modo.
 --   · Se crea la tabla plan_item_gasto.
 --   · Se crean tramo_cache y ruta_uso (la caché de rutas del mapa).
+--   · Se crea intentos_login (el freno a la fuerza bruta del login).
 --   · Se crea usuario_fotos (la galería de «Cambiar foto»).
 --   · plan_invitaciones gana 3 columnas: usos, usos_max y token_claro,
 --     para que el enlace de invitación se pueda compartir con varias
@@ -126,6 +127,34 @@ CREATE TABLE IF NOT EXISTS `ruta_uso` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- ── 3b. El freno a la fuerza bruta en el login ──────────────
+--
+-- POR QUÉ ESTÁ AQUÍ, SI TAMBIÉN LA CREA rutinas.sql
+-- Porque el diagnóstico, al echarla en falta, manda a ejecutar ESTE
+-- archivo, y hasta hoy no la creaba: quien seguía la pista corría el
+-- comando, volvía a comprobar y la tabla seguía sin aparecer. Le pasó
+-- a una compañera el 13/08/2026. La instrucción y el archivo tienen
+-- que decir lo mismo.
+--
+-- Sin ella, includes/intentos.php falla al consultar y -como falla en
+-- abierto a propósito- el límite de intentos queda DESACTIVADO EN
+-- SILENCIO: se puede probar contraseñas sin freno y nada avisa.
+--
+-- ip admite 45 caracteres porque ese es el largo de una IPv6 escrita
+-- del todo, y en localhost la de siempre es ::1.
+
+CREATE TABLE IF NOT EXISTS `intentos_login` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(150) NOT NULL COMMENT 'el que se tecleó, exista o no',
+  `ip` varchar(45) NOT NULL DEFAULT '' COMMENT 'IPv4 o IPv6',
+  `exito` tinyint(1) NOT NULL DEFAULT 0,
+  `creado_en` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_email_fecha` (`email`, `creado_en`),
+  KEY `idx_ip_fecha` (`ip`, `creado_en`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- ── 4. Las fotos que sube cada persona ──────────────────────
 -- La galeria de "Tus fotos" de la ventana Cambiar foto. Es del
 -- USUARIO y no del plan: el frame dice "Tus fotos", asi que una foto
@@ -180,8 +209,13 @@ UPDATE `plan_invitaciones` SET `usos` = 1 WHERE `usada` = 1 AND `usos` = 0;
 
 
 -- ── 6. Comprobación ─────────────────────────────────────────
--- Si todo salió bien, esto imprime 5 columnas nuevas, 3 tablas nuevas
+-- Si todo salió bien, esto imprime 5 columnas nuevas, 5 tablas nuevas
 -- y 3 columnas nuevas en plan_invitaciones.
+--
+-- OJO: esto NO comprueba las rutinas (funciones, procedimientos y
+-- disparadores). Ésas viven en basedatos/rutinas.sql y se instalan
+-- aparte. Quien use herramientas/actualizar.bat las tiene cubiertas:
+-- ese archivo ejecuta los dos.
 
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -190,8 +224,8 @@ SELECT
     AS `columnas_nuevas_en_plan_items (deben ser 5)`,
   (SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME IN ('plan_item_gasto','tramo_cache','ruta_uso'))
-    AS `tablas_nuevas (deben ser 3)`,
+       AND TABLE_NAME IN ('plan_item_gasto','tramo_cache','ruta_uso','intentos_login','usuario_fotos'))
+    AS `tablas_nuevas (deben ser 5)`,
   (SELECT COUNT(*) FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_invitaciones'
        AND COLUMN_NAME IN ('usos','usos_max','token_claro'))

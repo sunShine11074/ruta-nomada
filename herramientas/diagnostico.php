@@ -107,7 +107,15 @@ $configs = [
     'maps_config.php' => ['clave' => 'maps_key',   'que' => 'Google Maps',      'rompe' => 'El mapa, las rutas y la búsqueda de lugares no funcionan.'],
     'ai_config.php'   => ['clave' => 'gemini_key', 'que' => 'Gemini (asistente)','rompe' => 'El asistente contesta que no está configurado.'],
     'geo_config.php'  => ['clave' => 'csc_key',    'que' => 'CountryStateCity',  'rompe' => 'Las listas de país / estado / ciudad salen vacías.'],
-    'mail_config.php' => ['clave' => 'password',   'que' => 'Correo (SMTP)',     'rompe' => 'No se envían invitaciones ni recuperación de contraseña.'],
+    // 'opcional' baja el [X] a [!]. Sólo para lo que de verdad se puede
+    // dejar sin poner: sin SMTP la invitación SIGUE funcionando, porque
+    // la ventana avisa de que el correo no salió y enseña el enlace para
+    // pasarlo a mano. Marcarlo como fallo obligaba a quien no quiere
+    // configurar correo a vivir con un [X] eterno, y entonces "0 fallos"
+    // deja de significar nada.
+    'mail_config.php' => ['clave' => 'password',   'que' => 'Correo (SMTP)',     'opcional' => true,
+                          'rompe' => 'Las invitaciones no saldrán por correo: hay que pasar el enlace a mano. La recuperación de contraseña tampoco funciona. Todo lo demás va igual.'],
+    'pexels_config.php' => ['clave' => 'api_key',  'que' => 'Pexels (fotos)',    'rompe' => 'La pestaña "Buscar en la web" no devuelve nada y los viajes nuevos nacen sin portada.'],
 ];
 $claves = [];
 foreach ($configs as $archivo => $info) {
@@ -133,13 +141,14 @@ foreach ($configs as $archivo => $info) {
                    . '    copy includes\\' . basename($plantilla) . ' includes\\' . $archivo . "\n"
                    . $info['rompe'];
         }
-        linea(is_file($plantilla) ? 'falla' : 'aviso', $info['que'] . ' — includes/' . $archivo, $ayuda);
+        $gravedad = !empty($info['opcional']) ? 'aviso' : (is_file($plantilla) ? 'falla' : 'aviso');
+        linea($gravedad, $info['que'] . ' — includes/' . $archivo, $ayuda);
         continue;
     }
     $cfg = @include $ruta;
     $val = is_array($cfg) ? trim((string)($cfg[$info['clave']] ?? '')) : '';
     if ($val === '' || strpos($val, 'PON_AQUI') === 0) {
-        linea('falla', $info['que'] . ' — includes/' . $archivo,
+        linea(!empty($info['opcional']) ? 'aviso' : 'falla', $info['que'] . ' — includes/' . $archivo,
             'El archivo existe pero la clave sigue sin rellenar. ' . $info['rompe']);
     } else {
         $claves[$info['clave']] = $val;
@@ -202,6 +211,22 @@ if ($pdo) {
                 'Tu base es de una versión anterior. Ponla al día sin perder datos:' . "\n"
                 . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
             : linea('ok', 'plan_items tiene las columnas de horario y gasto');
+    }
+
+    // Igual con plan_invitaciones. OJO: la comprobación de tablas de
+    // arriba NO basta aquí. Esta tabla existe desde hace meses, así que
+    // una copia vieja pasa aquel control y aun así falla al invitar,
+    // porque lo que le faltan son COLUMNAS.
+    if (in_array('plan_invitaciones', $hay, true)) {
+        $cols   = $pdo->query('SHOW COLUMNS FROM plan_invitaciones')->fetchAll(PDO::FETCH_COLUMN);
+        $nuevas = ['usos', 'usos_max', 'token_claro'];
+        $sin    = array_values(array_diff($nuevas, $cols));
+        $sin
+            ? linea('falla', 'plan_invitaciones sin las columnas: ' . implode(', ', $sin),
+                'La ventana "Invita a compañeros de viaje" no podrá dar el enlace.' . "\n"
+                . 'Ponla al día sin perder datos:' . "\n"
+                . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
+            : linea('ok', 'plan_invitaciones admite enlaces para compartir (usos, usos_max, token_claro)');
     }
 
     // ── Rutinas: funciones, procedimientos y triggers ────────
@@ -319,6 +344,46 @@ if (!$conRed) {
     } else {
         linea('aviso', 'CountryStateCity — no se prueba: falta la clave');
     }
+
+    // 5c. Pexels — las fotos de portada. Se pide UNA sola imagen: la
+    // cuota gratuita es de 200 por hora y 25.000 al mes, así que un
+    // diagnóstico de vez en cuando no la mueve.
+    if (isset($claves['api_key'])) {
+        [$http, $cuerpo, ] = tocar('https://api.pexels.com/v1/search?query=oaxaca&per_page=1',
+            ['Authorization: ' . $claves['api_key']]);
+        if ($http === 200 && strpos((string)$cuerpo, '"photos"') !== false) {
+            linea('ok', 'Pexels — las fotos de portada se pueden buscar');
+        } elseif ($http === 401) {
+            linea('falla', 'Pexels (HTTP 401)',
+                'La clave no vale. Revisa que la copiaste entera y sin espacios' . "\n"
+                . 'al final, o sácate otra en pexels.com/api');
+        } elseif ($http === 429) {
+            linea('aviso', 'Pexels (HTTP 429) — cuota agotada por ahora',
+                'Son 200 peticiones por hora. Espera un rato y vuelve a probar.');
+        } else {
+            linea('falla', 'Pexels (HTTP ' . $http . ')',
+                'La pestaña "Buscar en la web" no devolverá fotos y los viajes' . "\n"
+                . 'nuevos nacerán sin portada.');
+        }
+    } else {
+        linea('aviso', 'Pexels — no se prueba: falta la clave');
+    }
+}
+
+// ── 5bis. La carpeta donde se guardan las fotos subidas ──────
+// api/fotos.php escribe aquí. Si no existe o no se puede escribir, la
+// pestaña "Tus fotos" acepta el archivo y luego falla al moverlo.
+echo PHP_EOL . '5b. Carpeta de fotos subidas' . PHP_EOL;
+$portadas = $raiz . '/img/portadas';
+if (!is_dir($portadas)) {
+    linea('falla', 'img/portadas/ no existe',
+        'Debería venir en el repositorio con un .gitkeep dentro. Créala a mano:' . "\n"
+        . '    mkdir img\\portadas');
+} elseif (!is_writable($portadas)) {
+    linea('falla', 'img/portadas/ existe pero no se puede escribir',
+        'Subir una foto desde el dispositivo va a fallar.');
+} else {
+    linea('ok', 'img/portadas/ existe y se puede escribir');
 }
 
 // ── 6. Archivos que tienen que viajar en el repo ────────────

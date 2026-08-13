@@ -18,7 +18,7 @@ function pexelsConfig(): ?array
     $cfg = @include $ruta;
     if (!is_array($cfg)) return null;
     $clave = (string)($cfg['api_key'] ?? '');
-    if ($clave === '' || strpos($clave, 'PON-AQUI') === 0) return null;
+    if ($clave === '' || strpos($clave, 'PON_AQUI') === 0) return null;
     return $cfg;
 }
 
