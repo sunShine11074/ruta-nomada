@@ -15,8 +15,40 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../db.php';
 
 // ── Respuestas JSON ──────────────────────────────────────────
+//
+// TODA respuesta correcta de un endpoint que trabaje sobre un plan
+// lleva `rev`, el testigo de cambio del viaje después de lo que se
+// acaba de hacer.
+//
+// ⚠ NO ES UN ADORNO: sin esto, quien edita se avisa a sí mismo.
+// El sondeo de api/plan_pulso.php compara el rev del servidor con el
+// que el navegador tiene guardado. Como los disparadores suben `rev`
+// con CUALQUIER cambio -incluidos los tuyos-, en cuanto alguien
+// añadiera un lugar su propio pulso vería el número distinto y le
+// anunciaría «hay novedades» por algo que acababa de hacer él.
+//
+// Devolviéndolo aquí, _sync() en el cliente adopta el número nuevo en
+// el mismo momento de escribir, y no queda ninguna ventana de carrera:
+// no hace falta un segundo viaje que otra persona pudiera colarse.
+//
+// Se pone en UN solo sitio a propósito. Hacerlo endpoint por endpoint
+// serían más de veinte llamadas a apiJson() repartidas por seis
+// archivos, y bastaría olvidar una para que reapareciera el falso
+// aviso justo en la acción olvidada.
 function apiJson(array $data, int $code = 200): void
 {
+    if (!empty($GLOBALS['rn_plan_id']) && !isset($data['rev']) && !empty($data['ok'])) {
+        try {
+            $st = getDB()->prepare('SELECT rev FROM planes WHERE id = ? LIMIT 1');
+            $st->execute([(int)$GLOBALS['rn_plan_id']]);
+            $r = $st->fetchColumn();
+            if ($r !== false) $data['rev'] = (int)$r;
+        } catch (Throwable $e) {
+            // Que no se pueda leer el testigo no es motivo para tumbar
+            // una respuesta que por lo demás salió bien.
+            error_log('apiJson rev: ' . $e->getMessage());
+        }
+    }
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
@@ -91,6 +123,12 @@ function planAccess(int $planId, string $need = 'lector'): array
     if (($rango[$row['rol']] ?? 0) < ($rango[$need] ?? 3)) {
         apiFail('No tienes permisos suficientes en este plan.', 403);
     }
+
+    // Se anota sobre qué plan trabaja esta petición para que apiJson()
+    // pueda devolver su `rev` sin que cada endpoint tenga que acordarse.
+    // Se anota DESPUÉS de comprobar el acceso: si no eres miembro, la
+    // línea de arriba ya cortó y aquí no se llega.
+    $GLOBALS['rn_plan_id'] = $planId;
 
     $rol = $row['rol'];
     unset($row['rol']);

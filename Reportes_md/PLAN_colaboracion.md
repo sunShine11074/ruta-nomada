@@ -236,6 +236,9 @@ borró después sin error y no quedó nada de ensayo.
 
 ## 5. Fase 3 · El latido
 
+> **✅ HECHA el 13/08/2026**, con **una desviación deliberada** y **un agujero
+> que este plan no vio**. Los dos, al final de la sección.
+
 **1 día.**
 
 ### `api/plan_pulso.php` (nuevo)
@@ -268,6 +271,73 @@ diagnosticar de todo este plan, porque no produce ningún error: sólo lentitud.
 
 Dos navegadores: A añade un lugar, B lo ve aparecer en ≤ 5 s. Con la pestaña
 de B oculta, el registro de Apache no muestra peticiones suyas.
+
+---
+
+### Lo que cambió al implementarla
+
+**1 · ⚠️ EL AGUJERO QUE ESTE PLAN NO VIO: quien edita se avisa a sí mismo.**
+
+Los disparadores de la fase 2 suben `rev` con **cualquier** cambio, y eso
+incluye los tuyos. Tal como estaba escrita esta fase, en cuanto alguien añadía
+un lugar su propio pulso veía el número distinto y le anunciaba «hay
+novedades» por algo que acababa de hacer él. El latido habría sido inútil
+desde el primer minuto.
+
+Se cierra en el servidor, no en el cliente: **`apiJson()` adjunta el `rev`
+resultante a toda respuesta correcta de un endpoint que trabaje sobre un
+plan**, y `_sync()` lo adopta en el mismo momento de escribir. Como el número
+viaja en la misma respuesta, **no queda ninguna ventana de carrera**: no hace
+falta un segundo viaje en el que otra persona pudiera colarse.
+
+Va en **un solo sitio** a propósito. Hacerlo endpoint por endpoint serían más
+de veinte llamadas a `apiJson()` repartidas por seis archivos, y bastaría
+olvidar una para que reapareciera el falso aviso justo en la acción olvidada.
+
+Detalle que importa: adoptar el número **no** borra un aviso que ya estuviera
+puesto. Si alguien cambió algo y todavía no lo has traído, ponerte a editar no
+debe hacer que ese aviso desaparezca.
+
+**2 · Esta fase AVISA; no trae los cambios. Y es a propósito.**
+
+El plan decía «si `rev` cambió → `fetch(plan_get.php)` → `_fusionar(j)`». Pero
+`_fusionar()` **es la fase 4**. Sustituir el estado sin ella se llevaría por
+delante el título a medio teclear o la nota a medio redactar — exactamente lo
+contrario de «nadie pierde trabajo sin enterarse».
+
+Así que la fase 3 entrega un aviso —«Alguien cambió algo en este viaje», con
+un botón **Actualizar** y otro para descartarlo— y deja que cada quien decida
+cuándo recargar. Ese botón recarga la página entera, que es lo único honesto
+que se puede hacer todavía; la fase 4 lo cambiará por la fusión selectiva.
+
+**3 · `session_write_close()` obligó a no usar `planAccess()`.**
+
+`planAccess()` consulta la sesión **y** la base en la misma llamada, así que
+usarlo obligaría a mantener el bloqueo del fichero de sesión durante la
+consulta, que es justo lo que había que evitar. El pulso lee de la sesión sólo
+el id de quien pregunta, la suelta, y **mete la comprobación de acceso dentro
+de la misma consulta que trae el número**: el `JOIN` con `plan_miembros` hace
+de guardián. Una sola consulta, y el bloqueo liberado antes de tocar la base.
+
+**4 · La respuesta pesa 19 bytes, no 25.**
+
+### Cómo se comprobó
+
+| Prueba | Resultado |
+|---|---|
+| Pestaña oculta, 14 s | **0 peticiones** en el registro de Apache (habrían sido ~3) |
+| Pestaña visible, 12 s | 2 pulsos, HTTP 200, **19 bytes** cada uno |
+| Otra sesión añade un lugar | Aviso en pantalla en **menos de 6 s** |
+| **Cambio propio** | `rev` sube 3→4, el cliente lo adopta y tras 8 s **cero avisos** |
+| 12 pulsos sin novedad | El ritmo pasa a 15 s |
+| Cualquier tecla o clic | Vuelve a 5 s |
+| Tres fallos seguidos | Se apaga y sale «Sin conexión con el plan» |
+| 12 s después de apagarse | **0 peticiones**: se apagó de verdad, no siguió insistiendo |
+
+> **Cómo se probó lo de la pestaña oculta.** El panel de navegador integrado se
+> declara **siempre** `document.hidden = true`, así que el latido no arrancaba
+> nunca. Eso verificó gratis el primer caso, y para el resto se sustituyó
+> **sólo esa propiedad del navegador** — el código del latido no se tocó.
 
 ---
 

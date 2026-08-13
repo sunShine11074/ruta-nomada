@@ -151,7 +151,11 @@ class Component extends DCLogic {
       //             bien de verdad (ver _invCopiar)
       invModal: false, invPant: 'invitar', invLink: '', invLinkErr: '',
       invCopiado: false, invEmail: '', invMsg: '', invMsgMal: false,
-      invEnviando: false
+      invEnviando: false,
+      // El latido (fase 3 de PLAN_colaboracion.md).
+      //   pulsoNovedad  alguien mas cambio algo y todavia no se ha visto
+      //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
+      pulsoNovedad: false, pulsoCaido: false
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -169,6 +173,9 @@ class Component extends DCLogic {
     if (!B || !B.plan) { this.DAYS = this._mkDays('2026-07-30', '2026-07-31', 2); this.state.destinoDesc = this.DESC_ENSENADA; return; }
     const P = B.plan;
     this.PLAN_ID = Number(P.id);
+    // El testigo de cambio con el que arranca esta pestana. Todo lo que
+    // haga el latido es comparar este numero con el del servidor.
+    this.REV = Number(P.rev) || 0;
     this.ROL = B.rol || 'lector';
     this.puedeEditar = this.ROL === 'editor' || this.ROL === 'propietario';
     let maxDia = 1;
@@ -299,10 +306,104 @@ class Component extends DCLogic {
       headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
       body: JSON.stringify(body)
     }).then(r => r.json()).then(j => {
-      if (!j.ok) console.warn('[plan] ' + endpoint + ':', j.error);
-      else if (onOk) onOk(j);
+      if (!j.ok) { console.warn('[plan] ' + endpoint + ':', j.error); return; }
+      // Se adopta el testigo que devuelve el servidor. Sin esto, el
+      // latido veria cambiado el numero por MI PROPIA escritura y me
+      // anunciaria "hay novedades" por algo que acabo de hacer yo.
+      // Viene en la misma respuesta, asi que no hay ninguna ventana en
+      // la que otra persona pueda colarse. Ver apiJson() en
+      // includes/plan_auth.php.
+      //
+      // OJO: adoptar el numero NO borra un aviso que ya estuviera
+      // puesto. Si alguien cambio algo y todavia no lo he traido,
+      // ponerme a editar no debe hacer que ese aviso desaparezca.
+      if (typeof j.rev === 'number') this.REV = j.rev;
+      if (onOk) onOk(j);
     }).catch(err => console.warn('[plan] ' + endpoint + ':', err));
   }
+
+  // ════ El latido: ¿alguien mas toco el viaje? ══════════════
+  // Fase 3 de Reportes_md/PLAN_colaboracion.md
+  //
+  // Pregunta a api/plan_pulso.php por el testigo de cambio del viaje.
+  // La respuesta pesa unos 25 bytes, asi que preguntar cada 5 s cuesta
+  // menos que cargar un icono.
+  //
+  // Esta fase SOLO DETECTA Y AVISA. Traer los cambios sin pisar lo que
+  // la otra persona esta escribiendo es la fase 4, y hacerlo antes
+  // seria justo lo contrario de lo que persigue el plan: sustituir el
+  // estado de golpe borraria el titulo a medio teclear o la nota a
+  // medio redactar. Hasta entonces, el aviso deja que cada quien
+  // decida cuando recargar.
+  _pulsoArranca() {
+    if (!this.PLAN_ID) return;          // modo demo sin servidor
+    this._pulsoMs = 5000;
+    this._pulsoQuietos = 0;
+    this._pulsoFallos = 0;
+    this._pulsoPrograma(this._pulsoMs);
+    // Una pestana en segundo plano no consume nada: ni red, ni base de
+    // datos, ni bateria. Al volver se pregunta EN EL ACTO, porque
+    // mientras estuvo oculta pudo cambiar cualquier cosa.
+    this._pulsoVis = () => {
+      if (document.hidden) { clearTimeout(this._pulsoT); return; }
+      if (this.state.pulsoCaido) return;
+      this._pulsoMs = 5000; this._pulsoQuietos = 0;
+      this._pulsoPrograma(0);
+    };
+    document.addEventListener('visibilitychange', this._pulsoVis);
+  }
+  _pulsoPrograma(ms) {
+    clearTimeout(this._pulsoT);
+    if (document.hidden || this.state.pulsoCaido) return;
+    this._pulsoT = setTimeout(() => this._latir(), ms);
+  }
+  _latir() {
+    if (document.hidden || !this.PLAN_ID) return;
+    fetch('api/plan_pulso.php?id=' + this.PLAN_ID, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.json())
+      .then(j => {
+        if (!j || !j.ok) throw new Error((j && j.error) || 'pulso');
+        this._pulsoFallos = 0;
+        if (typeof j.rev === 'number' && j.rev !== this.REV) {
+          // Cambio de OTRA persona: los propios ya se adoptaron en
+          // _sync() en el momento de escribirlos.
+          this.REV = j.rev;
+          this._pulsoMs = 5000; this._pulsoQuietos = 0;
+          if (!this.state.pulsoNovedad) this.setState({ pulsoNovedad: true });
+        } else {
+          // Retroceso progresivo: si no pasa nada, se pregunta menos.
+          // Un viaje que nadie toca no tiene por que costar doce
+          // peticiones por minuto durante horas.
+          this._pulsoQuietos++;
+          if (this._pulsoQuietos >= 12) this._pulsoMs = 15000;
+        }
+        this._pulsoPrograma(this._pulsoMs);
+      })
+      .catch(() => {
+        this._pulsoFallos = (this._pulsoFallos || 0) + 1;
+        if (this._pulsoFallos >= 3) {
+          // Se apaga solo. Insistir contra un servidor que no responde
+          // no arregla nada y llena la consola de rojo; mejor decirlo
+          // una vez y callarse.
+          clearTimeout(this._pulsoT);
+          this.setState({ pulsoCaido: true });
+          return;
+        }
+        this._pulsoPrograma(this._pulsoMs);
+      });
+  }
+  // Cualquier cosa que haga la persona vuelve a poner el ritmo rapido:
+  // si esta trabajando, es cuando mas importa enterarse de los demas.
+  _pulsoDespierta() {
+    if (!this.PLAN_ID || this.state.pulsoCaido || document.hidden) return;
+    if (this._pulsoMs === 5000 && this._pulsoQuietos === 0) return;
+    this._pulsoMs = 5000; this._pulsoQuietos = 0;
+    this._pulsoPrograma(this._pulsoMs);
+  }
+  // Fase 3: recargar entera es lo unico honesto que se puede hacer
+  // todavia. La fusion selectiva -traer lo de fuera SIN tocar lo que
+  // estas escribiendo- es la fase 4, y este boton se cambiara por ella.
+  _pulsoRecargar() { window.location.reload(); }
   // Abre la ventana y lleva el foco dentro. Se recuerda desde donde se
   // abrio para devolverlo al cerrar: si no, el foco vuelve al principio
   // del documento y quien navega con teclado se pierde.
@@ -2356,6 +2457,13 @@ class Component extends DCLogic {
       if (panel && !panel.contains(e.target)) this.setState({ catAllOpen: false });
     };
     document.addEventListener('mousedown', this._outside);
+    // El latido, y lo que lo devuelve al ritmo rapido. Van en captura
+    // para enterarse aunque algo mas se coma el evento por el camino.
+    this._pulsoArranca();
+    this._pulsoActividad = () => this._pulsoDespierta();
+    document.addEventListener('mousedown', this._pulsoActividad, true);
+    document.addEventListener('keydown', this._pulsoActividad, true);
+
     this._onResize = () => {
       const w = window.innerWidth;
       const patch = { winW: w, narrow: w <= 1024, mobile: w <= 640 };
@@ -2381,7 +2489,7 @@ class Component extends DCLogic {
         }).catch(() => {});
     }
   }
-  componentWillUnmount() { window.removeEventListener('keydown', this._esc); window.removeEventListener('keydown', this._modalTab); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
+  componentWillUnmount() { clearTimeout(this._pulsoT); document.removeEventListener('visibilitychange', this._pulsoVis); document.removeEventListener('mousedown', this._pulsoActividad, true); document.removeEventListener('keydown', this._pulsoActividad, true); window.removeEventListener('keydown', this._esc); window.removeEventListener('keydown', this._modalTab); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
 
   renderVals() {
     const s = this.state;
@@ -3064,6 +3172,14 @@ class Component extends DCLogic {
     // Solo el propietario. api/plan_invitar.php ya exige ese rol, asi
     // que dibujar el boton a los demas seria ofrecer algo que siempre
     // responde 403.
+    // ── El latido ───────────────────────────────────────────
+    // Los dos avisos son excluyentes: si el pulso se cayo, anunciar
+    // novedades seria mentir, porque ya no hay quien las vea llegar.
+    V.pulsoCaido   = !!s.pulsoCaido;
+    V.pulsoNovedad = !!s.pulsoNovedad && !s.pulsoCaido;
+    V.pulsoRecargar = () => this._pulsoRecargar();
+    V.pulsoDescartar = () => this.setState({ pulsoNovedad: false });
+
     // OJO: V se construye clave a clave, no copiando el estado. Si
     // esta linea falta, el sc-if de la plantilla lee undefined y la
     // ventana no se pinta NUNCA, sin dar ningun error.
