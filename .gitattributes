@@ -1,0 +1,23 @@
+# ============================================================
+#  .gitattributes — Finales de línea | Ruta Nómada
+# ============================================================
+
+# LOS .bat TIENEN QUE LLEGAR CON CRLF, SIEMPRE
+#
+# cmd.exe no sabe leer un .bat con finales de línea de Unix: los
+# bloques  if ... (  se le parten y el archivo hace cosas raras o no
+# hace nada, casi siempre cerrando la ventana de golpe y sin decir por
+# qué. Es de los fallos más desconcertantes que hay, porque el archivo
+# se ve perfecto al abrirlo.
+#
+# Git guarda LF y, si core.autocrlf está en true, devuelve CRLF al
+# hacer checkout. El problema es que eso depende de la CONFIGURACIÓN DE
+# CADA PERSONA: quien tenga autocrlf en false o en input recibe el .bat
+# con LF y no le arranca. Esta línea lo fuerza para todo el mundo, sin
+# que nadie tenga que configurar nada.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# El resto de archivos de texto se normalizan a LF dentro del
+# repositorio y salen con lo que toque en cada sistema.
+* text=auto

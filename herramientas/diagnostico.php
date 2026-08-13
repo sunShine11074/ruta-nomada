@@ -107,7 +107,14 @@ $configs = [
     'maps_config.php' => ['clave' => 'maps_key',   'que' => 'Google Maps',      'rompe' => 'El mapa, las rutas y la búsqueda de lugares no funcionan.'],
     'ai_config.php'   => ['clave' => 'gemini_key', 'que' => 'Gemini (asistente)','rompe' => 'El asistente contesta que no está configurado.'],
     'geo_config.php'  => ['clave' => 'csc_key',    'que' => 'CountryStateCity',  'rompe' => 'Las listas de país / estado / ciudad salen vacías.'],
-    'mail_config.php' => ['clave' => 'password',   'que' => 'Correo (SMTP)',     'rompe' => 'No se envían invitaciones ni recuperación de contraseña.'],
+    // 'opcional' baja el [X] a [!]. Sólo para lo que de verdad se puede
+    // dejar sin poner: sin SMTP la invitación SIGUE funcionando, porque
+    // la ventana avisa de que el correo no salió y enseña el enlace para
+    // pasarlo a mano. Marcarlo como fallo obligaba a quien no quiere
+    // configurar correo a vivir con un [X] eterno, y entonces "0 fallos"
+    // deja de significar nada.
+    'mail_config.php' => ['clave' => 'password',   'que' => 'Correo (SMTP)',     'opcional' => true,
+                          'rompe' => 'Las invitaciones no saldrán por correo: hay que pasar el enlace a mano. La recuperación de contraseña tampoco funciona. Todo lo demás va igual.'],
     'pexels_config.php' => ['clave' => 'api_key',  'que' => 'Pexels (fotos)',    'rompe' => 'La pestaña "Buscar en la web" no devuelve nada y los viajes nuevos nacen sin portada.'],
 ];
 $claves = [];
@@ -134,13 +141,14 @@ foreach ($configs as $archivo => $info) {
                    . '    copy includes\\' . basename($plantilla) . ' includes\\' . $archivo . "\n"
                    . $info['rompe'];
         }
-        linea(is_file($plantilla) ? 'falla' : 'aviso', $info['que'] . ' — includes/' . $archivo, $ayuda);
+        $gravedad = !empty($info['opcional']) ? 'aviso' : (is_file($plantilla) ? 'falla' : 'aviso');
+        linea($gravedad, $info['que'] . ' — includes/' . $archivo, $ayuda);
         continue;
     }
     $cfg = @include $ruta;
     $val = is_array($cfg) ? trim((string)($cfg[$info['clave']] ?? '')) : '';
     if ($val === '' || strpos($val, 'PON_AQUI') === 0) {
-        linea('falla', $info['que'] . ' — includes/' . $archivo,
+        linea(!empty($info['opcional']) ? 'aviso' : 'falla', $info['que'] . ' — includes/' . $archivo,
             'El archivo existe pero la clave sigue sin rellenar. ' . $info['rompe']);
     } else {
         $claves[$info['clave']] = $val;
