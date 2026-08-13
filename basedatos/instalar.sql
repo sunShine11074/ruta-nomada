@@ -205,6 +205,10 @@ CREATE TABLE `planes` (
   -- porque `timestamp` tiene resolucion de un segundo y dos ediciones
   -- dentro del mismo segundo serian indistinguibles.
   `rev` bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT 'Testigo de cambio del viaje; lo mueven los disparadores',
+  -- Version del NOMBRE del viaje, y solo del nombre: `rev` no sirve de
+  -- candado porque se mueve con cualquier cambio, y usar esta para el
+  -- resto de campos daria 409 contra uno mismo (se guardan con retardo).
+  `ver` int(10) unsigned NOT NULL DEFAULT 1 COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista',
   `dia_subtitulos` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `usuario_id` (`usuario_id`),

@@ -152,7 +152,7 @@ function planFullJson(int $planId, array $acc): array
 
     // Items por día (dia 0 = guardados sin asignar)
     $stmt = $db->prepare(
-        'SELECT id, dia, orden, nombre, categoria, hora, hora_fin, duracion,
+        'SELECT id, ver, dia, orden, nombre, categoria, hora, hora_fin, duracion,
                 precio, moneda, gasto_cat, gasto_desc, gasto_modo,
                 nota, place_id, lat, lng, imagen_url, modo_viaje
            FROM plan_items WHERE plan_id = ? ORDER BY dia, orden, id'

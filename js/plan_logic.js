@@ -179,6 +179,8 @@ class Component extends DCLogic {
     // El testigo de cambio con el que arranca esta pestana. Todo lo que
     // haga el latido es comparar este numero con el del servidor.
     this.REV = Number(P.rev) || 0;
+    // La version del NOMBRE del viaje. Solo la mueve renombrarlo.
+    this.PLAN_VER = Number(P.ver) || 1;
     this.ROL = B.rol || 'lector';
     this.puedeEditar = this.ROL === 'editor' || this.ROL === 'propietario';
     this.DAYS = this._diasDe(B);
@@ -268,15 +270,48 @@ class Component extends DCLogic {
     return a.d + '/' + a.m + ' – ' + b.d + '/' + b.m;
   }
   // fetch de persistencia (optimista, fuego-y-olvida con aviso en consola)
+  // Busca un lugar por su id de servidor, en cualquier dia.
+  _itemPorSid(sid) {
+    const dias = this.state.dayItems || [];
+    for (let d = 0; d < dias.length; d++) {
+      const it = dias[d].find(x => x.sid === Number(sid));
+      if (it) return it;
+    }
+    return null;
+  }
   _sync(endpoint, body, onOk) {
     if (!this.PLAN_ID) return;   // modo demo sin servidor
     body = Object.assign({ plan_id: this.PLAN_ID }, body);
+    // La version viaja SOLA, aqui y no en los quince sitios que llaman
+    // a _sync: si hubiera que acordarse en cada uno, el candado se
+    // quedaria fuera justo en la accion que se olvidara.
+    if (endpoint === 'plan_items.php' && body.id && body.ver === undefined) {
+      const it = this._itemPorSid(body.id);
+      if (it && it.ver) body.ver = it.ver;
+    }
+    if (endpoint === 'plan_update.php' && body.nombre !== undefined && body.ver === undefined) {
+      body.ver = this.PLAN_VER;
+    }
     fetch('api/' + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
       body: JSON.stringify(body)
     }).then(r => r.json()).then(j => {
-      if (!j.ok) { console.warn('[plan] ' + endpoint + ':', j.error); return; }
+      if (!j.ok) {
+        // ⚠ 409: alguien se adelanto. No es un error de red ni un fallo
+        // del programa; es la otra persona, y hay que ensenar SU version.
+        if (j.conflicto) { this._conflicto(j); return; }
+        console.warn('[plan] ' + endpoint + ':', j.error);
+        return;
+      }
+      // Se adoptan las versiones nuevas. Sin esto, la SIGUIENTE edicion
+      // del mismo lugar llegaria con la version vieja y chocaria
+      // consigo misma: un 409 provocado por uno mismo.
+      if (typeof j.ver === 'number' && j.item_id) {
+        const it = this._itemPorSid(j.item_id);
+        if (it) it.ver = j.ver;
+      }
+      if (typeof j.plan_ver === 'number') this.PLAN_VER = j.plan_ver;
       // Se adopta el testigo que devuelve el servidor. Sin esto, el
       // latido veria cambiado el numero por MI PROPIA escritura y me
       // anunciaria "hay novedades" por algo que acabo de hacer yo.
@@ -380,6 +415,33 @@ class Component extends DCLogic {
   }
   _pulsoRecargar() { window.location.reload(); }
 
+  // ════ Alguien se adelanto (HTTP 409) ═════════════════════
+  // Fase 5 de Reportes_md/PLAN_colaboracion.md
+  //
+  // Mi cambio NO se guardo, asi que la pantalla no puede seguir
+  // ensenandolo: seria mentir sobre lo que hay en la base. Se trae la
+  // version del servidor y se avisa de que paso.
+  //
+  // El truco esta en _forzarUid: ese lugar es justo el que la fusion
+  // protegeria por tenerlo abierto, y aqui hay que hacer lo contrario.
+  // Proteger sirve para no pisar lo que estas ESCRIBIENDO; cuando lo
+  // que escribiste ya fue RECHAZADO, protegerlo solo deja en pantalla
+  // un valor que no existe en ningun sitio.
+  _conflicto(j) {
+    if (j.item && j.item.id) this._forzarUid = 'i' + j.item.id;
+    if (j.plan && typeof j.plan.ver !== 'undefined') this.PLAN_VER = Number(j.plan.ver) || 1;
+    const parche = { avisoTxt: j.error || 'Alguien se adelanto y tu cambio no se guardo.', avisoRecarga: false };
+    // Si el choque fue con el nombre, se suelta la edicion del titulo
+    // para que la fusion pueda poner el de la otra persona.
+    if (j.plan) parche.titleEdit = false;
+    this.setState(parche);
+    clearTimeout(this._avisoT);
+    this._avisoT = setTimeout(() => {
+      if (!this.state.avisoRecarga) this.setState({ avisoTxt: '' });
+    }, 6000);
+    this._fusionTraer();
+  }
+
   // ════ Fusion selectiva ═══════════════════════════════════
   // Fase 4 de Reportes_md/PLAN_colaboracion.md
   //
@@ -424,6 +486,7 @@ class Component extends DCLogic {
     }
 
     // ── Lo que esta protegido ahora mismo ──
+    const forzado = !!this._forzarUid;
     const prot = {};
     if (s.itemOpen) prot[s.itemOpen] = true;
     if (s.horaMenu && s.horaMenu.uid) prot[s.horaMenu.uid] = true;
@@ -438,7 +501,10 @@ class Component extends DCLogic {
       // Protegido: se conserva ENTERO el de pantalla. Sus borradores
       // -hora, horaFin, gastoCat, gastoDesc...- viven en el propio
       // objeto, asi que basta con no sustituirlo.
-      if (prot[it.uid]) return mio;
+      //
+      // Salvo que venga de un 409: ahi mi valor fue rechazado y hay que
+      // ensenar el del servidor aunque lo tenga abierto. Ver _conflicto.
+      if (prot[it.uid] && this._forzarUid !== it.uid) return mio;
       // `travel` lo calcula el mapa con las rutas reales; no viene del
       // servidor y volveria a null en cada fusion.
       if (mio.travel) it.travel = mio.travel;
@@ -507,12 +573,16 @@ class Component extends DCLogic {
     while (subs.length < dias.length) subs.push('');
 
     if (typeof j.rev === 'number') this.REV = j.rev;
+    this._forzarUid = null;
     this.setState(Object.assign(parche, {
       dayItems, lists, gastos, added,
       // El presupuesto no se pisa si se esta escribiendo.
       budget: s.budgetEdit ? s.budget : (Number(P.presupuesto) || 0),
       daySubs: subs,
-      avisoTxt: 'Se trajeron los cambios de otra persona', avisoRecarga: false
+      // Si venimos de un 409, su aviso manda: explica por que tu
+      // cambio no esta, y sustituirlo por "se trajeron cambios" dejaria
+      // a la persona sin saber que paso con lo suyo.
+      avisoTxt: forzado ? s.avisoTxt : 'Se trajeron los cambios de otra persona', avisoRecarga: false
     }));
     // El aviso se va solo: es una confirmacion, no una tarea.
     clearTimeout(this._avisoT);
@@ -566,6 +636,8 @@ class Component extends DCLogic {
       const h0 = (it.hora || '').slice(0, 5), h1 = (it.hora_fin || '').slice(0, 5);
       dayItems[di].push({
         uid: 'i' + it.id, sid: Number(it.id),
+        // La version del lugar: el candado de la fase 5.
+        ver: Number(it.ver) || 1,
         name: it.nombre, nota: it.nota || '',
         horario: h0 ? (h1 ? h0 + ' - ' + h1 : h0) : '',
         costo: Number(it.precio) || 0, travel: null,

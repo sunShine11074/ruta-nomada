@@ -237,6 +237,10 @@ ALTER TABLE `plan_items`
   ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
       COMMENT 'Version del lugar para el bloqueo optimista' AFTER `plan_id`;
 
+ALTER TABLE `planes`
+  ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
+      COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista' AFTER `rev`;
+
 
 -- ── 7. Comprobación ─────────────────────────────────────────
 -- Si todo salió bien, esto imprime 5 columnas nuevas, 5 tablas nuevas
@@ -264,4 +268,7 @@ SELECT
      WHERE TABLE_SCHEMA = DATABASE()
        AND ((TABLE_NAME = 'planes' AND COLUMN_NAME = 'rev')
          OR (TABLE_NAME = 'plan_items' AND COLUMN_NAME = 'ver')))
-    AS `testigo_de_cambio (deben ser 2)`;
+    AS `testigo_de_cambio (deben ser 2)`,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'planes' AND COLUMN_NAME = 'ver')
+    AS `candado_del_nombre (debe ser 1)`;

@@ -59,11 +59,31 @@ ALTER TABLE `plan_items`
   ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
       COMMENT 'Version del lugar para el bloqueo optimista; la sube el UPDATE del endpoint' AFTER `plan_id`;
 
+-- planes.ver — la version del NOMBRE del viaje, y sólo del nombre.
+--
+-- ⚠ NO SE PUEDE USAR `rev` PARA ESTO, aunque sea tentador. `rev` se
+-- mueve con cualquier cambio del viaje: si alguien añade un lugar
+-- mientras tú escribes el título, tu guardado se rechazaría por un
+-- cambio que no tiene nada que ver con el título. Serían conflictos
+-- falsos a todas horas.
+--
+-- Y tampoco vale usar esta columna para el resto de campos del plan.
+-- Los subtítulos de los días y el presupuesto se guardan CON RETARDO
+-- (800 ms) desde el mismo navegador, así que dos escrituras propias se
+-- solapan a menudo: la segunda llegaría con una versión ya vieja y el
+-- cliente se daría un 409 A SÍ MISMO. Por eso esta versión la mueve y
+-- la comprueba únicamente el cambio de nombre, que es el caso que de
+-- verdad se pisa entre dos personas.
+
+ALTER TABLE `planes`
+  ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
+      COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista' AFTER `rev`;
+
 -- ── Comprobación ────────────────────────────────────────────
 -- Si todo salió bien, imprime 2.
 
-SELECT COUNT(*) AS `columnas_nuevas (deben ser 2)`
+SELECT COUNT(*) AS `columnas_nuevas (deben ser 3)`
   FROM information_schema.COLUMNS
  WHERE TABLE_SCHEMA = DATABASE()
-   AND ((TABLE_NAME = 'planes'     AND COLUMN_NAME = 'rev')
+   AND ((TABLE_NAME = 'planes'     AND COLUMN_NAME IN ('rev','ver'))
      OR (TABLE_NAME = 'plan_items' AND COLUMN_NAME = 'ver'));

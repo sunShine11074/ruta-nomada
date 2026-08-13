@@ -453,6 +453,9 @@ Es el retroceso de la fase 3 haciendo su trabajo.
 
 ## 7. Fase 5 · Bloqueo optimista y el 409
 
+> **✅ HECHA el 13/08/2026**, con **una corrección al plan**: el candado del
+> nombre del viaje **no** puede ir contra `rev`. Explicado al final.
+
 **1½ días.** Aquí es donde «sin sobrescribirse» deja de ser una promesa.
 
 ### Servidor — `api/plan_items.php`, acciones `update`, `move` y `del`
@@ -492,6 +495,77 @@ Dos navegadores con el mismo lugar abierto. A guarda; B guarda después → B
 recibe 409, ve el aviso y el valor de A. Repetir con `move` y con `del`
 (borrar algo que ya estaba borrado no debe dar error rojo: debe desaparecer en
 silencio).
+
+---
+
+### Lo que cambió al implementarla
+
+**1 · ⚠️ CORRECCIÓN: el nombre del viaje no puede ir contra `rev`.**
+
+El plan pedía «el mismo tratamiento contra `planes.rev`». **No funciona.**
+`rev` se mueve con **cualquier** cambio del viaje: si alguien añade un lugar
+mientras tú escribes el título, tu guardado se rechazaría por algo que no
+tiene nada que ver con lo que tocaste. Serían conflictos falsos a todas horas,
+y con un latido cada 5 segundos y dos personas trabajando, casi siempre.
+
+Se resuelve con una columna aparte, **`planes.ver`**, que sólo mueve y sólo
+comprueba el cambio de nombre.
+
+**2 · Y ese candado NO se puede extender al resto de campos del plan.**
+
+Los subtítulos de los días y el presupuesto se guardan **con retardo de
+800 ms** desde el mismo navegador, así que dos escrituras propias se solapan
+con facilidad. La segunda llegaría con una versión ya vieja y **el cliente se
+daría un 409 a sí mismo**. Cerrar eso pide antes poner en cola las escrituras
+del plan, y eso no es de esta fase. Queda anotado en `api/plan_update.php`.
+
+**3 · La trampa del `rowCount()` era real, y ahora hay prueba.**
+
+Medido antes de escribir el candado, contra esta misma base:
+
+| | `rowCount()` |
+|---|---|
+| Sin `ver = ver + 1`, guardando el **mismo** valor | **0** → conflicto FALSO |
+| Con `ver = ver + 1`, guardando el **mismo** valor | 1 → bien |
+| Con `ver = ver + 1`, versión que ya no casa | 0 → conflicto DE VERDAD |
+
+**4 · La versión viaja sola, y vuelve sola.**
+
+`_sync()` adjunta el `ver` sin que los quince sitios que lo llaman tengan que
+acordarse — si hubiera que hacerlo en cada uno, el candado se quedaría fuera
+justo en la acción que se olvidara. Y el servidor **devuelve la versión
+nueva**, que el cliente adopta: sin eso, la siguiente edición del mismo lugar
+llegaría con la versión vieja y **chocaría consigo misma**.
+
+**5 · En un 409 hay que hacer lo CONTRARIO que en la fase 4.**
+
+La fusión protege lo que tienes abierto para no pisar lo que escribes. Pero
+cuando lo que escribiste **ya fue rechazado**, protegerlo deja en pantalla un
+valor que no existe en ningún sitio. Por eso `_conflicto()` marca ese lugar
+para que la siguiente fusión lo sustituya **saltándose la protección**.
+
+**6 · Falta poder decir QUIÉN se adelantó.**
+
+El aviso del plan decía «*Ana* cambió…». Hoy dice «*Alguien* cambió…»: ni
+`plan_items` ni `planes` guardan quién tocó la fila por última vez. Añadirlo
+es una columna `editado_por` y escribirla en cada guardado.
+
+### Cómo se comprobó
+
+Once casos contra el servidor real, y después el cliente en el navegador.
+
+| Caso | Resultado |
+|---|---|
+| A guarda con la versión buena | 200, `ver` 1 → 2 |
+| B guarda después con la versión vieja | **409** con la fila fresca y el nombre de A |
+| B reintenta con la versión buena | 200 |
+| **Guardar el mismo valor otra vez** | **200** — el conflicto falso no aparece |
+| `move` con versión vieja / buena | 409 / 200 |
+| `del` con versión vieja / buena | 409 / 200 |
+| **`del` de algo ya borrado** | **200 `ya_no_estaba`**, sin error rojo |
+| Renombrar el viaje, segunda vez con versión vieja | 200 / **409** |
+| **Dos subtítulos seguidos** | **200 y 200** — sin candado, no hay 409 contra uno mismo |
+| En el navegador, con el lugar **abierto** | Sale el aviso con el valor de A, **y el lugar pasa a mostrar el de A pese a estar abierto** |
 
 ---
 
