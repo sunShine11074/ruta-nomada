@@ -153,9 +153,12 @@ class Component extends DCLogic {
       invCopiado: false, invEmail: '', invMsg: '', invMsgMal: false,
       invEnviando: false,
       // El latido (fase 3 de PLAN_colaboracion.md).
-      //   pulsoNovedad  alguien mas cambio algo y todavia no se ha visto
       //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
-      pulsoNovedad: false, pulsoCaido: false
+      pulsoCaido: false,
+      // El aviso de la fusion. avisoRecarga distingue "ya esta traido,
+      // esto es solo para que te enteres" -se va solo- de "esto no se
+      // pudo fusionar, hace falta recargar" -se queda-.
+      avisoTxt: '', avisoRecarga: false
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -178,44 +181,11 @@ class Component extends DCLogic {
     this.REV = Number(P.rev) || 0;
     this.ROL = B.rol || 'lector';
     this.puedeEditar = this.ROL === 'editor' || this.ROL === 'propietario';
-    let maxDia = 1;
-    (B.items || []).forEach(it => { if (Number(it.dia) > maxDia) maxDia = Number(it.dia); });
-    this.DAYS = this._mkDays(P.fecha_inicio, P.fecha_fin, maxDia);
+    this.DAYS = this._diasDe(B);
     const N = this.DAYS.length;
-    const dayItems = Array.from({ length: N }, () => []);
-    (B.items || []).slice().sort((a, b) => (a.dia - b.dia) || (a.orden - b.orden) || (a.id - b.id)).forEach(it => {
-      const di = Math.min(N, Math.max(1, Number(it.dia) || 1)) - 1;
-      const h0 = (it.hora || '').slice(0, 5), h1 = (it.hora_fin || '').slice(0, 5);
-      dayItems[di].push({
-        uid: 'i' + it.id, sid: Number(it.id),
-        name: it.nombre, nota: it.nota || '',
-        horario: h0 ? (h1 ? h0 + ' - ' + h1 : h0) : '',
-        costo: Number(it.precio) || 0, travel: null,
-        // El horario también se guarda suelto: la cadena 'horario' es
-        // para pintar, pero para editarlo hacen falta los dos extremos.
-        hora: (it.hora || '').slice(0, 5), horaFin: (it.hora_fin || '').slice(0, 5),
-        moneda: it.moneda || 'MXN', gastoCat: it.gasto_cat || '',
-        gastoDesc: it.gasto_desc || '', gastoModo: it.gasto_modo || 'no',
-        reparto: Array.isArray(it.reparto) ? it.reparto.map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })) : [],
-        // Cómo se va de este lugar al siguiente. null = el de por defecto.
-        modo: it.modo_viaje || null,
-        reacts: Array.isArray(it.reacts) ? it.reacts.map(r => ({ e: r.e, n: Number(r.n) || 0, mine: !!r.mine })) : [],
-        pid: it.place_id || null,
-        lat: (it.lat === null || it.lat === undefined) ? null : Number(it.lat),
-        lng: (it.lng === null || it.lng === undefined) ? null : Number(it.lng),
-        img: it.imagen_url || null, catg: it.categoria || 'custom'
-      });
-    });
-    const gastos = (B.gastos || []).map((g, i) => ({
-      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0, cat: g.categoria || 'Otro',
-      fecha: this._fmtDia(g.fecha), fiso: g.fecha || '', ts: (B.gastos.length - i)
-    }));
-    const lists = (B.listas || []).map(L => ({
-      id: Number(L.id), title: L.titulo, type: L.tipo === 'nota' ? 'note' : 'check',
-      open: true, cardTitle: L.titulo, newTxt: '', placeTxt: '',
-      text: L.texto || '',
-      items: (L.items || []).map(x => ({ iid: Number(x.id), t: x.texto, done: !!Number(x.hecho) }))
-    }));
+    const dayItems = this._mapearItems(B, N);
+    const gastos = this._mapearGastos(B);
+    const lists = this._mapearListas(B);
     this.MIEMBROS = this._mapMiembros(B.miembros);
     if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     const dest = P.destino || 'mi destino';
@@ -359,6 +329,11 @@ class Component extends DCLogic {
   }
   _latir() {
     if (document.hidden || !this.PLAN_ID) return;
+    // Si quedo una fusion pendiente por un arrastre, se intenta ahora.
+    // Se reintenta AQUI y no al soltar el raton a proposito: los sitios
+    // donde termina un arrastre son seis, y bastaria olvidar uno para
+    // que un cambio se quedara guardado y sin aplicar para siempre.
+    if (this._fusionPend) this._fusionar(this._fusionPend);
     fetch('api/plan_pulso.php?id=' + this.PLAN_ID, { headers: { 'Accept': 'application/json' } })
       .then(r => r.json())
       .then(j => {
@@ -367,9 +342,12 @@ class Component extends DCLogic {
         if (typeof j.rev === 'number' && j.rev !== this.REV) {
           // Cambio de OTRA persona: los propios ya se adoptaron en
           // _sync() en el momento de escribirlos.
-          this.REV = j.rev;
           this._pulsoMs = 5000; this._pulsoQuietos = 0;
-          if (!this.state.pulsoNovedad) this.setState({ pulsoNovedad: true });
+          // Desde la fase 4 no se avisa y ya: se TRAE. _fusionar()
+          // decide que se sustituye y que se respeta. `this.REV` lo
+          // pone la propia fusion, no aqui: si se pusiera antes y la
+          // peticion fallara, este cambio no se volveria a intentar.
+          this._fusionTraer();
         } else {
           // Retroceso progresivo: si no pasa nada, se pregunta menos.
           // Un viaje que nadie toca no tiene por que costar doce
@@ -400,10 +378,154 @@ class Component extends DCLogic {
     this._pulsoMs = 5000; this._pulsoQuietos = 0;
     this._pulsoPrograma(this._pulsoMs);
   }
-  // Fase 3: recargar entera es lo unico honesto que se puede hacer
-  // todavia. La fusion selectiva -traer lo de fuera SIN tocar lo que
-  // estas escribiendo- es la fase 4, y este boton se cambiara por ella.
   _pulsoRecargar() { window.location.reload(); }
+
+  // ════ Fusion selectiva ═══════════════════════════════════
+  // Fase 4 de Reportes_md/PLAN_colaboracion.md
+  //
+  // Trae del servidor lo que cambio SIN tocar lo que esta persona esta
+  // haciendo ahora mismo. La regla es una sola:
+  //
+  //     LO LOCAL GANA MIENTRAS ESTE VIVO.
+  //
+  // Un lugar abierto, una nota en edicion, un titulo a medio teclear o
+  // un horario a medio poner son trabajo de alguien que todavia no ha
+  // terminado. Sustituirlos por la version del servidor es exactamente
+  // el "perder trabajo sin enterarse" que este plan existe para evitar.
+  _fusionTraer() {
+    if (!this.PLAN_ID || this._fusionPidiendo) return;
+    this._fusionPidiendo = true;
+    fetch('api/plan_get.php?id=' + this.PLAN_ID, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.json())
+      .then(j => { this._fusionPidiendo = false; this._fusionar(j); })
+      .catch(() => { this._fusionPidiendo = false; });
+  }
+  _fusionar(j) {
+    if (!j || !j.ok || !j.plan) return;
+    const s = this.state;
+
+    // ⚠ ARRASTRANDO NO SE FUSIONA NADA. Reordenar la lista por debajo
+    // del dedo que arrastra deja el elemento en un sitio que nadie
+    // eligio. Se guarda y se aplica al soltar (ver _fusionReintenta).
+    if (s.drag || s.ckDrag) { this._fusionPend = j; return; }
+    this._fusionPend = null;
+
+    const P = j.plan;
+    const dias = this._diasDe(j);
+
+    // Si cambio el NUMERO de dias no se fusiona: dayOpen, dayRecsOpen,
+    // placeTxts y daySubs van indexados por dia, y rehacerlos con
+    // menus abiertos por medio es pedir un fallo raro. Se avisa y se
+    // deja que la persona recargue cuando le venga bien.
+    if (dias.length !== this.DAYS.length) {
+      if (typeof j.rev === 'number') this.REV = j.rev;
+      this.setState({ avisoTxt: 'Cambiaron las fechas del viaje', avisoRecarga: true });
+      return;
+    }
+
+    // ── Lo que esta protegido ahora mismo ──
+    const prot = {};
+    if (s.itemOpen) prot[s.itemOpen] = true;
+    if (s.horaMenu && s.horaMenu.uid) prot[s.horaMenu.uid] = true;
+    if (s.gastoMenu && s.gastoMenu.uid) prot[s.gastoMenu.uid] = true;
+
+    const local = {};
+    (s.dayItems || []).forEach(col => col.forEach(it => { local[it.uid] = it; }));
+
+    const dayItems = this._mapearItems(j, dias.length).map(col => col.map(it => {
+      const mio = local[it.uid];
+      if (!mio) return it;
+      // Protegido: se conserva ENTERO el de pantalla. Sus borradores
+      // -hora, horaFin, gastoCat, gastoDesc...- viven en el propio
+      // objeto, asi que basta con no sustituirlo.
+      if (prot[it.uid]) return mio;
+      // `travel` lo calcula el mapa con las rutas reales; no viene del
+      // servidor y volveria a null en cada fusion.
+      if (mio.travel) it.travel = mio.travel;
+      return it;
+    }));
+
+    // Lo que esta EN VUELO: creado aqui y todavia sin confirmar. El
+    // servidor no lo conoce, asi que no viene en j y descartarlo lo
+    // perderia. Los temporales se reconocen por no tener sid.
+    (s.dayItems || []).forEach((col, d) => col.forEach(it => {
+      if (!it.sid && dayItems[d]) dayItems[d].push(it);
+    }));
+
+    // Si alguien borro el lugar que yo tenia abierto, el lugar ya no
+    // existe: se cierran los menus que apuntaban a el en vez de dejar
+    // una ventana flotando sobre la nada.
+    const vivos = {};
+    dayItems.forEach(col => col.forEach(it => { vivos[it.uid] = true; }));
+    const parche = {};
+    if (s.itemOpen && !vivos[s.itemOpen]) parche.itemOpen = null;
+    if (s.horaMenu && !vivos[s.horaMenu.uid]) parche.horaMenu = null;
+    if (s.gastoMenu && !vivos[s.gastoMenu.uid]) parche.gastoMenu = null;
+
+    // ── Listas ──
+    const listasSrv = this._mapearListas(j);
+    const idsSrv = {};
+    listasSrv.forEach(L => { idsSrv[L.id] = true; });
+    const lists = listasSrv.map(L => {
+      const mia = (s.lists || []).find(x => x.id === L.id);
+      if (!mia) return L;
+      // Estado de interfaz que solo vive en esta pantalla.
+      L.open = mia.open; L.newTxt = mia.newTxt; L.placeTxt = mia.placeTxt;
+      // La nota en edicion gana: es texto que se esta escribiendo.
+      if (s.noteEdit === L.id) { L.text = mia.text; L.title = mia.title; L.cardTitle = mia.cardTitle; }
+      return L;
+    });
+    // Listas y gastos en vuelo: sus ids temporales son CADENAS
+    // ('l'+fecha, 'g'+fecha) y los del servidor son numeros.
+    (s.lists || []).forEach(L => { if (typeof L.id === 'string' && !idsSrv[L.id]) lists.push(L); });
+
+    const gastosSrv = this._mapearGastos(j);
+    const idsG = {};
+    gastosSrv.forEach(g => { idsG[g.id] = true; });
+    const gastos = gastosSrv.slice();
+    (s.gastos || []).forEach(g => { if (typeof g.id === 'string' && !idsG[g.id]) gastos.push(g); });
+
+    // ── Miembros y cabecera ──
+    this.MIEMBROS = this._mapMiembros(j.miembros);
+    if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
+    const dest = P.destino || this.META.destino;
+    // El titulo en edicion gana; la portada y el destino se aceptan.
+    this.META = {
+      titulo: s.titleEdit ? this.META.titulo : (P.nombre || this.META.titulo),
+      destino: dest,
+      fechas: this._fmtRango(P.fecha_inicio, P.fecha_fin),
+      hero: P.portada_url || this.META.hero
+    };
+    // `added` y `_addedSid` son derivados: se rehacen enteros.
+    const added = {};
+    this._addedSid = {};
+    (j.items || []).forEach(it => {
+      if (it.place_id) { added[it.place_id] = true; this._addedSid[it.place_id] = Number(it.id); }
+    });
+
+    const subs = Array.isArray(P.dia_subtitulos) ? P.dia_subtitulos.slice(0, dias.length) : (s.daySubs || []);
+    while (subs.length < dias.length) subs.push('');
+
+    if (typeof j.rev === 'number') this.REV = j.rev;
+    this.setState(Object.assign(parche, {
+      dayItems, lists, gastos, added,
+      // El presupuesto no se pisa si se esta escribiendo.
+      budget: s.budgetEdit ? s.budget : (Number(P.presupuesto) || 0),
+      daySubs: subs,
+      avisoTxt: 'Se trajeron los cambios de otra persona', avisoRecarga: false
+    }));
+    // El aviso se va solo: es una confirmacion, no una tarea.
+    clearTimeout(this._avisoT);
+    this._avisoT = setTimeout(() => {
+      if (!this.state.avisoRecarga) this.setState({ avisoTxt: '' });
+    }, 4500);
+
+    // Los pines son un overlay propio calculado con MERC(), asi que
+    // recolocarlos es todo lo que hace falta para que el mapa quede al
+    // dia. Nada de Google Maps se toca.
+    this._reproject();
+  }
+
   // Abre la ventana y lleva el foco dentro. Se recuerda desde donde se
   // abrio para devolverlo al cerrar: si no, el foco vuelve al principio
   // del documento y quien navega con teclado se pierde.
@@ -423,6 +545,60 @@ class Component extends DCLogic {
     const volver = this._fotoVolverA;
     this._fotoVolverA = null;
     if (volver && volver.focus) setTimeout(() => volver.focus(), 60);
+  }
+
+  // ════ Del JSON del servidor al estado ════════════════════
+  // Estos cuatro los usan DOS sitios: la siembra inicial (_boot) y la
+  // fusion del latido (_fusionar). Viven aparte justo por eso: dos
+  // copias del mismo mapeo acabarian divergiendo, y el dia que lo
+  // hicieran se veria como que "a veces" un campo se pierde al llegar
+  // un cambio de otra persona. Imposible de encontrar.
+  _diasDe(B) {
+    const P = B.plan || {};
+    let maxDia = 1;
+    (B.items || []).forEach(it => { if (Number(it.dia) > maxDia) maxDia = Number(it.dia); });
+    return this._mkDays(P.fecha_inicio, P.fecha_fin, maxDia);
+  }
+  _mapearItems(B, N) {
+    const dayItems = Array.from({ length: N }, () => []);
+    (B.items || []).slice().sort((a, b) => (a.dia - b.dia) || (a.orden - b.orden) || (a.id - b.id)).forEach(it => {
+      const di = Math.min(N, Math.max(1, Number(it.dia) || 1)) - 1;
+      const h0 = (it.hora || '').slice(0, 5), h1 = (it.hora_fin || '').slice(0, 5);
+      dayItems[di].push({
+        uid: 'i' + it.id, sid: Number(it.id),
+        name: it.nombre, nota: it.nota || '',
+        horario: h0 ? (h1 ? h0 + ' - ' + h1 : h0) : '',
+        costo: Number(it.precio) || 0, travel: null,
+        // El horario también se guarda suelto: la cadena 'horario' es
+        // para pintar, pero para editarlo hacen falta los dos extremos.
+        hora: (it.hora || '').slice(0, 5), horaFin: (it.hora_fin || '').slice(0, 5),
+        moneda: it.moneda || 'MXN', gastoCat: it.gasto_cat || '',
+        gastoDesc: it.gasto_desc || '', gastoModo: it.gasto_modo || 'no',
+        reparto: Array.isArray(it.reparto) ? it.reparto.map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })) : [],
+        // Cómo se va de este lugar al siguiente. null = el de por defecto.
+        modo: it.modo_viaje || null,
+        reacts: Array.isArray(it.reacts) ? it.reacts.map(r => ({ e: r.e, n: Number(r.n) || 0, mine: !!r.mine })) : [],
+        pid: it.place_id || null,
+        lat: (it.lat === null || it.lat === undefined) ? null : Number(it.lat),
+        lng: (it.lng === null || it.lng === undefined) ? null : Number(it.lng),
+        img: it.imagen_url || null, catg: it.categoria || 'custom'
+      });
+    });
+    return dayItems;
+  }
+  _mapearGastos(B) {
+    return (B.gastos || []).map((g, i) => ({
+      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0, cat: g.categoria || 'Otro',
+      fecha: this._fmtDia(g.fecha), fiso: g.fecha || '', ts: ((B.gastos || []).length - i)
+    }));
+  }
+  _mapearListas(B) {
+    return (B.listas || []).map(L => ({
+      id: Number(L.id), title: L.titulo, type: L.tipo === 'nota' ? 'note' : 'check',
+      open: true, cardTitle: L.titulo, newTxt: '', placeTxt: '',
+      text: L.texto || '',
+      items: (L.items || []).map(x => ({ iid: Number(x.id), t: x.texto, done: !!Number(x.hecho) }))
+    }));
   }
 
   // Filas de plan_miembros -> la forma que usa el resto del codigo.
@@ -3175,10 +3351,12 @@ class Component extends DCLogic {
     // ── El latido ───────────────────────────────────────────
     // Los dos avisos son excluyentes: si el pulso se cayo, anunciar
     // novedades seria mentir, porque ya no hay quien las vea llegar.
-    V.pulsoCaido   = !!s.pulsoCaido;
-    V.pulsoNovedad = !!s.pulsoNovedad && !s.pulsoCaido;
-    V.pulsoRecargar = () => this._pulsoRecargar();
-    V.pulsoDescartar = () => this.setState({ pulsoNovedad: false });
+    V.pulsoCaido    = !!s.pulsoCaido;
+    V.avisoHay      = !!s.avisoTxt && !s.pulsoCaido;
+    V.avisoTxt      = s.avisoTxt || '';
+    V.avisoRecarga  = !!s.avisoTxt && !!s.avisoRecarga && !s.pulsoCaido;
+    V.pulsoRecargar  = () => this._pulsoRecargar();
+    V.pulsoDescartar = () => this.setState({ avisoTxt: '' });
 
     // OJO: V se construye clave a clave, no copiando el estado. Si
     // esta linea falta, el sc-if de la plantilla lee undefined y la

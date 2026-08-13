@@ -343,6 +343,9 @@ de guardián. Una sola consulta, y el bloqueo liberado antes de tocar la base.
 
 ## 6. Fase 4 · Fusión selectiva
 
+> **✅ HECHA el 13/08/2026.** El botón «Actualizar» de la fase 3 desaparece:
+> los cambios entran solos. Lo que salió distinto, al final de la sección.
+
 **1½ días.** La parte con más riesgo de romper cosas que ya funcionan.
 
 `_fusionar(j)` reconstruye `dayItems`, `gastos`, `lists` y `MIEMBROS` desde el
@@ -374,6 +377,77 @@ tocar nada de Google Maps.
 B escribe una nota larga mientras A añade tres lugares y borra uno. La nota de
 B no pierde un carácter y los lugares de A aparecen. Repetir con B arrastrando
 un elemento entre días.
+
+---
+
+### Lo que cambió al implementarla
+
+**1 · Lo primero fue borrar código, no escribirlo.**
+
+`_boot()` traía el mapeo del JSON del servidor al estado escrito a mano dentro
+de sí mismo. La fusión necesita **exactamente el mismo mapeo**, y copiarlo
+habría dejado dos versiones que acabarían divergiendo. El día que divergieran,
+lo que se vería es que «a veces» un campo se pierde al llegar un cambio de
+otra persona — imposible de encontrar.
+
+Así que primero se extrajeron `_diasDe()`, `_mapearItems()`, `_mapearGastos()`
+y `_mapearListas()`. `_boot()` pasó a ser cuatro líneas y la fusión usa los
+mismos cuatro métodos. Es la misma lección que dejó `_mapMiembros()` en la
+fase 1.
+
+**2 · Lo que está en vuelo también hay que protegerlo, y el plan no lo decía.**
+
+La tabla de arriba cubre lo que se está *editando*, pero no lo que se acaba de
+crear y **el servidor todavía no conoce**: un lugar recién añadido, una lista
+recién creada, un gasto recién apuntado. Como no vienen en la respuesta del
+servidor, una fusión ingenua **los borraría de la pantalla** justo entre que se
+crean y se confirman.
+
+Se reconocen sin ambigüedad: los ids temporales son **cadenas** (`'l'+fecha`,
+`'g'+fecha`) frente a los números del servidor, y los lugares en vuelo no
+tienen `sid`.
+
+**3 · Si cambia el NÚMERO de días no se fusiona: se avisa.**
+
+`dayOpen`, `dayRecsOpen`, `placeTxts` y `daySubs` van indexados por día.
+Rehacerlos con menús abiertos por medio es pedir un fallo raro, así que ese
+caso —y sólo ese— conserva el aviso con botón **Actualizar** de la fase 3.
+
+**4 · Si alguien borra el lugar que tú tienes abierto, se cierran sus menús.**
+
+Proteger lo abierto es no *sobrescribir* lo que estás editando, no resucitar
+una fila que ya no existe. Si el lugar desaparece del servidor, desaparece — y
+`itemOpen`, `horaMenu` y `gastoMenu` que apuntaban a él se ponen a `null` en
+vez de dejar una ventana flotando sobre la nada.
+
+**5 · El reintento tras un arrastre lo hace el propio latido.**
+
+Enganchar «al soltar» habría significado tocar los **seis** sitios donde
+termina un arrastre, y bastaría olvidar uno para que un cambio se quedara
+guardado y sin aplicar para siempre. En vez de eso, cada pulso comprueba si
+quedó algo pendiente. Se aplica hasta 5 s después de soltar, y a cambio no hay
+ningún sitio que se pueda olvidar.
+
+### Cómo se comprobó
+
+Dos sesiones sobre el mismo viaje. B tenía una nota de 257 caracteres en
+edición **y** un lugar abierto; A hizo cinco cambios de golpe: tres lugares
+nuevos, uno borrado, y **renombró justo el lugar que B tenía abierto**.
+
+| Qué se miró | Resultado |
+|---|---|
+| Los tres lugares nuevos | Aparecieron, cada uno en su día |
+| El lugar borrado | Desapareció |
+| La nota de B | **257 caracteres, ni uno menos**, y seguía en edición |
+| El lugar abierto de B | Conservó **su** nombre; el de A no lo pisó |
+| Al recargar después | Sale el nombre de A: el servidor siempre lo tuvo bien |
+| El aviso | Apareció junto con el cambio y se fue **a los 4501 ms** |
+| **Arrastrando** | Durante: 6 lugares y fusión aparcada. Al soltar: 7, y `rev` adoptado |
+| Arranque normal tras el refactor | 3 días, 7 lugares en su sitio, lista, miembro y título |
+
+Un detalle que salió en la medición y no es un fallo: el aviso tardó 18,5 s en
+llegar porque el latido había retrocedido a 15 s tras doce pulsos sin novedad.
+Es el retroceso de la fase 3 haciendo su trabajo.
 
 ---
 

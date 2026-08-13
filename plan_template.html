@@ -1809,21 +1809,23 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
      EL LATIDO — «alguien más tocó este viaje»
      Fase 3 de Reportes_md/PLAN_colaboracion.md
 
-     Avisa; NO recarga solo. Traer los cambios de fuera sin pisar lo
-     que esta persona está escribiendo es la fase 4, y sustituir el
-     estado antes de tenerla sería justo lo contrario de lo que
-     persigue el plan: se llevaría por delante el título a medio
-     teclear o la nota a medio redactar.
+     Desde la fase 4 los cambios se TRAEN solos, respetando lo que
+     esta persona esté escribiendo. Este aviso es la confirmación de
+     que llegaron, y se va solo a los 4,5 s.
+
+     Se queda -y saca el botón Actualizar- únicamente cuando la fusión
+     NO se pudo hacer: hoy, el día que cambian las fechas del viaje,
+     porque medio estado va indexado por día.
 
      Va debajo de la barra de arriba y por debajo de las ventanas
      modales (z-index 900 frente a 940): si hay un diálogo abierto,
      manda el diálogo.
      ══════════════════════════════════════════════════════════════ -->
-<sc-if value="{{ pulsoNovedad }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ avisoHay }}" hint-placeholder-val="{{ false }}">
   <div role="status" aria-live="polite" style="position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:900;display:flex;align-items:center;gap:14px;padding:10px 14px 10px 16px;border-radius:22px;background:#0E2A33;color:#ffffff;box-shadow:0 8px 24px rgba(13,31,39,.28);font-size:13px;animation:rnSube .3s cubic-bezier(.22,1,.36,1)">
     <svg width="15" height="15" viewBox="0 0 640 640" fill="currentColor" style="flex-shrink:0;display:block"><path d="M320 64C302.3 64 288 78.3 288 96L288 99.2C215 114 160 178.6 160 256L160 277.5C160 325.4 143.5 371.8 113.4 409L106.1 418C98.4 427.5 96.9 440.6 102.2 451.6C107.5 462.6 118.6 469.6 130.8 469.6L509.2 469.6C521.4 469.6 532.5 462.6 537.8 451.6C543.1 440.6 541.6 427.5 533.9 418L526.6 409C496.5 371.8 480 325.4 480 277.5L480 256C480 178.6 425 114 352 99.2L352 96C352 78.3 337.7 64 320 64zM320 576C337 576 353.3 569.3 365.3 557.3C377.3 545.3 384 529 384 512L256 512C256 529 262.7 545.3 274.7 557.3C286.7 569.3 303 576 320 576z"></path></svg>
-    <span>Alguien cambió algo en este viaje</span>
-    <button onClick="{{ pulsoRecargar }}" style="border:none;border-radius:14px;background:#F5B93F;color:#0E2A33;font-family:inherit;font-size:12.5px;font-weight:700;padding:6px 14px;cursor:pointer;transition:filter .15s ease" style-hover="filter:brightness(1.08)">Actualizar</button>
+    <span>{{ avisoTxt }}</span>
+    <sc-if value="{{ avisoRecarga }}" hint-placeholder-val="{{ false }}"><button onClick="{{ pulsoRecargar }}" style="border:none;border-radius:14px;background:#F5B93F;color:#0E2A33;font-family:inherit;font-size:12.5px;font-weight:700;padding:6px 14px;cursor:pointer;transition:filter .15s ease" style-hover="filter:brightness(1.08)">Actualizar</button></sc-if>
     <button onClick="{{ pulsoDescartar }}" aria-label="Descartar el aviso" title="Descartar el aviso" style="width:24px;height:24px;flex-shrink:0;border:none;border-radius:50%;background:none;color:#9FB3B9;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .15s ease" style-hover="color:#ffffff">
       <svg width="11" height="11" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg>
     </button>
