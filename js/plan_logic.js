@@ -152,7 +152,7 @@ class Component extends DCLogic {
     this.USER = window.PLAN_USER || { inicial: 'R', nombre: 'Ramon' };
     this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     this.puedeEditar = true;   // por defecto (modo demo sin servidor)
-    this.META = { titulo: 'Nuestro viaje a Ensenada', destino: 'Ensenada', fechas: '30/7 – 31/7', hero: 'https://picsum.photos/seed/rn-en-hero/1400/460' };
+    this.META = { titulo: 'Viaje a Ensenada', destino: 'Ensenada', fechas: '30/7 – 31/7', hero: 'https://picsum.photos/seed/rn-en-hero/1400/460' };
     this.DESC_ENSENADA = 'Ensenada es una ciudad portuaria de Baja California, a hora y media de la frontera, famosa por su malecón frente a la bahía de Todos Santos, sus tacos de pescado y su cercanía con el Valle de Guadalupe, la principal región vinícola de México. Al sur, La Bufadora lanza chorros de mar de más de 20 metros; en el centro, la Primera y la Plaza Cívica concentran cantinas históricas, cafés y una escena gastronómica que mezcla mariscos de la lonja con cocina de autor.';
     if (!B || !B.plan) { this.DAYS = this._mkDays('2026-07-30', '2026-07-31', 2); this.state.destinoDesc = this.DESC_ENSENADA; return; }
     const P = B.plan;
@@ -205,7 +205,7 @@ class Component extends DCLogic {
     if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     const dest = P.destino || 'mi destino';
     this.META = {
-      titulo: P.nombre || ('Nuestro viaje a ' + dest),
+      titulo: P.nombre || ('Viaje a ' + dest),
       destino: dest,
       fechas: this._fmtRango(P.fecha_inicio, P.fecha_fin),
       hero: P.portada_url || ('https://picsum.photos/seed/rn-' + encodeURIComponent(dest.toLowerCase().replace(/\s+/g, '-')) + '-hero/1400/460')

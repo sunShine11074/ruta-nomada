@@ -207,7 +207,7 @@
       headers: { "Content-Type": "application/json", "X-CSRF": window.PLAN_CSRF || "" },
       body: JSON.stringify({
         destino: destino,
-        nombre: "Nuestro viaje a " + destino.split(",")[0].trim(),
+        nombre: "Viaje a " + destino.split(",")[0].trim(),
         lat: S.destLat, lng: S.destLng,
         fecha_inicio: S.start, fecha_fin: S.end || S.start,
         privacidad: S.privacy,

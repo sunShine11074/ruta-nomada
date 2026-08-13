@@ -19,7 +19,10 @@ $destino = trim((string)($in['destino'] ?? ''));
 if ($destino === '' || mb_strlen($destino) > 120) apiFail('Indica el destino del viaje.');
 
 $nombre = trim((string)($in['nombre'] ?? ''));
-if ($nombre === '') $nombre = 'Nuestro viaje a ' . $destino;
+// Sin nombre se usa el destino, recortando lo que va tras la primera
+// coma igual que hace js/plan_nuevo.js: si no, este respaldo daba
+// «Viaje a Madrid, España» y el cliente «Viaje a Madrid».
+if ($nombre === '') $nombre = 'Viaje a ' . trim(explode(',', $destino)[0]);
 $nombre = mb_substr($nombre, 0, 200);
 
 $lat = isset($in['lat']) && $in['lat'] !== '' ? (float)$in['lat'] : null;
