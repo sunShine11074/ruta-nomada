@@ -44,57 +44,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
         $error_form = 'Por favor, completa todos los campos.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
-    } elseif (!correoConDominioReal($email)) {
-        // Caza-erratas, no control de seguridad: sólo dice que ese
-        // dominio no tiene por dónde recibir correo. Ver el comentario
-        // largo de includes/email_dominio.php.
-        $error_form = 'El dominio «' . dominioDeCorreo($email) . '» no puede recibir correo. '
-                    . 'Revisa que esté bien escrito.';
-    } elseif (strlen($password) < 6) {
-        $error_form = 'La contraseña debe tener al menos 6 caracteres.';
-    } elseif ($password !== $confirm_password) {
-        $error_form = 'Las contraseñas no coinciden.';
-    } elseif (!$terms) {
-        $error_form = 'Debes aceptar los Términos de Servicio para registrarte.';
     } else {
-        try {
-            $db = getDB();
+        // Validar que el email pertenezca a dominios permitidos
+        $dominios_permitidos = [
+            // Gmail
+            'gmail.com',
+            // Outlook
+            'outlook.com',
+            'outlook.es',
+            'outlook.com.ar',
+            'outlook.com.br',
+            'outlook.fr',
+            'outlook.de',
+            'outlook.it',
+            'outlook.jp',
+            // Yahoo
+            'yahoo.com',
+            'yahoo.es',
+            'yahoo.com.br',
+            'yahoo.com.ar',
+            'yahoo.fr',
+            'yahoo.de',
+            'yahoo.it',
+            'yahoo.jp',
+            // Hotmail
+            'hotmail.com',
+            'hotmail.es',
+            'hotmail.com.ar',
+            'hotmail.com.br',
+            'hotmail.fr',
+            'hotmail.de',
+            'hotmail.it',
+            'hotmail.jp',
+            // Icloud
+            'icloud.com',
+            'me.com',
+            'mac.com',
+            // Live
+            'live.com',
+            'live.es',
+            'live.com.ar',
+            'live.com.br',
+            'live.fr',
+            'live.de',
+            'live.it',
+            'live.jp',
+        ];
+        
+        $dominio_email = strtolower(substr(strrchr($email, '@'), 1));
+        $dominio_valido = in_array($dominio_email, $dominios_permitidos, true);
+        
+        if (!$dominio_valido) {
+            $error_form = 'Solo se permiten direcciones de correo de Gmail, Outlook, Yahoo, Hotmail, Icloud o Live. '
+                        . 'Por favor, usa un email de estos proveedores.';
+        } elseif (!correoConDominioReal($email)) {
+            // Caza-erratas, no control de seguridad: sólo dice que ese
+            // dominio no tiene por dónde recibir correo. Ver el comentario
+            // largo de includes/email_dominio.php.
+            $error_form = 'El dominio «' . dominioDeCorreo($email) . '» no puede recibir correo. '
+                        . 'Revisa que esté bien escrito.';
+        } elseif (strlen($password) < 6) {
+            $error_form = 'La contraseña debe tener al menos 6 caracteres.';
+        } elseif ($password !== $confirm_password) {
+            $error_form = 'Las contraseñas no coinciden.';
+        } elseif (!$terms) {
+            $error_form = 'Debes aceptar los Términos de Servicio para registrarte.';
+        } else {
+            try {
+                $db = getDB();
 
-            // Encriptar la contraseña de forma segura (el hash se genera
-            // en PHP; la contraseña en texto plano nunca viaja a MySQL)
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                // Encriptar la contraseña de forma segura (el hash se genera
+                // en PHP; la contraseña en texto plano nunca viaja a MySQL)
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
-            // Registrar mediante el procedimiento almacenado:
-            // verifica el correo duplicado e inserta en una sola operación,
-            // y devuelve el id generado (ver basedatos/procedures.sql)
-            $stmt = $db->prepare('CALL sp_registrar_usuario(?, ?, ?)');
-            $stmt->execute([$nombre, $email, $password_hash]);
-            $userId = (int) $stmt->fetchColumn();
-            $stmt->closeCursor();
+                // Registrar mediante el procedimiento almacenado:
+                // verifica el correo duplicado e inserta en una sola operación,
+                // y devuelve el id generado (ver basedatos/procedures.sql)
+                $stmt = $db->prepare('CALL sp_registrar_usuario(?, ?, ?)');
+                $stmt->execute([$nombre, $email, $password_hash]);
+                $userId = (int) $stmt->fetchColumn();
+                $stmt->closeCursor();
 
-            session_regenerate_id(true);
-            $_SESSION['user'] = [
-                'id'     => $userId,
-                'nombre' => $nombre,
-                'email'  => $email,
-            ];
+                session_regenerate_id(true);
+                $_SESSION['user'] = [
+                    'id'     => $userId,
+                    'nombre' => $nombre,
+                    'email'  => $email,
+                ];
 
-            // Redirigir directamente al panel principal tras el éxito
-            header('Location: inicio.php');
-            exit;
-        } catch (PDOException $e) {
-            if (strpos($e->getMessage(), 'EMAIL_DUPLICADO') !== false) {
-                $error_form = 'El correo electrónico ya está registrado. Intenta iniciar sesión.';
-            } else {
-                // El detalle va al registro del servidor, nunca a la pantalla:
-                // traía el nombre de la tabla, la columna y el motor. db.php ya
-                // aplica este criterio y aquí se estaba deshaciendo.
-                error_log('register.php: ' . $e->getMessage());
-                // $error_form y no $error_db a propósito: la conexión ya se
-                // comprobó al cargar la página, así que lo que falla aquí es
-                // casi siempre el dato. Con $error_db el formulario se
-                // deshabilita y la persona se queda sin poder corregir.
-                $error_form = 'No se pudo crear la cuenta. Revisa los datos e inténtalo de nuevo.';
+                // Redirigir directamente al panel principal tras el éxito
+                header('Location: inicio.php');
+                exit;
+            } catch (PDOException $e) {
+                if (strpos($e->getMessage(), 'EMAIL_DUPLICADO') !== false) {
+                    $error_form = 'El correo electrónico ya está registrado. Intenta iniciar sesión.';
+                } else {
+                    // El detalle va al registro del servidor, nunca a la pantalla:
+                    // traía el nombre de la tabla, la columna y el motor. db.php ya
+                    // aplica este criterio y aquí se estaba deshaciendo.
+                    error_log('register.php: ' . $e->getMessage());
+                    // $error_form y no $error_db a propósito: la conexión ya se
+                    // comprobó al cargar la página, así que lo que falla aquí es
+                    // casi siempre el dato. Con $error_db el formulario se
+                    // deshabilita y la persona se queda sin poder corregir.
+                    $error_form = 'No se pudo crear la cuenta. Revisa los datos e inténtalo de nuevo.';
+                }
             }
         }
     }
