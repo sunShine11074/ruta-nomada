@@ -118,86 +118,56 @@ require_once __DIR__ . '/includes/user_topbar.php';
         </div>
         <?php endif; ?>
 
-        <!-- Cabecera de bienvenida -->
-        <div class="dashboard-header">
-            <h2 class="dashboard-title">¡Hola, <?= htmlspecialchars(explode(' ', $user['nombre'])[0], ENT_QUOTES, 'UTF-8') ?>!</h2>
-            <p class="dashboard-subtitle">Explora destinos seleccionados para ti y retoma tus rutas guardadas.</p>
-        </div>
-
-        <!-- Buscador -->
-        <div class="search-bar">
-            <span class="search-icon">🔍︎​​</span>
-            <input type="text" placeholder="Buscar destinos, actividades, hoteles…">
-            <button class="btn-filter">⚙ Filtrar</button>
-        </div>
-
-        <!-- ── Recomendado para ti ── -->
-        <section class="section">
-            <div class="section-header">
-                <h3 class="section-title">Recomendado para ti</h3>
+        <!-- ════════════════════════════════════════════════════════════
+             SECCIÓN HERO
+        ════════════════════════════════════════════════════════════ -->
+        <section class="hero-section">
+            <div class="hero-background">
+                <div class="hero-gradient"></div>
             </div>
-
-            <!-- Filtros de categoría -->
-            <div class="category-filters">
-                <button class="cat-btn cat-btn--active">♜ Cultura</button>
-                <button class="cat-btn">❤︎ Romance</button>
-                <button class="cat-btn">✈︎ Aventura</button>
-                <button class="cat-btn">🔎︎ Descubrimiento</button>
-            </div>
-
-           <!-- Tarjetas de destinos -->
-<div class="cards-grid">
-    <?php foreach (array_slice($destinos, 0, 6) as $d): ?>
-    <?php $destId = isset($d['id']) ? (int)$d['id'] : 0; ?>
-    <article class="dest-card" <?= $destId ? 'onclick="location.href=\'destino.php?id=' . $destId . '\'"' : '' ?> >
-        <div class="dest-card__img">
-            <span class="dest-card__tag <?= $d['categoria'] ?? '' ?>"><?= $d['tag'] ?></span>
-            <span class="dest-card__img-icon"><?= $d['imagen_url'] ?></span>
-            <span class="dest-card__img-label">📍 <?= htmlspecialchars($d['nombre'], ENT_QUOTES, 'UTF-8') ?></span>
-        </div>
-        <div class="dest-card__body">
-            <h4 class="dest-card__name"><?= htmlspecialchars($d['nombre'], ENT_QUOTES, 'UTF-8') ?></h4>
-            <p class="dest-card__country">📍 <?= htmlspecialchars($d['pais'], ENT_QUOTES, 'UTF-8') ?></p>
-            <p class="dest-card__desc"><?= htmlspecialchars($d['descripcion'], ENT_QUOTES, 'UTF-8') ?></p>
-            <div class="dest-card__footer">
-                <div>
-                    <span class="dest-card__since">Desde</span>
-                    <span class="dest-card__price"><?= priceInUserCurrency($d['precio_desde']) ?></span>
+            
+            <div class="hero-content">
+                <h1 class="hero-title">¡Tú próxima aventura comienza aquí!</h1>
+                <p class="hero-subtitle">Planifica, cotiza y reserva viajes increíbles con la plataforma más completa para viajeros</p>
+                
+                <div class="hero-buttons">
+                    <a href="plan.php" class="btn-cta btn-cta--primary">
+                        Planificar Viaje
+                    </a>
                 </div>
-                <span class="dest-card__rating">⭐ <?= $d['valoracion'] ?></span>
             </div>
-        </div>
-    </article>
-    <?php endforeach; ?>
-</div>
+        </section>
 
-
-<?php if (count($destinos) > 8): ?>
-    <div class="see-all-wrap">
-        <a href="inicio.php">
-            <button class="btn-primary">Ver todos los destinos</button>
-        </a>
-    </div>
-<?php endif; ?>
-
-        <!-- ── Subido recientemente ── -->
-        <section class="section">
-            <div class="section-header">
-                <h3 class="section-title">Subido recientemente</h3>
-                <a href="#" class="section-link">Ver más ›</a>
-            </div>
-
-            <div class="recents-grid">
-                <?php foreach ($recientes as $r): ?>
-                <div class="recent-card">
-                    <div class="recent-card__thumb"><?= $r['icon'] ?></div>
-                    <div class="recent-card__body">
-                        <span class="recent-card__time"><?= $r['hace'] ?></span>
-                        <p class="recent-card__title"><?= htmlspecialchars($r['titulo'], ENT_QUOTES, 'UTF-8') ?></p>
-                        <span class="recent-card__author"><?= htmlspecialchars($r['autor'], ENT_QUOTES, 'UTF-8') ?></span>
-                    </div>
+        <!-- ════════════════════════════════════════════════════════════
+             SECCIÓN DE BENEFICIOS
+        ════════════════════════════════════════════════════════════ -->
+        <section class="benefits-section">
+            <h2 class="benefits-title">Todo lo que necesitas para viajar</h2>
+            
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <div class="benefit-icon">✈︎</div>
+                    <h3 class="benefit-name">Destinos Únicos</h3>
+                    <p class="benefit-desc">Explora miles de destinos recomendados especialmente para ti.</p>
                 </div>
-                <?php endforeach; ?>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">$</div>
+                    <h3 class="benefit-name">Mejores Precios</h3>
+                    <p class="benefit-desc">Cotiza y compara precios para obtener los mejores viajes.</p>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">🗪</div>
+                    <h3 class="benefit-name">Colaboración</h3>
+                    <p class="benefit-desc">Planifica viajes en equipo y organiza tus aventuras juntos.</p>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">𖡡</div>
+                    <h3 class="benefit-name">Mapas Interactivos</h3>
+                    <p class="benefit-desc">Visualiza tu ruta completa con mapas detallados en tiempo real.</p>
+                </div>
             </div>
         </section>
 
