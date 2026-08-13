@@ -229,6 +229,24 @@ if ($pdo) {
             : linea('ok', 'plan_invitaciones admite enlaces para compartir (usos, usos_max, token_claro)');
     }
 
+    // El testigo de cambio de la colaboración. Otras dos columnas
+    // sobre tablas que ya existían, así que el control de tablas
+    // tampoco las ve.
+    $faltaTestigo = [];
+    if (in_array('planes', $hay, true)) {
+        $c = $pdo->query('SHOW COLUMNS FROM planes')->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('rev', $c, true)) $faltaTestigo[] = 'planes.rev';
+    }
+    if (in_array('plan_items', $hay, true)) {
+        $c = $pdo->query('SHOW COLUMNS FROM plan_items')->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('ver', $c, true)) $faltaTestigo[] = 'plan_items.ver';
+    }
+    $faltaTestigo
+        ? linea('falla', 'Falta el testigo de cambio: ' . implode(', ', $faltaTestigo),
+            'Sin él no se puede saber si un viaje cambió sin recargarlo entero.' . "\n"
+            . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
+        : linea('ok', 'El testigo de cambio está puesto (planes.rev, plan_items.ver)');
+
     // ── Rutinas: funciones, procedimientos y triggers ────────
     // Igual que con las tablas, la lista NO va escrita a mano: se lee
     // de basedatos/rutinas.sql, que es el archivo canónico. Si mañana

@@ -135,6 +135,11 @@ cabecera de A al recargar.
 
 ## 4. Fase 2 · Que la base sepa cuándo cambió algo
 
+> **✅ HECHA el 13/08/2026.** Cuatro cosas salieron distintas de lo escrito
+> aquí abajo, y están explicadas al final de la sección, en «Lo que cambió al
+> implementarla». La más importante: **`rev` NO sube exactamente una vez por
+> acción**, y la verificación de más abajo estaba mal planteada.
+
 **1 día.** Sin esto no hay forma barata de preguntar «¿hay novedades?».
 
 ### Migración nueva: `basedatos/migrate_colaboracion.sql`
@@ -178,6 +183,54 @@ plan entero, y eso se realimenta hasta fundir el servidor. Los disparadores de
 `SELECT rev FROM planes WHERE id = N` sube **exactamente una vez** por cada
 tipo de cambio: añadir un lugar, moverlo, borrarlo, añadir un gasto, crear una
 lista, marcar un pendiente, reaccionar, repartir un coste, entrar un miembro.
+
+---
+
+### Lo que cambió al implementarla
+
+**1 · No son 15 disparadores, son 17. Y el recuento de partida estaba mal.**
+
+Tres por cada una de `plan_gastos`, `plan_listas`, `plan_lista_items`,
+`plan_item_gasto` y `plan_item_reacciones`, y sólo dos en `plan_miembros`.
+El proyecto pasa de **5 a 22 disparadores**, de **5 a 7 funciones** y de **6 a
+7 procedimientos** — no de «4 a 6 funciones y 5 a 6 procedimientos» como decía
+la nota académica, que se escribió con un recuento ya desfasado.
+
+**2 · ⚠️ `rev` es un TESTIGO DE CAMBIO, no una cuenta de acciones.**
+
+La verificación de arriba pide que suba «exactamente una vez» por cada cambio,
+y con los nueve casos de esa lista se cumple. Pero **hay una acción que la
+rompe**: guardar el reparto de un gasto. `api/plan_items.php` borra todas las
+filas de `plan_item_gasto` del lugar y vuelve a insertarlas, así que repartir
+entre cuatro personas sube `rev` **ocho veces**, no una.
+
+No es un fallo, pero sí una expectativa mal escrita. Lo único que se le pide a
+`rev` es que **cambie cuando algo cambió** y **no cambie cuando no cambió
+nada**; nadie va a interpretar el salto. Como todo eso ocurre dentro de una
+transacción, quien sondea ve un solo cambio neto.
+
+**3 · Las reacciones necesitaban también el disparador de UPDATE, y no era
+evidente.**
+
+`api/plan_reacciones.php` cambia de emoji con `INSERT ... ON DUPLICATE KEY
+UPDATE`. Comprobado en MariaDB 10.4: sobre una fila que ya existe eso dispara
+**sólo el `AFTER UPDATE`**, no el `AFTER INSERT`, así que no hay doble conteo.
+Y de regalo, reenviar el **mismo** emoji no dispara nada: `rev` no se mueve
+cuando en realidad no cambió nada.
+
+**4 · Los borrados en cascada no disparan nada, y de eso depende el diseño.**
+
+Comprobado antes de escribir una línea. Gracias a eso, borrar un lugar sube
+`rev` **una sola vez** aunque arrastre su reparto y sus reacciones, y borrar un
+viaje entero no intenta tocar una fila de `planes` que está desapareciendo.
+
+### Cómo se comprobó
+
+Doce casos contra la base real, con un usuario y un plan de usar y tirar:
+los nueve tipos de cambio de la lista, más cambiar de emoji, más los dos que
+**no** deben mover `rev` —reenviar el mismo emoji y el `UPDATE` sobre
+`plan_miembros` que hará el sondeo de la fase 6—. **12 de 12.** El plan se
+borró después sin error y no quedó nada de ensayo.
 
 ---
 

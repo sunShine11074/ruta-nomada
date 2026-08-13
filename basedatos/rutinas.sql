@@ -474,6 +474,66 @@ END $$
 --  TRIGGERS
 -- ════════════════════════════════════════════════════════════
 
+-- ════════════════════════════════════════════════════════════
+--  COLABORACIÓN — el testigo de cambio del viaje
+--  Fase 2 de Reportes_md/PLAN_colaboracion.md
+-- ════════════════════════════════════════════════════════════
+
+-- ------------------------------------------------------------
+-- sp_tocar_plan(plan_id)
+--   Sube planes.rev y mueve planes.updated_at. Es la única línea que
+--   escriben los veinte disparadores de más abajo, y por eso vive
+--   aquí: si mañana hay que cambiar cómo se marca un plan como
+--   modificado, se cambia en UN sitio y no en veinte.
+--
+--   `updated_at` se pone explícitamente aunque la columna ya lleve
+--   ON UPDATE current_timestamp: así se lee la intención sin tener
+--   que ir a mirar la definición de la tabla.
+--
+--   No hay riesgo de recursión: `planes` no tiene ningún disparador
+--   de UPDATE, sólo el BEFORE DELETE de auditoría.
+-- ------------------------------------------------------------
+DROP PROCEDURE IF EXISTS sp_tocar_plan $$
+CREATE PROCEDURE sp_tocar_plan (IN p_plan_id INT)
+BEGIN
+    IF p_plan_id IS NOT NULL THEN
+        UPDATE planes
+           SET rev = rev + 1,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE id = p_plan_id;
+    END IF;
+END $$
+
+-- ------------------------------------------------------------
+-- fn_plan_de_item(item_id) → INT
+-- fn_plan_de_lista(lista_id) → INT
+--   Las tablas NIETAS no saben a qué plan pertenecen: plan_item_gasto
+--   y plan_item_reacciones sólo guardan item_id, y plan_lista_items
+--   sólo lista_id. Sus disparadores necesitan el plan_id para llamar
+--   a sp_tocar_plan, y estas dos funciones lo resuelven.
+--
+--   Devuelven NULL si la fila madre ya no está; sp_tocar_plan sabe
+--   tragarse un NULL sin hacer nada.
+-- ------------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_plan_de_item $$
+CREATE FUNCTION fn_plan_de_item(p_item_id INT)
+RETURNS INT
+NOT DETERMINISTIC
+READS SQL DATA
+BEGIN
+    RETURN (SELECT plan_id FROM plan_items WHERE id = p_item_id);
+END $$
+
+DROP FUNCTION IF EXISTS fn_plan_de_lista $$
+CREATE FUNCTION fn_plan_de_lista(p_lista_id INT)
+RETURNS INT
+NOT DETERMINISTIC
+READS SQL DATA
+BEGIN
+    RETURN (SELECT plan_id FROM plan_listas WHERE id = p_lista_id);
+END $$
+
+
 -- ------------------------------------------------------------
 -- trg_item_ins / trg_item_upd / trg_item_del  (datos derivados)
 --   «Última modificación» en mis_planes.php lee planes.updated_at, y
@@ -486,12 +546,15 @@ END $$
 --   disparan triggers en MariaDB, y aquí eso es exactamente lo que
 --   conviene: el plan que muere no necesita que le toquen la fecha.
 -- ------------------------------------------------------------
+--   Desde la fase 2 hacen ADEMÁS lo suyo con planes.rev, llamando a
+--   sp_tocar_plan en vez de escribir el UPDATE a mano.
+-- ------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_item_ins_toca_plan $$
 CREATE TRIGGER trg_item_ins_toca_plan
 AFTER INSERT ON plan_items
 FOR EACH ROW
 BEGIN
-    UPDATE planes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.plan_id;
+    CALL sp_tocar_plan(NEW.plan_id);
 END $$
 
 DROP TRIGGER IF EXISTS trg_item_upd_toca_plan $$
@@ -499,7 +562,7 @@ CREATE TRIGGER trg_item_upd_toca_plan
 AFTER UPDATE ON plan_items
 FOR EACH ROW
 BEGIN
-    UPDATE planes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.plan_id;
+    CALL sp_tocar_plan(NEW.plan_id);
 END $$
 
 DROP TRIGGER IF EXISTS trg_item_del_toca_plan $$
@@ -507,8 +570,130 @@ CREATE TRIGGER trg_item_del_toca_plan
 AFTER DELETE ON plan_items
 FOR EACH ROW
 BEGIN
-    UPDATE planes SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.plan_id;
+    CALL sp_tocar_plan(OLD.plan_id);
 END $$
+
+-- ------------------------------------------------------------
+-- Los otros diecisiete: todo lo demás que puede cambiar en un viaje
+--
+--   Son tantos porque en MariaDB un disparador es POR TABLA Y POR
+--   EVENTO: no existe «uno para insertar, borrar y actualizar». Cada
+--   uno es de tres líneas y todos hacen lo mismo, así que la lista es
+--   larga pero no tiene nada que entender.
+--
+--   Los borrados EN CASCADA no disparan nada (comprobado en MariaDB
+--   10.4), y aquí eso es justo lo que conviene: al borrar un viaje
+--   entero, sus hijas y nietas se van sin intentar tocar una fila de
+--   `planes` que está desapareciendo. Y al borrar un LUGAR, su reparto
+--   y sus reacciones caen con él sin sumar de más: basta con el
+--   disparador del propio lugar.
+-- ------------------------------------------------------------
+
+-- ── plan_gastos ──
+-- El BEFORE INSERT de validación (trg_gasto_valido) sigue donde
+-- estaba; éste es AFTER, así que conviven sin estorbarse.
+DROP TRIGGER IF EXISTS trg_gasto_ins_toca_plan $$
+CREATE TRIGGER trg_gasto_ins_toca_plan
+AFTER INSERT ON plan_gastos FOR EACH ROW
+BEGIN CALL sp_tocar_plan(NEW.plan_id); END $$
+
+DROP TRIGGER IF EXISTS trg_gasto_upd_toca_plan $$
+CREATE TRIGGER trg_gasto_upd_toca_plan
+AFTER UPDATE ON plan_gastos FOR EACH ROW
+BEGIN CALL sp_tocar_plan(NEW.plan_id); END $$
+
+DROP TRIGGER IF EXISTS trg_gasto_del_toca_plan $$
+CREATE TRIGGER trg_gasto_del_toca_plan
+AFTER DELETE ON plan_gastos FOR EACH ROW
+BEGIN CALL sp_tocar_plan(OLD.plan_id); END $$
+
+-- ── plan_listas ──
+DROP TRIGGER IF EXISTS trg_lista_ins_toca_plan $$
+CREATE TRIGGER trg_lista_ins_toca_plan
+AFTER INSERT ON plan_listas FOR EACH ROW
+BEGIN CALL sp_tocar_plan(NEW.plan_id); END $$
+
+DROP TRIGGER IF EXISTS trg_lista_upd_toca_plan $$
+CREATE TRIGGER trg_lista_upd_toca_plan
+AFTER UPDATE ON plan_listas FOR EACH ROW
+BEGIN CALL sp_tocar_plan(NEW.plan_id); END $$
+
+DROP TRIGGER IF EXISTS trg_lista_del_toca_plan $$
+CREATE TRIGGER trg_lista_del_toca_plan
+AFTER DELETE ON plan_listas FOR EACH ROW
+BEGIN CALL sp_tocar_plan(OLD.plan_id); END $$
+
+-- ── plan_lista_items (nieta: pasa por fn_plan_de_lista) ──
+DROP TRIGGER IF EXISTS trg_litem_ins_toca_plan $$
+CREATE TRIGGER trg_litem_ins_toca_plan
+AFTER INSERT ON plan_lista_items FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_lista(NEW.lista_id)); END $$
+
+DROP TRIGGER IF EXISTS trg_litem_upd_toca_plan $$
+CREATE TRIGGER trg_litem_upd_toca_plan
+AFTER UPDATE ON plan_lista_items FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_lista(NEW.lista_id)); END $$
+
+DROP TRIGGER IF EXISTS trg_litem_del_toca_plan $$
+CREATE TRIGGER trg_litem_del_toca_plan
+AFTER DELETE ON plan_lista_items FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_lista(OLD.lista_id)); END $$
+
+-- ── plan_item_gasto (nieta: pasa por fn_plan_de_item) ──
+DROP TRIGGER IF EXISTS trg_reparto_ins_toca_plan $$
+CREATE TRIGGER trg_reparto_ins_toca_plan
+AFTER INSERT ON plan_item_gasto FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_item(NEW.item_id)); END $$
+
+DROP TRIGGER IF EXISTS trg_reparto_upd_toca_plan $$
+CREATE TRIGGER trg_reparto_upd_toca_plan
+AFTER UPDATE ON plan_item_gasto FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_item(NEW.item_id)); END $$
+
+DROP TRIGGER IF EXISTS trg_reparto_del_toca_plan $$
+CREATE TRIGGER trg_reparto_del_toca_plan
+AFTER DELETE ON plan_item_gasto FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_item(OLD.item_id)); END $$
+
+-- ── plan_item_reacciones (nieta: pasa por fn_plan_de_item) ──
+-- Hace falta el de UPDATE, y no es evidente: api/plan_reacciones.php
+-- cambia de emoji con INSERT ... ON DUPLICATE KEY UPDATE, que sobre
+-- una fila que ya existe dispara SÓLO el AFTER UPDATE. Comprobado, y
+-- de paso: reenviar el MISMO emoji no dispara nada, así que `rev` no
+-- se mueve cuando en realidad no cambió nada.
+DROP TRIGGER IF EXISTS trg_react_ins_toca_plan $$
+CREATE TRIGGER trg_react_ins_toca_plan
+AFTER INSERT ON plan_item_reacciones FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_item(NEW.item_id)); END $$
+
+DROP TRIGGER IF EXISTS trg_react_upd_toca_plan $$
+CREATE TRIGGER trg_react_upd_toca_plan
+AFTER UPDATE ON plan_item_reacciones FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_item(NEW.item_id)); END $$
+
+DROP TRIGGER IF EXISTS trg_react_del_toca_plan $$
+CREATE TRIGGER trg_react_del_toca_plan
+AFTER DELETE ON plan_item_reacciones FOR EACH ROW
+BEGIN CALL sp_tocar_plan(fn_plan_de_item(OLD.item_id)); END $$
+
+-- ── plan_miembros: SÓLO al entrar y al salir ──
+--
+-- ⚠ AQUÍ NO VA UN DISPARADOR DE UPDATE, Y ES A PROPÓSITO.
+-- La fase 6 (presencia: «quién está mirando ahora») escribirá en
+-- plan_miembros EN CADA SONDEO. Si ese UPDATE subiera `rev`, cada
+-- sondeo contaría como una novedad, cada cliente se recargaría el
+-- plan entero, ese recargado generaría más sondeos... y se realimenta
+-- hasta fundir el servidor. Quien añada aquí un trg_miembro_upd
+-- estará encendiendo esa mecha.
+DROP TRIGGER IF EXISTS trg_miembro_ins_toca_plan $$
+CREATE TRIGGER trg_miembro_ins_toca_plan
+AFTER INSERT ON plan_miembros FOR EACH ROW
+BEGIN CALL sp_tocar_plan(NEW.plan_id); END $$
+
+DROP TRIGGER IF EXISTS trg_miembro_del_toca_plan $$
+CREATE TRIGGER trg_miembro_del_toca_plan
+AFTER DELETE ON plan_miembros FOR EACH ROW
+BEGIN CALL sp_tocar_plan(OLD.plan_id); END $$
 
 -- ------------------------------------------------------------
 -- trg_plan_borrado  (auditoría)
@@ -548,8 +733,14 @@ DELIMITER ;
 
 
 -- ────────────────────────────────────────────────────────────
---  Verificación: debe imprimir 5 funciones, 6 procedimientos y
---  5 triggers. Si algún número no cuadra, algo de arriba falló.
+--  Verificación: debe imprimir 7 funciones, 7 procedimientos y
+--  22 triggers. Si algún número no cuadra, algo de arriba falló.
+--
+--  Los 22 salen de: 5 de antes (3 sobre plan_items, la auditoría del
+--  borrado y la validación del gasto) + 17 de la fase 2 — tres por
+--  cada una de plan_gastos, plan_listas, plan_lista_items,
+--  plan_item_gasto y plan_item_reacciones, y sólo dos en
+--  plan_miembros, que no lleva el de UPDATE a propósito.
 -- ────────────────────────────────────────────────────────────
 SELECT ROUTINE_TYPE AS tipo, COUNT(*) AS cuantas
   FROM information_schema.ROUTINES

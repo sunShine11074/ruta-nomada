@@ -34,6 +34,8 @@
 --   · plan_invitaciones gana 3 columnas: usos, usos_max y token_claro,
 --     para que el enlace de invitación se pueda compartir con varias
 --     personas en vez de morir con la primera.
+--   · planes gana `rev` y plan_items gana `ver`: el testigo de cambio
+--     con el que la colaboración detecta novedades sin recargar.
 --   Nada más: ni tipos distintos, ni índices nuevos, ni cambios en
 --   el procedimiento sp_registrar_usuario.
 -- ============================================================
@@ -208,7 +210,35 @@ ALTER TABLE `plan_invitaciones`
 UPDATE `plan_invitaciones` SET `usos` = 1 WHERE `usada` = 1 AND `usos` = 0;
 
 
--- ── 6. Comprobación ─────────────────────────────────────────
+-- ── 6. El testigo de cambio del viaje (colaboración) ────────
+--
+-- Sin estas dos columnas no hay forma barata de preguntar «¿hay
+-- novedades en este viaje?»: habría que traerse el plan entero cada
+-- pocos segundos.
+--
+-- planes.rev     cambia cuando cambia CUALQUIER COSA del viaje. Lo
+--                mueven 20 disparadores; nadie lo escribe desde PHP.
+--                No sirve updated_at: `timestamp` tiene resolución de
+--                UN SEGUNDO, y dos ediciones dentro del mismo segundo
+--                serían indistinguibles.
+-- plan_items.ver la versión de un lugar concreto, para el bloqueo
+--                optimista. La sube la sentencia UPDATE del endpoint,
+--                nunca un disparador.
+--
+-- ⚠ Esto sólo trae las COLUMNAS. Los disparadores que mueven `rev`
+-- están en basedatos/rutinas.sql: hay que ejecutarlo también, o se
+-- quedan quietas para siempre. herramientas/actualizar.bat hace los dos.
+
+ALTER TABLE `planes`
+  ADD COLUMN IF NOT EXISTS `rev` bigint(20) unsigned NOT NULL DEFAULT 0
+      COMMENT 'Testigo de cambio del viaje; lo mueven los disparadores' AFTER `updated_at`;
+
+ALTER TABLE `plan_items`
+  ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
+      COMMENT 'Version del lugar para el bloqueo optimista' AFTER `plan_id`;
+
+
+-- ── 7. Comprobación ─────────────────────────────────────────
 -- Si todo salió bien, esto imprime 5 columnas nuevas, 5 tablas nuevas
 -- y 3 columnas nuevas en plan_invitaciones.
 --
@@ -229,4 +259,9 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_invitaciones'
        AND COLUMN_NAME IN ('usos','usos_max','token_claro'))
-    AS `columnas_nuevas_en_plan_invitaciones (deben ser 3)`;
+    AS `columnas_nuevas_en_plan_invitaciones (deben ser 3)`,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND ((TABLE_NAME = 'planes' AND COLUMN_NAME = 'rev')
+         OR (TABLE_NAME = 'plan_items' AND COLUMN_NAME = 'ver')))
+    AS `testigo_de_cambio (deben ser 2)`;
