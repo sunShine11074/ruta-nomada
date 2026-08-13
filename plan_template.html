@@ -1730,14 +1730,14 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         <sc-if value="{{ fotoHayMias }}" hint-placeholder-val="{{ false }}">
           <div style="display:grid;grid-template-columns:repeat(3,1fr);column-gap:22.5px;row-gap:13.5px;margin-top:19.5px">
             <sc-for list="{{ fotoMiasVM }}" as="fm" hint-placeholder-count="3">
-              <div style="position:relative;aspect-ratio:16/10;border-radius:6px;overflow:hidden;background:#D3D3D3;border:2px solid {{ fm.borde }};box-sizing:border-box">
-                <button onClick="{{ fm.elegir }}" aria-label="Usar esta foto como portada" style="position:absolute;inset:0;width:100%;height:100%;padding:0;border:none;background:none;cursor:pointer;display:block">
+              <div style="position:relative;aspect-ratio:16/10;border-radius:6px;overflow:hidden;background:#D3D3D3;border:4px solid {{ fm.borde }};box-sizing:border-box">
+                <button onClick="{{ fm.marcar }}" aria-label="Marcar esta foto" style="position:absolute;inset:0;width:100%;height:100%;padding:0;border:none;background:none;cursor:pointer;display:block">
                   <img src="{{ fm.ruta }}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">
                 </button>
                 <button onClick="{{ fm.borrar }}" title="Quitar esta foto" aria-label="Quitar esta foto" style="position:absolute;top:7px;left:7px;width:26px;height:26px;border:none;border-radius:6px;background:rgba(255,255,255,.92);color:#0D1F27;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(13,31,39,.22)" style-hover="background:#ffffff;color:#C0392B">
                   <svg width="11" height="11" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg>
                 </button>
-                <span style="position:absolute;top:7px;right:7px;display:{{ fm.insignia }};align-items:center;height:24px;padding:0 11px;border-radius:12px;background:#3F52E3;color:#ffffff;font-size:11.5px;font-weight:700;pointer-events:none">Selecciona</span>
+                <button onClick="{{ fm.aplicar }}" style="position:absolute;top:7px;right:7px;display:{{ fm.insignia }};align-items:center;justify-content:center;height:26px;padding:0 11px;border:none;border-radius:13px;background:#3F52E3;color:#ffffff;font-size:11.5px;font-weight:700;line-height:1;cursor:pointer;transition:background .15s ease" style-hover="background:#2E3A87">Selecciona</button>
               </div>
             </sc-for>
           </div>
@@ -1780,8 +1780,8 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         <sc-if value="{{ fotoHayRes }}" hint-placeholder-val="{{ false }}">
           <div style="display:grid;grid-template-columns:repeat(3,1fr);column-gap:22.5px;row-gap:13.5px;margin-top:19.5px">
             <sc-for list="{{ fotoResVM }}" as="fr" hint-placeholder-count="6">
-              <div style="position:relative;aspect-ratio:16/10;border-radius:6px;overflow:hidden;background:#D3D3D3;border:2px solid {{ fr.borde }};box-sizing:border-box">
-                <button onClick="{{ fr.elegir }}" title="{{ fr.autor }}" aria-label="{{ fr.autor }}" style="position:absolute;inset:0;width:100%;height:100%;padding:0;border:none;background:none;cursor:pointer;display:block">
+              <div style="position:relative;aspect-ratio:16/10;border-radius:6px;overflow:hidden;background:#D3D3D3;border:4px solid {{ fr.borde }};box-sizing:border-box">
+                <button onClick="{{ fr.marcar }}" title="{{ fr.autor }}" aria-label="Marcar esta foto: {{ fr.autor }}" style="position:absolute;inset:0;width:100%;height:100%;padding:0;border:none;background:none;cursor:pointer;display:block">
                   <img src="{{ fr.mini }}" alt="{{ fr.alt }}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">
                 </button>
                 <!-- Enlace al original. Pexels lo exige para poder usar
@@ -1789,7 +1789,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                 <a href="{{ fr.pagina }}" target="_blank" rel="noopener noreferrer" title="{{ fr.autor }}" aria-label="Abrir el original: {{ fr.autor }}" style="position:absolute;top:7px;left:7px;width:26px;height:26px;border-radius:6px;background:rgba(255,255,255,.92);color:#0D1F27;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 1px 4px rgba(13,31,39,.22)" style-hover="background:#ffffff">
                   <svg width="12" height="12" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M354.4 83.8C359.4 71.8 371.1 64 384 64L544 64C561.7 64 576 78.3 576 96L576 256C576 268.9 568.2 280.6 556.2 285.6C544.2 290.6 530.5 287.8 521.3 278.7L464 221.3L310.6 374.6C298.1 387.1 277.8 387.1 265.3 374.6C252.8 362.1 252.8 341.8 265.3 329.3L418.7 176L361.4 118.6C352.2 109.4 349.5 95.7 354.5 83.7zM64 240C64 195.8 99.8 160 144 160L224 160C241.7 160 256 174.3 256 192C256 209.7 241.7 224 224 224L144 224C135.2 224 128 231.2 128 240L128 496C128 504.8 135.2 512 144 512L400 512C408.8 512 416 504.8 416 496L416 416C416 398.3 430.3 384 448 384C465.7 384 480 398.3 480 416L480 496C480 540.2 444.2 576 400 576L144 576C99.8 576 64 540.2 64 496L64 240z"></path></svg>
                 </a>
-                <span style="position:absolute;top:7px;right:7px;display:{{ fr.insignia }};align-items:center;height:24px;padding:0 11px;border-radius:12px;background:#3F52E3;color:#ffffff;font-size:11.5px;font-weight:700;pointer-events:none">Selecciona</span>
+                <button onClick="{{ fr.aplicar }}" style="position:absolute;top:7px;right:7px;display:{{ fr.insignia }};align-items:center;justify-content:center;height:26px;padding:0 11px;border:none;border-radius:13px;background:#3F52E3;color:#ffffff;font-size:11.5px;font-weight:700;line-height:1;cursor:pointer;transition:background .15s ease" style-hover="background:#2E3A87">Selecciona</button>
               </div>
             </sc-for>
           </div>

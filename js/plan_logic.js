@@ -2856,7 +2856,8 @@ class Component extends DCLogic {
         ruta: f.ruta,
         borde: elegida ? '#3F52E3' : 'transparent',
         insignia: elegida ? 'flex' : 'none',
-        elegir: () => this._fotoElegirMia(f),
+        marcar: () => this.setState({ fotoSel: 'm' + f.id }),
+        aplicar: () => this._fotoElegirMia(f),
         borrar: () => this._fotoBorrarMia(f)
       };
     });
@@ -2880,7 +2881,11 @@ class Component extends DCLogic {
         // #3F52E3 medido del borde de la tarjeta elegida en el frame
         borde: elegida ? '#3F52E3' : 'transparent',
         insignia: elegida ? 'flex' : 'none',
-        elegir: () => this._fotoElegir(f)
+        // Dos pasos a proposito: pulsar la foto solo la MARCA, y es
+        // "Selecciona" quien la aplica. Con un solo paso, rozar una
+        // tarjeta cambiaba la portada del viaje sin querer.
+        marcar: () => this.setState({ fotoSel: f.id }),
+        aplicar: () => this._fotoElegir(f)
       };
     });
     // NO usa _sync: ese es fuego-y-olvida y se traga los fallos en la
