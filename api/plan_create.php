@@ -82,6 +82,28 @@ try {
     // El plan ya existe; se sigue sin los items del borrador.
 }
 
+// ── Portada automática ──────────────────────────────────────
+// Un viaje recién creado no tenía foto, y plan.php caía en
+// picsum.photos: una imagen ALEATORIA sembrada con el nombre del
+// destino. Estable, sí, pero sin ninguna relación con la ciudad.
+// Ahora se busca una foto real del destino en Pexels.
+//
+// Va en su propio try, después del plan y sin transacción: si Pexels
+// tarda o falla, el viaje se crea igual y simplemente se queda sin
+// portada, con el mismo respaldo de antes. Espera 6 segundos como
+// mucho; la consulta suele tardar menos de uno.
+try {
+    require_once __DIR__ . '/../includes/pexels_lib.php';
+    $portada = pexelsPortadaDeDestino($destino);
+    if ($portada !== null) {
+        $db->prepare('UPDATE planes SET portada_url = ? WHERE id = ?')
+           ->execute([mb_substr($portada, 0, 500), $planId]);
+    }
+} catch (Throwable $e) {
+    error_log('plan_create (portada): ' . $e->getMessage());
+    // El plan ya existe; se sigue sin portada.
+}
+
 // Invitaciones por correo (fuera de la transacción; el correo puede fallar sin abortar)
 $invitados = array_slice(array_filter(array_map('trim', (array)($in['invitados'] ?? []))), 0, 10);
 $enviadas = 0;
