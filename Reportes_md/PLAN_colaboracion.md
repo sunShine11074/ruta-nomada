@@ -571,6 +571,8 @@ Once casos contra el servidor real, y después el cliente en el navegador.
 
 ## 8. Fase 6 · Presencia
 
+> **✅ HECHA el 13/08/2026.** Dos detalles que el plan no menciona, al final.
+
 **½ día.**
 
 ```sql
@@ -584,6 +586,43 @@ Media jornada de trabajo, y es lo que hace que la demostración **se vea**
 colaborativa en lugar de tener que explicarse con palabras.
 
 (Ver la trampa de §4: este `UPDATE` no debe llevar disparador.)
+
+---
+
+### Lo que cambió al implementarla
+
+**1 · `TIMESTAMP NULL` hay que escribirlo con `DEFAULT NULL` explícito.**
+
+En MariaDB una columna `TIMESTAMP` declarada sin decir nada puede heredar
+`DEFAULT CURRENT_TIMESTAMP`. Si eso pasara, **todas las filas de
+`plan_miembros` que ya existen nacerían marcadas como «aquí ahora mismo»**, y
+al abrir el viaje saldrían en verde personas que llevan semanas sin entrar.
+Comprobado tras aplicarla: la columna queda `NULL`, sin `Extra`, y las ocho
+filas existentes en `NULL`.
+
+**2 · La presencia va dentro de un `try`, y el latido sobrevive sin ella.**
+
+Quien traiga el código sin poner la base al día no tiene la columna. Sin esa
+protección se le caería **el latido entero** —detección de cambios incluida—
+por no tener puntos verdes. Así, se queda sin puntos y conserva lo demás.
+
+**3 · Por qué 45 segundos y no menos.**
+
+Con el latido a 5 s, 45 dejan margen para tres fallos seguidos antes de que a
+alguien se le apague el punto. Con los 15 s a los que retrocede el latido
+cuando no pasa nada, el punto **parpadearía**; por eso importa que cualquier
+tecla o clic devuelva el ritmo a 5 s, que ya hacía la fase 3.
+
+### Cómo se comprobó
+
+| Prueba | Resultado |
+|---|---|
+| **Seis sondeos seguidos de dos personas** | **`rev` no se movió** — la trampa de §4 sigue cerrada |
+| Los dos con la pestaña abierta | `aqui: [34,35]` para ambos |
+| A B se le atrasa la marca 60 s | A pasa a ver `aqui: [34]` |
+| En el navegador | Dos puntos en el árbol: uno `block` y otro `none`, en `#41A24D` y 9 px |
+| Título del avatar | «Presencia Uno · propietario · **aqui ahora**» frente a «Presencia Dos · editor» |
+| **B vuelve y late** | El segundo punto aparece en la pantalla de A **sin recargar** |
 
 ---
 

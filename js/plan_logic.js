@@ -154,7 +154,7 @@ class Component extends DCLogic {
       invEnviando: false,
       // El latido (fase 3 de PLAN_colaboracion.md).
       //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
-      pulsoCaido: false,
+      pulsoCaido: false, presentes: [],
       // El aviso de la fusion. avisoRecarga distingue "ya esta traido,
       // esto es solo para que te enteres" -se va solo- de "esto no se
       // pudo fusionar, hace falta recargar" -se queda-.
@@ -374,6 +374,14 @@ class Component extends DCLogic {
       .then(j => {
         if (!j || !j.ok) throw new Error((j && j.error) || 'pulso');
         this._pulsoFallos = 0;
+        // Quien mas esta mirando el viaje ahora. Se compara antes de
+        // llamar a setState: sin eso, cada pulso repintaria el arbol
+        // entero para dejarlo exactamente igual.
+        const aqui = Array.isArray(j.aqui) ? j.aqui : [];
+        const ant = this.state.presentes || [];
+        if (aqui.length !== ant.length || aqui.some((u, i) => u !== ant[i])) {
+          this.setState({ presentes: aqui });
+        }
         if (typeof j.rev === 'number' && j.rev !== this.REV) {
           // Cambio de OTRA persona: los propios ya se adoptaron en
           // _sync() en el momento de escribirlos.
@@ -4431,11 +4439,19 @@ class Component extends DCLogic {
     V.chatTitle = this.META.titulo;
     V.conceptoPlaceholder = 'Concepto (p. ej. Boletos ' + this.META.destino + ')';
     V.exSearchPh = this.META.destino;
-    V.miembrosVM = this.MIEMBROS.map(m => ({
-      inicial: m.inicial,
-      titulo: m.nombre + ' · ' + m.rol,
-      hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || ''
-    }));
+    const aqui = s.presentes || [];
+    V.miembrosVM = this.MIEMBROS.map(m => {
+      // El punto verde: estuvo activa en los ultimos 45 s. La persona
+      // que mira SIEMPRE se cuenta -su propio latido acaba de marcarla-,
+      // asi que el punto tambien dice "el latido funciona".
+      const esta = aqui.indexOf(m.uid) >= 0;
+      return {
+        inicial: m.inicial,
+        titulo: m.nombre + ' · ' + m.rol + (esta ? ' · aqui ahora' : ''),
+        hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || '',
+        punto: esta ? 'block' : 'none'
+      };
+    });
     return V;
   }
 }

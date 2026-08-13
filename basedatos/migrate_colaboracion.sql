@@ -79,11 +79,35 @@ ALTER TABLE `planes`
   ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
       COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista' AFTER `rev`;
 
--- ── Comprobación ────────────────────────────────────────────
--- Si todo salió bien, imprime 2.
+-- ── Presencia: quién está mirando el viaje ahora ─────────────
+--
+-- La marca la escribe api/plan_pulso.php en cada latido, y los
+-- avatares de la cabecera sacan un punto verde si su dueño estuvo
+-- activo en los últimos 45 segundos.
+--
+-- ⚠ NULL EXPLÍCITO, Y NO ES POR GUSTO. En MariaDB una columna
+-- TIMESTAMP declarada sin decir nada puede heredar DEFAULT
+-- CURRENT_TIMESTAMP: entonces TODAS las filas que ya existen nacerían
+-- marcadas como «aquí ahora mismo», y al abrir el viaje aparecerían en
+-- verde personas que llevan semanas sin entrar. Con NULL DEFAULT NULL
+-- la columna empieza vacía, que es la verdad.
+--
+-- ⚠⚠ Y NO SE LE PONE NINGÚN DISPARADOR. Este UPDATE ocurre en CADA
+-- sondeo de CADA persona. Si moviera `rev`, cada sondeo contaría como
+-- una novedad, cada cliente se traería el plan entero, ese trabajo
+-- generaría más sondeos, y se realimenta hasta fundir el servidor.
+-- Por eso plan_miembros sólo tiene disparadores de INSERT y DELETE.
 
-SELECT COUNT(*) AS `columnas_nuevas (deben ser 3)`
+ALTER TABLE `plan_miembros`
+  ADD COLUMN IF NOT EXISTS `visto_en` timestamp NULL DEFAULT NULL
+      COMMENT 'Ultimo latido de esta persona en este viaje' AFTER `joined_at`;
+
+-- ── Comprobación ────────────────────────────────────────────
+-- Si todo salió bien, imprime 4.
+
+SELECT COUNT(*) AS `columnas_nuevas (deben ser 4)`
   FROM information_schema.COLUMNS
  WHERE TABLE_SCHEMA = DATABASE()
-   AND ((TABLE_NAME = 'planes'     AND COLUMN_NAME IN ('rev','ver'))
-     OR (TABLE_NAME = 'plan_items' AND COLUMN_NAME = 'ver'));
+   AND ((TABLE_NAME = 'planes'        AND COLUMN_NAME IN ('rev','ver'))
+     OR (TABLE_NAME = 'plan_items'    AND COLUMN_NAME = 'ver')
+     OR (TABLE_NAME = 'plan_miembros' AND COLUMN_NAME = 'visto_en'));

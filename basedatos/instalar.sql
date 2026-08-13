@@ -349,6 +349,11 @@ CREATE TABLE `plan_miembros` (
   `usuario_id` int(11) NOT NULL,
   `rol` enum('propietario','editor','lector') NOT NULL DEFAULT 'editor',
   `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  -- Presencia: ultimo latido. NULL explicito para que las filas nazcan
+  -- vacias y no marcadas como "aqui ahora". Sin disparador a proposito:
+  -- se escribe en CADA sondeo y mover `rev` desde aqui realimentaria el
+  -- servidor hasta fundirlo.
+  `visto_en` timestamp NULL DEFAULT NULL COMMENT 'Ultimo latido de esta persona en este viaje',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_plan_user` (`plan_id`,`usuario_id`),
   KEY `fk_planmiembros_user` (`usuario_id`),

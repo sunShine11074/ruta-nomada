@@ -241,6 +241,14 @@ ALTER TABLE `planes`
   ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
       COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista' AFTER `rev`;
 
+-- Presencia. NULL explicito: sin el, MariaDB puede darle DEFAULT
+-- CURRENT_TIMESTAMP y todas las filas existentes nacerian marcadas como
+-- "aqui ahora mismo". Y sin disparador: se escribe en CADA sondeo, y si
+-- moviera `rev` el servidor se realimentaria hasta fundirse.
+ALTER TABLE `plan_miembros`
+  ADD COLUMN IF NOT EXISTS `visto_en` timestamp NULL DEFAULT NULL
+      COMMENT 'Ultimo latido de esta persona en este viaje' AFTER `joined_at`;
+
 
 -- ── 7. Comprobación ─────────────────────────────────────────
 -- Si todo salió bien, esto imprime 5 columnas nuevas, 5 tablas nuevas
