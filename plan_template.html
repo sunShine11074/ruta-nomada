@@ -84,6 +84,33 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
    centro al terminar. Paso el 12/08/2026 reutilizando rnMenu aqui. */
 @keyframes rnSube{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 .rn-skel{background:linear-gradient(90deg,#e7edf2 25%,#f3f7fa 37%,#e7edf2 63%);background-size:420px 100%;animation:rnShimmer 1.3s infinite linear;}
+/* ── Print Styles ────────────────────────────────────────────── */
+@media print {
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: auto !important; overflow: visible !important; background: white; color: black; }
+  /* Hide non-printing elements */
+  header, aside, .tb-right, .rn-emosb, .rn-bar, .rn-menu, button, .tb-crearplan { display: none !important; }
+  /* Show the main content scroll container and make it printable */
+  #rnContentScroll { display: block !important; overflow: visible !important; height: auto !important; min-height: auto !important; flex: none !important; }
+  #rnContentScroll > div { display: block !important; width: 100% !important; flex: none !important; }
+  #rnContentScroll > div > div { display: block !important; width: 100% !important; flex: none !important; border: none !important; padding: 0 !important; }
+  /* Content visibility */
+  #secItinerario { display: block !important; }
+  #secPresupuesto { display: block !important; }
+  [id^="secDia"] { display: block !important; page-break-inside: avoid; margin-bottom: 1.5cm; padding: 1cm 0; border-bottom: 1px solid #ddd; }
+  [id^="secDia"] h2 { font-size: 16pt !important; margin: 1cm 0 0.5cm 0 !important; font-weight: 700 !important; }
+  /* Itinerary items */
+  .rn-ckrow { display: block !important; page-break-inside: avoid; margin-bottom: 0.8cm; padding-bottom: 0.5cm; border-bottom: 1px solid #e0e0e0; }
+  .rn-ckrow * { display: block !important; color: black !important; background: transparent !important; }
+  /* Remove hover and interactive styles */
+  .rn-ckact { display: none !important; }
+  .rn-grip { display: none !important; }
+  /* Force text colors to black */
+  h1, h2, h3, h4, h5, h6 { color: black !important; page-break-after: avoid; }
+  p { orphans: 2; widows: 2; }
+  /* Links remain visible but not underlined in print */
+  a { color: black !important; text-decoration: none !important; }
+}
 </style>
 <script src="plantillas.js"></script>
 </helmet>
@@ -239,17 +266,9 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         <sc-if value="{{ heroMenuOpen }}" hint-placeholder-val="{{ false }}">
           <div onClick="{{ heroMenuClose }}" style="position:fixed;inset:0;z-index:479"></div>
           <div style="position:absolute;top:calc(100% + 10px);right:0;z-index:480;width:292px;background:#ffffff;border-radius:14px;box-shadow:0 12px 36px rgba(14,42,51,.25);overflow:hidden;padding-bottom:4px;animation:rnMenu .18s ease both">
-            <button onClick="{{ heroMenuClose }}" class="rn-menuitem" style="display:flex;align-items:center;gap:15px;width:100%;background:none;border:none;padding:14px 18px;font-size:13.8px;font-weight:500;color:#16262e;cursor:pointer;text-align:left" style-hover="background:#E9E9E9">
-              <svg width="17" height="17" viewBox="0 0 640 640" style="flex-shrink:0"><path fill="#212529" d="M259.1 73.5C262.1 58.7 275.2 48 290.4 48L350.2 48C365.4 48 378.5 58.7 381.5 73.5L396 143.5C410.1 149.5 423.3 157.2 435.3 166.3L503.1 143.8C517.5 139 533.3 145 540.9 158.2L570.8 210C578.4 223.2 575.7 239.8 564.3 249.9L511 297.3C511.9 304.7 512.3 312.3 512.3 320C512.3 327.7 511.8 335.3 511 342.7L564.4 390.2C575.8 400.3 578.4 417 570.9 430.1L541 481.9C533.4 495 517.6 501.1 503.2 496.3L435.4 473.8C423.3 482.9 410.1 490.5 396.1 496.6L381.7 566.5C378.6 581.4 365.5 592 350.4 592L290.6 592C275.4 592 262.3 581.3 259.3 566.5L244.9 496.6C230.8 490.6 217.7 482.9 205.6 473.8L137.5 496.3C123.1 501.1 107.3 495.1 99.7 481.9L69.8 430.1C62.2 416.9 64.9 400.3 76.3 390.2L129.7 342.7C128.8 335.3 128.4 327.7 128.4 320C128.4 312.3 128.9 304.7 129.7 297.3L76.3 249.8C64.9 239.7 62.3 223 69.8 209.9L99.7 158.1C107.3 144.9 123.1 138.9 137.5 143.7L205.3 166.2C217.4 157.1 230.6 149.5 244.6 143.4L259.1 73.5zM320.3 400C364.5 399.8 400.2 363.9 400 319.7C399.8 275.5 363.9 239.8 319.7 240C275.5 240.2 239.8 276.1 240 320.3C240.2 364.5 276.1 400.2 320.3 400z"></path></svg>
-              Configuración
-            </button>
-            <button onClick="{{ heroMenuClose }}" class="rn-menuitem" style="display:flex;align-items:center;gap:15px;width:100%;background:none;border:none;padding:14px 18px;font-size:13.8px;font-weight:500;color:#16262e;cursor:pointer;text-align:left" style-hover="background:#E9E9E9">
+            <button onClick="{{ heroMenuPrint }}" class="rn-menuitem" style="display:flex;align-items:center;gap:15px;width:100%;background:none;border:none;padding:14px 18px;font-size:13.8px;font-weight:500;color:#16262e;cursor:pointer;text-align:left" style-hover="background:#E9E9E9">
               <svg width="17" height="17" viewBox="0 0 640 640" style="flex-shrink:0"><path fill="#212529" d="M128 128C128 92.7 156.7 64 192 64L405.5 64C422.5 64 438.8 70.7 450.8 82.7L493.3 125.2C505.3 137.2 512 153.5 512 170.5L512 208L128 208L128 128zM64 320C64 284.7 92.7 256 128 256L512 256C547.3 256 576 284.7 576 320L576 416C576 433.7 561.7 448 544 448L512 448L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 448L96 448C78.3 448 64 433.7 64 416L64 320zM192 480L192 512L448 512L448 416L192 416L192 480zM520 336C520 322.7 509.3 312 496 312C482.7 312 472 322.7 472 336C472 349.3 482.7 360 496 360C509.3 360 520 349.3 520 336z"></path></svg>
               Imprimir este viaje
-            </button>
-            <button onClick="{{ heroMenuClose }}" class="rn-menuitem" style="display:flex;align-items:center;gap:15px;width:100%;background:none;border:none;padding:14px 18px;font-size:13.8px;font-weight:500;color:#16262e;cursor:pointer;text-align:left" style-hover="background:#E9E9E9">
-              <svg width="17" height="17" viewBox="0 0 640 640" style="flex-shrink:0"><path fill="#212529" d="M320 96C239.2 96 174.5 132.8 127.4 176.6C80.6 220.1 49.3 272 34.4 307.7C31.1 315.6 31.1 324.4 34.4 332.3C49.3 368 80.6 420 127.4 463.4C174.5 507.1 239.2 544 320 544C400.8 544 465.5 507.2 512.6 463.4C559.4 419.9 590.7 368 605.6 332.3C608.9 324.4 608.9 315.6 605.6 307.7C590.7 272 559.4 220 512.6 176.6C465.5 132.9 400.8 96 320 96zM176 320C176 240.5 240.5 176 320 176C399.5 176 464 240.5 464 320C464 399.5 399.5 464 320 464C240.5 464 176 399.5 176 320zM320 256C320 291.3 291.3 320 256 320C244.5 320 233.7 317 224.3 311.6C223.3 322.5 224.2 333.7 227.2 344.8C240.9 396 293.6 426.4 344.8 412.7C396 399 426.4 346.3 412.7 295.1C400.5 249.4 357.2 220.3 311.6 224.3C316.9 233.6 320 244.4 320 256z"></path></svg>
-              Modo solo lectura
             </button>
             <button onClick="{{ allSecToggle }}" class="rn-menuitem" style="display:flex;align-items:center;gap:15px;width:100%;background:none;border:none;padding:14px 18px;font-size:13.8px;font-weight:500;color:#16262e;cursor:pointer;text-align:left" style-hover="background:#E9E9E9">
               <svg width="15" height="15" viewBox="0 0 640 640" style="flex-shrink:0;transform:rotate({{ allSecRot }});transition:transform .2s"><path fill="#212529" d="M297.4 470.6C309.9 483.1 330.2 483.1 342.7 470.6L534.7 278.6C547.2 266.1 547.2 245.8 534.7 233.3C522.2 220.8 501.9 220.8 489.4 233.3L320 402.7L150.6 233.4C138.1 220.9 117.8 220.9 105.3 233.4C92.8 245.9 92.8 266.2 105.3 278.7L297.3 470.7z"></path></svg>
