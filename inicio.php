@@ -176,7 +176,7 @@ require_once __DIR__ . '/includes/user_topbar.php';
     <div class="footer-container">
         <!-- Columna 1: Logo y descripción -->
         <div class="footer-col brand-col">
-            <img src="img/logo_deriva.png" alt="Logo Deriva" class="footer-logo">
+            <img src="img/DERIVA EN BLANCO.png" alt="Logo Deriva" class="footer-logo">
             <p>Descubre el mundo con nosotros. Creamos rutas, destinos y aventuras diseñadas especialmente a tu medida.</p>
         </div>
         
