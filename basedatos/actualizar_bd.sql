@@ -28,6 +28,11 @@
 --   · plan_items gana 5 columnas: modo_viaje, moneda, gasto_cat,
 --     gasto_desc y gasto_modo.
 --   · Se crea la tabla plan_item_gasto.
+--   · Se crean tramo_cache y ruta_uso (la caché de rutas del mapa).
+--   · Se crea usuario_fotos (la galería de «Cambiar foto»).
+--   · plan_invitaciones gana 3 columnas: usos, usos_max y token_claro,
+--     para que el enlace de invitación se pueda compartir con varias
+--     personas en vez de morir con la primera.
 --   Nada más: ni tipos distintos, ni índices nuevos, ni cambios en
 --   el procedimiento sp_registrar_usuario.
 -- ============================================================
@@ -144,8 +149,39 @@ CREATE TABLE IF NOT EXISTS `usuario_fotos` (
     REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ── 5. Comprobación ─────────────────────────────────────────
--- Si todo salió bien, esto imprime 5 columnas nuevas y 3 tablas nuevas.
+-- ── 5. El enlace de invitación se puede compartir ───────────
+--
+-- La ventana «Invita a compañeros de viaje» enseña un enlace para
+-- repartir entre varias personas, pero el token era de UN SOLO USO:
+-- la segunda persona que lo abría recibía «inválido, ya fue usado».
+--
+-- usos / usos_max separan los dos tipos de invitación que ya convivían
+-- en la tabla: la de correo (un uso, dirigida a alguien) y la de
+-- compartir (email NULL, usos_max NULL = sin límite).
+--
+-- token_claro guarda el token legible SÓLO en la de compartir, porque
+-- la ventana tiene que poder volver a enseñar el enlace y de un
+-- SHA-256 no se saca. Las de correo siguen siendo únicamente hash.
+-- El razonamiento entero está en basedatos/migrate_invitar.sql.
+
+ALTER TABLE `plan_invitaciones`
+  ADD COLUMN IF NOT EXISTS `usos` smallint(5) unsigned NOT NULL DEFAULT 0
+      COMMENT 'Cuánta gente ha entrado ya por esta invitación' AFTER `usada`;
+
+ALTER TABLE `plan_invitaciones`
+  ADD COLUMN IF NOT EXISTS `usos_max` smallint(5) unsigned DEFAULT 1
+      COMMENT 'NULL = sin límite (enlace para compartir)' AFTER `usos`;
+
+ALTER TABLE `plan_invitaciones`
+  ADD COLUMN IF NOT EXISTS `token_claro` varchar(64) DEFAULT NULL
+      COMMENT 'Token legible; SÓLO para el enlace de compartir (email IS NULL)' AFTER `token_hash`;
+
+UPDATE `plan_invitaciones` SET `usos` = 1 WHERE `usada` = 1 AND `usos` = 0;
+
+
+-- ── 6. Comprobación ─────────────────────────────────────────
+-- Si todo salió bien, esto imprime 5 columnas nuevas, 3 tablas nuevas
+-- y 3 columnas nuevas en plan_invitaciones.
 
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -155,4 +191,8 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE()
        AND TABLE_NAME IN ('plan_item_gasto','tramo_cache','ruta_uso'))
-    AS `tablas_nuevas (deben ser 3)`;
+    AS `tablas_nuevas (deben ser 3)`,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_invitaciones'
+       AND COLUMN_NAME IN ('usos','usos_max','token_claro'))
+    AS `columnas_nuevas_en_plan_invitaciones (deben ser 3)`;

@@ -94,6 +94,14 @@ la siguiente llegue a existir.
 
 ## 3. Fase 1 · El botón de invitar cobra vida
 
+> **✅ HECHA el 12/08/2026, pero no como se cuenta aquí debajo.** Esta sección
+> se escribió sin los frames. Lo que se implementó de verdad —y por qué, y con
+> qué medidas— está en **`PLAN_invitar.md`**. Tres diferencias que importan:
+> los frames **no traen selector de rol** (todo el que entra es `editor`); la
+> lista de miembros vive en una **segunda pantalla** de la misma ventana, no
+> junto al campo de correo; y hubo que tocar `plan_invitaciones`, porque el
+> enlace era de **un solo uso** y el frame lo enseña para compartirlo.
+
 **1 día.** El backend está completo; sólo falta quien lo llame.
 
 ### Archivos

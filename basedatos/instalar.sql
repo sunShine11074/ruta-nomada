@@ -259,13 +259,24 @@ CREATE TABLE `plan_gastos` (
   CONSTRAINT `fk_plangastos_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Dos tipos de invitación conviven en esta tabla:
+--   · por correo     → email = el destinatario, usos_max = 1
+--   · para compartir → email NULL, usos_max NULL (sin límite), uno por
+--     plan, y es el que enseña la ventana «Invita a compañeros».
+-- token_claro se rellena SÓLO en el segundo caso, porque la ventana
+-- tiene que poder volver a enseñar el enlace cada vez que se abre y de
+-- un SHA-256 no se saca el token. El razonamiento entero, con las
+-- alternativas descartadas, está en basedatos/migrate_invitar.sql.
 CREATE TABLE `plan_invitaciones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
   `token_hash` char(64) NOT NULL COMMENT 'SHA-256 del token de invitación',
+  `token_claro` varchar(64) DEFAULT NULL COMMENT 'Token legible; SÓLO para el enlace de compartir (email IS NULL)',
   `rol` enum('editor','lector') NOT NULL DEFAULT 'editor',
   `email` varchar(255) DEFAULT NULL,
   `usada` tinyint(1) NOT NULL DEFAULT 0,
+  `usos` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Cuánta gente ha entrado ya por esta invitación',
+  `usos_max` smallint(5) unsigned DEFAULT 1 COMMENT 'NULL = sin límite (enlace para compartir)',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `expira_en` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),

@@ -140,7 +140,18 @@ class Component extends DCLogic {
       // fotoBuscado distingue "aun no has buscado" de "buscaste y no
       // hubo nada": son dos pantallas distintas y sin esto se
       // confunden, porque las dos tienen la rejilla vacia.
-      fotoBuscado: false, fotoError: ''
+      fotoBuscado: false, fotoError: '',
+      // Invitar companeros de viaje. Una sola ventana con DOS
+      // pantallas -invitar y gestionar-, que es como lo piden los
+      // frames. Medidas en Reportes_md/PLAN_invitar.md
+      //   invPant   'invitar' | 'gestiona'
+      //   invLink   el enlace para compartir, tal cual lo manda el
+      //             servidor; '' mientras se pide
+      //   invCopiado  el boton dice "Copiado" SOLO si la copia salio
+      //             bien de verdad (ver _invCopiar)
+      invModal: false, invPant: 'invitar', invLink: '', invLinkErr: '',
+      invCopiado: false, invEmail: '', invMsg: '', invMsgMal: false,
+      invEnviando: false
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -152,6 +163,7 @@ class Component extends DCLogic {
     this.USER = window.PLAN_USER || { inicial: 'R', nombre: 'Ramon' };
     this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     this.puedeEditar = true;   // por defecto (modo demo sin servidor)
+    this.ROL = 'propietario';  // el demo se mira como si fuera tuyo
     this.META = { titulo: 'Viaje a Ensenada', destino: 'Ensenada', fechas: '30/7 – 31/7', hero: 'https://picsum.photos/seed/rn-en-hero/1400/460' };
     this.DESC_ENSENADA = 'Ensenada es una ciudad portuaria de Baja California, a hora y media de la frontera, famosa por su malecón frente a la bahía de Todos Santos, sus tacos de pescado y su cercanía con el Valle de Guadalupe, la principal región vinícola de México. Al sur, La Bufadora lanza chorros de mar de más de 20 metros; en el centro, la Primera y la Plaza Cívica concentran cantinas históricas, cafés y una escena gastronómica que mezcla mariscos de la lonja con cocina de autor.';
     if (!B || !B.plan) { this.DAYS = this._mkDays('2026-07-30', '2026-07-31', 2); this.state.destinoDesc = this.DESC_ENSENADA; return; }
@@ -197,11 +209,7 @@ class Component extends DCLogic {
       text: L.texto || '',
       items: (L.items || []).map(x => ({ iid: Number(x.id), t: x.texto, done: !!Number(x.hecho) }))
     }));
-    this.MIEMBROS = (B.miembros || []).map(m => ({
-      uid: Number(m.usuario_id),
-      inicial: (m.nombre || '?').trim().charAt(0).toUpperCase(),
-      nombre: ((m.nombre || '') + ' ' + (m.apellidos || '')).trim(), rol: m.rol, foto: m.foto_perfil || null
-    }));
+    this.MIEMBROS = this._mapMiembros(B.miembros);
     if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     const dest = P.destino || 'mi destino';
     this.META = {
@@ -314,6 +322,152 @@ class Component extends DCLogic {
     const volver = this._fotoVolverA;
     this._fotoVolverA = null;
     if (volver && volver.focus) setTimeout(() => volver.focus(), 60);
+  }
+
+  // Filas de plan_miembros -> la forma que usa el resto del codigo.
+  // Vive aparte porque hay DOS sitios que la necesitan: la siembra
+  // inicial y la respuesta de api/plan_miembros.php al quitar a
+  // alguien. Duplicarla acabaria con las dos versiones divergiendo.
+  _mapMiembros(arr) {
+    return (arr || []).map(m => ({
+      uid: Number(m.usuario_id),
+      inicial: (m.nombre || '?').trim().charAt(0).toUpperCase(),
+      nombre: ((m.nombre || '') + ' ' + (m.apellidos || '')).trim(),
+      rol: m.rol,
+      foto: m.foto_perfil || null
+    }));
+  }
+
+  // ════ Invitar companeros de viaje ════════════════════════
+  // Una sola ventana con dos pantallas, como piden los frames:
+  //   screens_ref/Invita a companeros de viaje*.png
+  //   medidas y decisiones en Reportes_md/PLAN_invitar.md
+
+  _invAbrir() {
+    this._invVolverA = document.activeElement;
+    this.setState({
+      invModal: true, invPant: 'invitar', invCopiado: false,
+      invEmail: '', invMsg: '', invMsgMal: false, invEnviando: false
+    });
+    this._invPedirEnlace();
+    // Se espera al repintado del runtime antes de buscar el boton.
+    setTimeout(() => {
+      const caja = document.querySelector('[role="dialog"][data-inv="1"]');
+      const b = caja && caja.querySelector('button');
+      if (b) b.focus();
+    }, 60);
+  }
+  _invCerrar() {
+    clearTimeout(this._invCopiaT);
+    this.setState({ invModal: false });
+    const volver = this._invVolverA;
+    this._invVolverA = null;
+    if (volver && volver.focus) setTimeout(() => volver.focus(), 60);
+  }
+
+  // El enlace se PIDE cada vez que se abre la ventana, pero el
+  // servidor devuelve SIEMPRE el mismo mientras siga vigente: reutiliza
+  // el que ya haya en vez de crear uno. Sin eso, abrir y cerrar la
+  // ventana veinte veces dejaria veinte credenciales permanentes en la
+  // base. La decision esta en planEnlaceDePlan().
+  _invPedirEnlace() {
+    if (!this.PLAN_ID) { this.setState({ invLink: '', invLinkErr: '' }); return; }
+    this.setState({ invLink: '', invLinkErr: '' });
+    fetch('api/plan_invitar.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'enlace' })
+    })
+      .then(r => r.json())
+      .then(j => {
+        if (j && j.ok && j.link) this.setState({ invLink: j.link, invLinkErr: '' });
+        else this.setState({ invLink: '', invLinkErr: (j && j.error) || 'No se pudo preparar el enlace.' });
+      })
+      .catch(() => this.setState({ invLink: '', invLinkErr: 'No se pudo preparar el enlace.' }));
+  }
+
+  // ⚠ navigator.clipboard SOLO existe en contexto seguro. localhost lo
+  // es; http://192.168.x.x NO, y alli seria undefined. Sin el respaldo
+  // de execCommand, el boton diria "Copiado" sin haber copiado nada.
+  // Por eso "Copiado" se pinta unicamente cuando la copia salio bien.
+  _invCopiar() {
+    const link = this.state.invLink;
+    if (!link) return;
+    const bien = () => {
+      clearTimeout(this._invCopiaT);
+      this.setState({ invCopiado: true });
+      // El frame captura el estado "Copiado", no dice cuanto dura. Se
+      // vuelve solo a los 2 s para poder copiar otra vez sin cerrar.
+      this._invCopiaT = setTimeout(() => this.setState({ invCopiado: false }), 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(bien, () => { if (this._invCopiarViejo(link)) bien(); });
+      return;
+    }
+    if (this._invCopiarViejo(link)) bien();
+  }
+  _invCopiarViejo(txt) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = txt;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, txt.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) { return false; }
+  }
+
+  _invEnviar() {
+    const email = (this.state.invEmail || '').trim();
+    if (!email || this.state.invEnviando || !this.PLAN_ID) return;
+    this.setState({ invEnviando: true, invMsg: '', invMsgMal: false });
+    fetch('api/plan_invitar.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'correo', email: email, rol: 'editor' })
+    })
+      .then(r => r.json())
+      .then(j => {
+        if (!j || !j.ok) {
+          this.setState({ invEnviando: false, invMsg: (j && j.error) || 'No se pudo invitar.', invMsgMal: true });
+          return;
+        }
+        // Se dice la verdad. includes/mail_config.php esta en
+        // .gitignore, asi que en las maquinas de los companeros el
+        // envio falla siempre: anunciar "enviada" seria mentir, y la
+        // persona se quedaria esperando un correo que no existe.
+        this.setState({
+          invEnviando: false, invEmail: '',
+          invMsg: j.correo_enviado
+            ? ('Invitación enviada a ' + email)
+            : 'La invitación quedó creada, pero el correo no salió. Pásale el enlace de arriba.',
+          invMsgMal: !j.correo_enviado
+        });
+      })
+      .catch(() => this.setState({ invEnviando: false, invMsg: 'No se pudo invitar. Inténtalo de nuevo.', invMsgMal: true }));
+  }
+
+  // ── Gestionar companeros ────────────────────────────────
+  _invQuitar(uid) {
+    if (!this.PLAN_ID || !uid) return;
+    fetch('api/plan_miembros.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'quitar', usuario_id: uid })
+    })
+      .then(r => r.json())
+      .then(j => {
+        if (!j || !j.ok) { this.setState({ invMsg: (j && j.error) || 'No se pudo quitar.', invMsgMal: true }); return; }
+        this.MIEMBROS = this._mapMiembros(j.miembros);
+        // MIEMBROS no es estado, asi que hace falta un setState para
+        // que el runtime repinte la lista y los avatares de arriba.
+        this.setState({ invMsg: '', invMsgMal: false });
+      })
+      .catch(() => this.setState({ invMsg: 'No se pudo quitar. Inténtalo de nuevo.', invMsgMal: true }));
   }
 
   // ── Fotos propias: listar, subir y borrar ────────────────
@@ -2135,9 +2289,16 @@ class Component extends DCLogic {
     this._esc = (e) => {
       if (e.key !== 'Escape') return;
       const s = this.state;
-      // La ventana de la portada es la capa de mas arriba: si esta
-      // abierta, Escape le toca a ella antes que a nada.
+      // Las dos ventanas modales son la capa de mas arriba: si una
+      // esta abierta, Escape le toca a ella antes que a nada.
       if (s.fotoModal) { this._fotoCerrar(); return; }
+      // "Gestiona companeros" es una PANTALLA de la misma ventana, no
+      // otra ventana: Escape retrocede a la de invitar antes de
+      // cerrar, igual que hace el menu de gasto con sus desplegables.
+      if (s.invModal) {
+        if (s.invPant === 'gestiona') { this.setState({ invPant: 'invitar', invMsg: '', invMsgMal: false }); return; }
+        this._invCerrar(); return;
+      }
       if (s.gastoMenu) {
         if (s.gMonOpen || s.gCatOpen || s.gModoOpen) { this.setState({ gMonOpen: false, gCatOpen: false, gModoOpen: false }); return; }
         if (s.gColorUid != null) { this.setState({ gColorUid: null }); return; }
@@ -2162,17 +2323,23 @@ class Component extends DCLogic {
     };
     window.addEventListener('keydown', this._esc);
 
-    // ── Trampa de foco de la ventana "Cambiar foto" ──────────
+    // ── Trampa de foco de las ventanas modales ──────────────
     // Con un dialogo modal, el tabulador no puede escaparse a lo que
     // hay detras: se veria el foco saltando por una pagina que esta
     // tapada. Se ciclan los elementos enfocables de dentro.
     //
     // Se buscan en CADA pulsacion y no una vez al abrir: el runtime dc
     // repinta el arbol entero al cambiar de estado -al buscar, al
-    // subir- y una lista guardada apuntaria a nodos que ya no existen.
-    this._fotoTab = (e) => {
-      if (e.key !== 'Tab' || !this.state.fotoModal) return;
-      const caja = document.querySelector('[role="dialog"][aria-label="Cambiar foto"]');
+    // subir, al cambiar de pantalla- y una lista guardada apuntaria a
+    // nodos que ya no existen.
+    this._modalTab = (e) => {
+      if (e.key !== 'Tab') return;
+      const s = this.state;
+      const sel = s.fotoModal ? '[role="dialog"][aria-label="Cambiar foto"]'
+                : s.invModal  ? '[role="dialog"][data-inv="1"]'
+                : null;
+      if (!sel) return;
+      const caja = document.querySelector(sel);
       if (!caja) return;
       const foco = Array.from(caja.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])'))
         .filter(el => !el.disabled && el.offsetParent !== null);
@@ -2182,7 +2349,7 @@ class Component extends DCLogic {
       else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
       else if (!caja.contains(document.activeElement)) { e.preventDefault(); primero.focus(); }
     };
-    window.addEventListener('keydown', this._fotoTab);
+    window.addEventListener('keydown', this._modalTab);
     this._outside = (e) => {
       if (!this.state.catAllOpen) return;
       const panel = document.getElementById('rnCatPanel');
@@ -2214,7 +2381,7 @@ class Component extends DCLogic {
         }).catch(() => {});
     }
   }
-  componentWillUnmount() { window.removeEventListener('keydown', this._esc); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
+  componentWillUnmount() { window.removeEventListener('keydown', this._esc); window.removeEventListener('keydown', this._modalTab); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
 
   renderVals() {
     const s = this.state;
@@ -2334,7 +2501,11 @@ class Component extends DCLogic {
     const C = 2 * Math.PI * 44;      // circunferencia del radio 44 del SVG
     let acum = 0;
     V.gastoDona = conMonto.map(u => {
-      const m = this.MIEMBROS.find(x => x.uid === u) || { nombre: '—' };
+      // Un uid sin miembro es de alguien a quien quitaron del viaje.
+      // Su parte del gasto SE CONSERVA a proposito -borrarla cambiaria
+      // en silencio el saldo de los demas-, asi que la dona tiene que
+      // poder nombrar ese trozo. Ver api/plan_miembros.php.
+      const m = this.MIEMBROS.find(x => x.uid === u) || { nombre: 'Alguien que ya no está' };
       const frac = sumaDona > 0 ? s.gRep[u].monto / sumaDona : 0;
       const largo = C * frac;
       const off = -acum;
@@ -2888,6 +3059,56 @@ class Component extends DCLogic {
         aplicar: () => this._fotoElegir(f)
       };
     });
+
+    // ── Invitar companeros de viaje ─────────────────────────
+    // Solo el propietario. api/plan_invitar.php ya exige ese rol, asi
+    // que dibujar el boton a los demas seria ofrecer algo que siempre
+    // responde 403.
+    // OJO: V se construye clave a clave, no copiando el estado. Si
+    // esta linea falta, el sc-if de la plantilla lee undefined y la
+    // ventana no se pinta NUNCA, sin dar ningun error.
+    V.invModal  = !!s.invModal;
+    V.esProp    = this.ROL === 'propietario';
+    V.invAbrir  = V.esProp ? () => this._invAbrir() : V.noop;
+    V.invCerrar = () => this._invCerrar();
+    V.invEsInvitar  = s.invPant !== 'gestiona';
+    V.invEsGestiona = s.invPant === 'gestiona';
+    V.invTitulo = V.invEsGestiona ? 'Gestiona compañeros de viaje' : 'Invita a compañeros de viaje';
+    V.invGestiona = () => this.setState({ invPant: 'gestiona', invMsg: '', invMsgMal: false });
+    V.invVolver   = () => this.setState({ invPant: 'invitar', invMsg: '', invMsgMal: false });
+
+    // Tres estados para la ranura del enlace: pidiendolo, error, o la
+    // URL. El texto se corta con puntos suspensivos por CSS, como en
+    // el frame; el valor que se copia es SIEMPRE el completo.
+    V.invUrlTxt = s.invLink ? s.invLink : (s.invLinkErr || 'Preparando el enlace…');
+    V.invUrlColor = s.invLink ? '#212529' : '#6C757D';
+    V.invCopiar = () => this._invCopiar();
+    V.invCopiarTxt = s.invCopiado ? 'Copiado' : 'Copiar enlace';
+    // Medidos del frame: el boton conserva el MISMO rectangulo en los
+    // dos estados, solo cambian los colores. Por eso el ancho va fijo:
+    // "Copiado" es mas corto y la caja daria un salto al copiar.
+    V.invCopiarBg   = s.invCopiado ? '#D4EDFF' : '#3F52E3';
+    V.invCopiarTint = s.invCopiado ? '#212529' : '#ffffff';
+
+    V.invEmail = s.invEmail || '';
+    V.invEmailCambia = (e) => this.setState({ invEmail: e.target.value });
+    V.invEmailTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); this._invEnviar(); } };
+    V.invHayMsg = !!s.invMsg;
+    V.invMsg = s.invMsg || '';
+    V.invMsgColor = s.invMsgMal ? '#C0392B' : '#2E7D32';
+
+    // La lista de la segunda pantalla. El propietario NO lleva aspa:
+    // quitarlo dejaria el viaje sin dueno, y planes.usuario_id y
+    // sp_borrar_plan cuentan con que exista.
+    const miem = this.MIEMBROS || [];
+    V.invMiembrosVM = miem.map((m, i) => ({
+      nombre: m.nombre || 'Sin nombre',
+      hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || '', inicial: m.inicial,
+      aspa: m.rol === 'propietario' ? 'none' : 'flex',
+      // El frame pone una linea ENTRE filas, no debajo de la ultima.
+      sep: i === miem.length - 1 ? 'none' : '1px solid #DEE2E6',
+      quitar: () => this._invQuitar(m.uid)
+    }));
     // NO usa _sync: ese es fuego-y-olvida y se traga los fallos en la
     // consola. Aqui hay alguien mirando una rueda girar, asi que el
     // error tiene que llegar a la pantalla.
