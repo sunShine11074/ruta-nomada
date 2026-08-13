@@ -9,6 +9,10 @@ $_topbar_foto   = null;
 $_topbar_nombre = $user['nombre'] ?? '';
 $_topbar_apellidos = '';
 
+if (!isset($user)) {
+    die('Error: Usuario no autenticado.');
+}
+
 $db_check_tb = checkDBConnection();
 if ($db_check_tb['ok']) {
     try {
