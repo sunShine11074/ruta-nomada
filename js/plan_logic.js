@@ -295,6 +295,27 @@ class Component extends DCLogic {
       else if (onOk) onOk(j);
     }).catch(err => console.warn('[plan] ' + endpoint + ':', err));
   }
+  // Abre la ventana y lleva el foco dentro. Se recuerda desde donde se
+  // abrio para devolverlo al cerrar: si no, el foco vuelve al principio
+  // del documento y quien navega con teclado se pierde.
+  _fotoAbrir() {
+    this._fotoVolverA = document.activeElement;
+    this.setState({ fotoModal: true, fotoTab: 'tus', fotoSel: null });
+    this._fotoCargarMias();
+    // Se espera al repintado del runtime antes de buscar el boton.
+    setTimeout(() => {
+      const caja = document.querySelector('[role="dialog"][aria-label="Cambiar foto"]');
+      const b = caja && caja.querySelector('button');
+      if (b) b.focus();
+    }, 60);
+  }
+  _fotoCerrar() {
+    this.setState({ fotoModal: false });
+    const volver = this._fotoVolverA;
+    this._fotoVolverA = null;
+    if (volver && volver.focus) setTimeout(() => volver.focus(), 60);
+  }
+
   // ── Fotos propias: listar, subir y borrar ────────────────
   // Se piden al abrir la ventana en la pestaña "Tus fotos" y despues
   // de cada subida. No se guardan entre aperturas: son pocas y la
@@ -2114,6 +2135,9 @@ class Component extends DCLogic {
     this._esc = (e) => {
       if (e.key !== 'Escape') return;
       const s = this.state;
+      // La ventana de la portada es la capa de mas arriba: si esta
+      // abierta, Escape le toca a ella antes que a nada.
+      if (s.fotoModal) { this._fotoCerrar(); return; }
       if (s.gastoMenu) {
         if (s.gMonOpen || s.gCatOpen || s.gModoOpen) { this.setState({ gMonOpen: false, gCatOpen: false, gModoOpen: false }); return; }
         if (s.gColorUid != null) { this.setState({ gColorUid: null }); return; }
@@ -2137,6 +2161,28 @@ class Component extends DCLogic {
       if (s.mapModal) { this.setState({ mapModal: false }); }
     };
     window.addEventListener('keydown', this._esc);
+
+    // ── Trampa de foco de la ventana "Cambiar foto" ──────────
+    // Con un dialogo modal, el tabulador no puede escaparse a lo que
+    // hay detras: se veria el foco saltando por una pagina que esta
+    // tapada. Se ciclan los elementos enfocables de dentro.
+    //
+    // Se buscan en CADA pulsacion y no una vez al abrir: el runtime dc
+    // repinta el arbol entero al cambiar de estado -al buscar, al
+    // subir- y una lista guardada apuntaria a nodos que ya no existen.
+    this._fotoTab = (e) => {
+      if (e.key !== 'Tab' || !this.state.fotoModal) return;
+      const caja = document.querySelector('[role="dialog"][aria-label="Cambiar foto"]');
+      if (!caja) return;
+      const foco = Array.from(caja.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])'))
+        .filter(el => !el.disabled && el.offsetParent !== null);
+      if (!foco.length) return;
+      const primero = foco[0], ultimo = foco[foco.length - 1];
+      if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+      else if (!caja.contains(document.activeElement)) { e.preventDefault(); primero.focus(); }
+    };
+    window.addEventListener('keydown', this._fotoTab);
     this._outside = (e) => {
       if (!this.state.catAllOpen) return;
       const panel = document.getElementById('rnCatPanel');
@@ -2785,16 +2831,18 @@ class Component extends DCLogic {
         // #EDC13F medido del subrayado en el frame
         color: activa ? '#EDC13F' : '#212529',
         linea: activa ? '#EDC13F' : 'transparent',
+        // El subrayado distingue la pestaña activa a la vista; esto
+        // hace lo mismo para quien usa lector de pantalla.
+        sel: activa ? 'true' : 'false',
         pick: () => this.setState({ fotoTab: t.clave })
       };
     });
     // Sólo quien puede editar cambia la portada. El endpoint que
     // guardará la elección ya exige rol 'editor'; esto evita abrir
     // una ventana que después no serviría de nada.
-    V.fotoAbrir = this.puedeEditar
-      ? () => { this.setState({ fotoModal: true, fotoTab: 'tus', fotoSel: null }); this._fotoCargarMias(); }
-      : V.noop;
-    V.fotoCerrar = () => this.setState({ fotoModal: false });
+    V.fotoPuede = !!this.puedeEditar;
+    V.fotoAbrir = this.puedeEditar ? () => this._fotoAbrir() : V.noop;
+    V.fotoCerrar = () => this._fotoCerrar();
     V.fotoQCambia = (e) => this.setState({ fotoQ: e.target.value });
     V.fotoQTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); V.fotoBuscar(); } };
     V.fotoSubirClic = () => this._fotoPedirArchivos();

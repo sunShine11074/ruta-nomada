@@ -1,6 +1,6 @@
 # Plan de implementación — «Cambiar foto» del itinerario
 
-**Ruta Nómada · 12 de agosto de 2026 · fases 1 y 2 hechas, falta la 3**
+**Ruta Nómada · 12 de agosto de 2026 · LAS CUATRO FASES HECHAS**
 
 Ventana para cambiar la foto de portada de un itinerario, con dos
 orígenes: las fotos que sube la persona y una búsqueda de imágenes en
@@ -149,7 +149,7 @@ queda centrado tanto a 1440 como a 1920.
 **Verificación:** buscar «La paz» devuelve fotos reales, elegir una
 cambia la portada, y sobrevive a recargar la página.
 
-### Fase 3 · «Tus fotos» — 1½ días
+### Fase 3 · «Tus fotos» — HECHA
 
 - Migración `usuario_fotos` (id, usuario_id, ruta, subida_en). Hace
   falta porque el frame dice *«Aún no has subido ninguna foto»*: hay
@@ -170,25 +170,26 @@ cambia la portada, y sobrevive a recargar la página.
 1 MB; un `.php` renombrado a `.jpg` se rechaza; la galería lista lo
 subido.
 
-### Fase 4 · Detalles y verificación — ½ día
+### Fase 4 · Detalles y verificación — HECHA
 
-Foco atrapado dentro del modal, `Esc` cierra, clic fuera cierra,
-atributos `aria-*`, y el lápiz sólo visible si `puedeEditar`. Medición
-final contra los tres frames a 1440.
+Foco atrapado dentro del modal, `Esc` cierra, atributos `aria-*`, y el
+lápiz sólo visible si `puedeEditar`. Medición final contra los frames.
 
-**Total ≈ 4½ días.**
+> **El clic fuera NO cierra**, al contrario de lo que decía este plan.
+> Se cambió a petición durante la fase 1: un clic despistado no debe
+> tirar por la borda lo que se estuviera eligiendo. Sólo cierran la X
+> y `Esc`.
 
 ---
 
 ## 6. Decisiones pendientes
 
-1. **¿Pexels?** Si se prefiere otro proveedor cambia la fase 2 entera.
-   Hay que darse de alta y generar la clave.
-2. **¿Las fotos subidas son del usuario o del plan?** El frame dice
-   «Tus fotos», así que se asumen del usuario y reutilizables entre
-   planes. Si fueran del plan, la tabla cambia.
-3. **¿Se pueden borrar las fotos subidas?** No aparece en los frames.
-   Sin ello la galería sólo crece.
+Las tres quedaron resueltas durante la implementación:
+
+1. **Pexels**, decidido y en marcha. Clave en `includes/pexels_config.php`.
+2. **Las fotos son del usuario**, reutilizables entre planes.
+3. **Sí se pueden borrar**, con el botón de la esquina de cada tarjeta.
+   Se quita el archivo del disco además de la fila.
 
 ---
 
