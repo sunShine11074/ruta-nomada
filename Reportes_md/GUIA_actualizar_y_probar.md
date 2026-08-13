@@ -84,6 +84,15 @@ por la clave que te pasaron, entre comillas.
 > lanza el diagnóstico— y deja la ventana abierta para que leas el resultado.
 > Si te funciona, sáltate el resto de este paso y ve al paso 4.
 >
+> **¿El doble clic no hace nada, o la ventana aparece y se cierra de golpe?**
+> No pelees con él: los dos comandos de abajo hacen exactamente lo mismo.
+> Antes de rendirte, prueba a lanzarlo desde una terminal para poder leer el
+> error, en vez de que la ventana se lleve el mensaje al cerrarse:
+>
+> ```bash
+> cmd /c herramientas\actualizar.bat
+> ```
+>
 > A mano son **dos** comandos, no uno, y ese es el error que se cuela: la base
 > y las rutinas viven en archivos distintos.
 
