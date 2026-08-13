@@ -7,6 +7,8 @@
 // ============================================================
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/intentos.php';
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
     header('Location: inicio.php');
@@ -31,44 +33,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
     $remember = !empty($_POST['remember']);
 
     // Validación básica
-    if (empty($email) || empty($password)) {
+    if (!csrfValido()) {
+        // Pasa de verdad cuando la pestaña lleva horas abierta y la
+        // sesión de PHP ya caducó. Se pide reintentar, no se acusa a
+        // nadie: el formulario recargado ya trae un token nuevo.
+        $error_form = 'La sesión del formulario caducó. Vuelve a intentarlo.';
+    } elseif (empty($email) || empty($password)) {
         $error_form = 'Por favor, completa todos los campos.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
     } else {
-        try {
-            $db   = getDB();
-            $stmt = $db->prepare('SELECT id, nombre, email, password_hash, divisa FROM usuarios WHERE email = ? LIMIT 1');
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
+        // Validar que el email pertenezca a dominios permitidos
+        $dominios_permitidos = [
+            'gmail.com',
+            'outlook.com',
+            'outlook.es',
+            'outlook.com.ar',
+            'outlook.com.br',
+            'outlook.fr',
+            'outlook.de',
+            'outlook.it',
+            'outlook.jp',
+            'yahoo.com',
+            'yahoo.es',
+            'yahoo.com.br',
+            'yahoo.com.ar',
+            'yahoo.fr',
+            'yahoo.de',
+            'yahoo.it',
+            'yahoo.jp',
+        ];
+        
+        $dominio_email = strtolower(substr(strrchr($email, '@'), 1));
+        $dominio_valido = in_array($dominio_email, $dominios_permitidos, true);
+        
+        if (!$dominio_valido) {
+            $error_form = 'Solo se permiten direcciones de correo de Gmail, Outlook o Yahoo. '
+                        . 'Por favor, usa un email de estos proveedores.';
+        } else {
+            try {
+                $db = getDB();
+                $ip = ipCliente();
 
-            if ($user && password_verify($password, $user['password_hash'])) {
-                // Login exitoso
-                session_regenerate_id(true);
-                $_SESSION['user'] = [
-                    'id'     => $user['id'],
-                    'nombre' => $user['nombre'],
-                    'email'  => $user['email'],
-                    'divisa' => $user['divisa'] ?: 'MXN',
-                ];
-                if ($remember) {
-                    // Cookie de 30 días (simplificado — en producción usa token seguro)
-                    setcookie('remember_email', $email, time() + 60 * 60 * 24 * 30, '/', '', true, true);
+                // ── Freno a la fuerza bruta ──────────────────────
+                // Se comprueba ANTES de tocar la contraseña: si hay que
+                // frenar, no se gasta un password_verify ni se revela nada.
+                if (loginBloqueado($db, $email, $ip)) {
+                    $error_form = 'Demasiados intentos fallidos. Espera unos minutos '
+                                . 'antes de volver a probar, o restablece tu contraseña.';
+                } else {
+                    $stmt = $db->prepare('SELECT id, nombre, email, password_hash, divisa FROM usuarios WHERE email = ? LIMIT 1');
+                    $stmt->execute([$email]);
+                    $user = $stmt->fetch();
+
+                    $acertado = $user && password_verify($password, $user['password_hash']);
+                    // Queda constancia SIEMPRE, acierte o falle: los aciertos
+                    // son los que limpian el contador de esa cuenta.
+                    loginRegistrar($db, $email, $ip, $acertado);
+
+                    if ($acertado) {
+                        // Login exitoso
+                        session_regenerate_id(true);
+                        $_SESSION['user'] = [
+                            'id'     => $user['id'],
+                            'nombre' => $user['nombre'],
+                            'email'  => $user['email'],
+                            'divisa' => $user['divisa'] ?: 'MXN',
+                        ];
+                        if ($remember) {
+                            // Cookie de 30 días (simplificado — en producción usa token seguro)
+                            setcookie('remember_email', $email, time() + 60 * 60 * 24 * 30, '/', '', true, true);
+                        }
+                        // Retorno pendiente (p. ej. una invitación a un plan)
+                        $destino_login = $_SESSION['despues_de_login'] ?? 'inicio.php';
+                        unset($_SESSION['despues_de_login']);
+                        // Solo rutas internas simples (sin esquemas ni //)
+                        if (!preg_match('/^[a-z_]+\.php(\?[a-zA-Z0-9_=&]*)?$/', $destino_login)) {
+                            $destino_login = 'inicio.php';
+                        }
+                        header('Location: ' . $destino_login);
+                        exit;
+                    } else {
+                        $error_form = 'Correo o contraseña incorrectos. Intenta de nuevo.';
+                    }
                 }
-                // Retorno pendiente (p. ej. una invitación a un plan)
-                $destino_login = $_SESSION['despues_de_login'] ?? 'inicio.php';
-                unset($_SESSION['despues_de_login']);
-                // Solo rutas internas simples (sin esquemas ni //)
-                if (!preg_match('/^[a-z_]+\.php(\?[a-zA-Z0-9_=&]*)?$/', $destino_login)) {
-                    $destino_login = 'inicio.php';
-                }
-                header('Location: ' . $destino_login);
-                exit;
-            } else {
-                $error_form = 'Correo o contraseña incorrectos. Intenta de nuevo.';
+            } catch (RuntimeException $e) {
+                $error_db = $e->getMessage();
             }
-        } catch (RuntimeException $e) {
-            $error_db = $e->getMessage();
         }
     }
 }
@@ -170,6 +221,8 @@ $prefill_email = htmlspecialchars(
         <?php endif; ?>
 
         <form method="POST" action="login.php" novalidate>
+            <?= csrfCampo() ?>
+
 
             <!-- Email -->
             <div class="field">
@@ -184,7 +237,7 @@ $prefill_email = htmlspecialchars(
                         placeholder="ana@rutanomada.mx"
                         value="<?= $prefill_email ?>"
                         autocomplete="email"
-                        <?= $error_db ?  : '' ?>
+                        <?= $error_db ? 'disabled' : '' ?>
                     >
                 </div>
             </div>
@@ -201,7 +254,7 @@ $prefill_email = htmlspecialchars(
                         name="password"
                         placeholder="Ingresa tu contraseña"
                         autocomplete="current-password"
-                        <?= $error_db ?  : '' ?>
+                        <?= $error_db ? 'disabled' : '' ?>
                     >
                     <button type="button" class="field__toggle-pw" aria-label="Mostrar contraseña" onclick="togglePassword('password', this)">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -217,7 +270,7 @@ $prefill_email = htmlspecialchars(
                         name="remember"
                         class="checkbox-input"
                         <?= !empty($_POST['remember']) ? 'checked' : '' ?>
-                        <?= $error_db ?  : '' ?>
+                        <?= $error_db ? 'disabled' : '' ?>
                     >
                     <span class="checkbox-custom"></span>
                     Recordar mi contraseña
@@ -229,7 +282,7 @@ $prefill_email = htmlspecialchars(
             <button
                 type="submit"
                 class="btn-primary"
-                <?= $error_db ?  : '' ?>
+                <?= $error_db ? 'disabled' : '' ?>
             >
                 Ingresar &nbsp;→
             </button>

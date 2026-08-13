@@ -401,6 +401,34 @@ CREATE TABLE IF NOT EXISTS `planes_borrados` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- ────────────────────────────────────────────────────────────
+--  0.b intentos_login — freno a la fuerza bruta en login.php
+--
+--  Sin esto, probar contraseñas contra una cuenta sale gratis: el
+--  formulario acepta tantos intentos por segundo como aguante Apache.
+--  Aquí queda constancia de cada intento y fn_login_bloqueado() decide
+--  cuándo hay que parar.
+--
+--  Guarda el correo TECLEADO, exista o no la cuenta. Es a propósito:
+--  si sólo se anotaran los correos reales, la tabla misma sería una
+--  lista de quién está registrado.
+--
+--  Nunca guarda la contraseña probada, ni siquiera su hash.
+--
+--  ip admite 45 caracteres porque ese es el largo de una IPv6 escrita
+--  del todo, y en localhost la de siempre es ::1.
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `intentos_login` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(150) NOT NULL COMMENT 'el que se tecleó, exista o no',
+  `ip` varchar(45) NOT NULL DEFAULT '' COMMENT 'IPv4 o IPv6',
+  `exito` tinyint(1) NOT NULL DEFAULT 0,
+  `creado_en` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_email_fecha` (`email`, `creado_en`),
+  KEY `idx_ip_fecha` (`ip`, `creado_en`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DELIMITER $$
 
 -- ════════════════════════════════════════════════════════════
@@ -478,6 +506,56 @@ BEGIN
              LIMIT 1);
 END $$
 
+
+-- ------------------------------------------------------------
+-- fn_login_bloqueado(email, ip) → 1 si hay que frenar, 0 si no
+--   La política de fuerza bruta, en un solo sitio. Frena por dos
+--   caminos a la vez, y basta con que uno se pase:
+--
+--     · 5 fallos sobre el MISMO CORREO en 15 minutos
+--       Protege una cuenta concreta de quien prueba contraseñas.
+--     · 20 fallos desde la MISMA IP en 15 minutos
+--       Protege al resto de quien barre muchas cuentas a la vez.
+--       El tope es más alto porque una casa o un campus comparten IP
+--       y no queremos bloquear a gente que sólo se equivocó.
+--
+--   Es una ventana deslizante, no un castigo fijo: en cuanto los
+--   intentos viejos salen de los 15 minutos, se puede volver a probar.
+--   Nadie tiene que desbloquear nada a mano.
+--
+--   Un acierto borra los fallos de ese correo (ver sp_registrar_intento),
+--   así que quien acaba recordando su contraseña empieza de cero.
+--
+--   Lo llama login.php antes de comprobar la contraseña.
+-- ------------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_login_bloqueado $$
+CREATE FUNCTION fn_login_bloqueado(
+    p_email VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    p_ip    VARCHAR(45)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+)
+RETURNS TINYINT(1)
+NOT DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_correo INT DEFAULT 0;
+    DECLARE v_ip     INT DEFAULT 0;
+
+    SELECT COUNT(*) INTO v_correo
+      FROM intentos_login
+     WHERE email = p_email
+       AND exito = 0
+       AND creado_en > DATE_SUB(NOW(), INTERVAL 15 MINUTE);
+    IF v_correo >= 5 THEN RETURN 1; END IF;
+
+    SELECT COUNT(*) INTO v_ip
+      FROM intentos_login
+     WHERE ip = p_ip
+       AND exito = 0
+       AND creado_en > DATE_SUB(NOW(), INTERVAL 15 MINUTE);
+    IF v_ip >= 20 THEN RETURN 1; END IF;
+
+    RETURN 0;
+END $$
 
 -- ════════════════════════════════════════════════════════════
 --  PROCEDIMIENTOS — el CRUD del plan
@@ -692,6 +770,44 @@ BEGIN
 END $$
 
 
+-- ------------------------------------------------------------
+-- sp_registrar_intento(email, ip, exito)
+--   Deja constancia de un intento de inicio de sesión y mantiene
+--   limpia la tabla. Hace tres cosas:
+--
+--     1. Anota el intento.
+--     2. Si acertó, borra los fallos anteriores de ese correo. Quien
+--        se equivoca dos veces y a la tercera entra no debe quedarse
+--        con dos fallos colgando hasta que caduquen.
+--     3. Purga lo anterior a un día. La ventana que mira
+--        fn_login_bloqueado() es de 15 minutos, así que un día sobra
+--        y la tabla no crece sin fin.
+--
+--   La purga va aquí y no en un evento programado porque el planificador
+--   de eventos de MariaDB viene apagado en XAMPP, y una tarea que hay
+--   que acordarse de encender es una tarea que no se ejecuta.
+--
+--   Lo llama login.php después de comprobar la contraseña.
+-- ------------------------------------------------------------
+DROP PROCEDURE IF EXISTS sp_registrar_intento $$
+CREATE PROCEDURE sp_registrar_intento (
+    IN p_email VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    IN p_ip    VARCHAR(45)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    IN p_exito TINYINT(1)
+)
+BEGIN
+    INSERT INTO intentos_login (email, ip, exito)
+    VALUES (p_email, p_ip, IF(p_exito = 1, 1, 0));
+
+    IF p_exito = 1 THEN
+        DELETE FROM intentos_login
+         WHERE email = p_email AND exito = 0;
+    END IF;
+
+    DELETE FROM intentos_login
+     WHERE creado_en < DATE_SUB(NOW(), INTERVAL 1 DAY);
+END $$
+
 -- ════════════════════════════════════════════════════════════
 --  TRIGGERS
 -- ════════════════════════════════════════════════════════════
@@ -770,7 +886,7 @@ DELIMITER ;
 
 
 -- ────────────────────────────────────────────────────────────
---  Verificación: debe imprimir 4 funciones, 5 procedimientos y
+--  Verificación: debe imprimir 5 funciones, 6 procedimientos y
 --  5 triggers. Si algún número no cuadra, algo de arriba falló.
 -- ────────────────────────────────────────────────────────────
 SELECT ROUTINE_TYPE AS tipo, COUNT(*) AS cuantas

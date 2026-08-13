@@ -48,13 +48,11 @@ function validDate($s): ?string
 }
 
 // ── CSRF ─────────────────────────────────────────────────────
-function csrfToken(): string
-{
-    if (empty($_SESSION['csrf_plan'])) {
-        $_SESSION['csrf_plan'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_plan'];
-}
+// csrfToken(), csrfCampo() y csrfValido() viven en includes/csrf.php,
+// que también usan los formularios HTML de sesión. El token es el
+// mismo; aquí sólo queda la variante que corta con JSON, que es lo que
+// espera la API del planificador.
+require_once __DIR__ . '/csrf.php';
 
 function csrfCheck(array $in): void
 {

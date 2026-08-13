@@ -5,6 +5,7 @@
 session_start();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
@@ -27,7 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
 
     $email = trim($_POST['email'] ?? '');
 
-    if (empty($email)) {
+    if (!csrfValido()) {
+        $error_form = 'La sesión del formulario caducó. Vuelve a intentarlo.';
+    } elseif (empty($email)) {
         $error_form = 'Por favor, ingresa tu correo electrónico.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
@@ -173,6 +176,8 @@ $prefill_email = htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8');
             <?php endif; ?>
 
             <form method="POST" action="forgot-password.php" novalidate>
+                <?= csrfCampo() ?>
+
 
                 <!-- Email -->
                 <div class="field">
