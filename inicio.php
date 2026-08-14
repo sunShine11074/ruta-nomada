@@ -183,7 +183,11 @@ require_once __DIR__ . '/includes/user_topbar.php';
     <div class="footer-container">
         <!-- Columna 1: Logo y descripción -->
         <div class="footer-col brand-col">
-            <img src="img/DERIVA EN BLANCO.png" alt="Logo Deriva" class="footer-logo">
+            <!-- .PNG en mayúsculas: así se llama el archivo en git. Windows no
+                 distingue mayúsculas y esto funcionaba igual, pero en Linux el
+                 logo desaparecía. Se arregla aquí y NO renombrando el archivo:
+                 git en Windows no registra un cambio que sólo sea de caja. -->
+            <img src="img/DERIVA EN BLANCO.PNG" alt="Logo Deriva" class="footer-logo">
             <p>Descubre el mundo con nosotros. Creamos rutas, destinos y aventuras diseñadas especialmente a tu medida.</p>
         </div>
         

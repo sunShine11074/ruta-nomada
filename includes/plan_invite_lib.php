@@ -19,26 +19,118 @@
 // ============================================================
 require_once __DIR__ . '/../db.php';
 
+// ── ¿Me puedo fiar de este Host? ─────────────────────────────
+//
+// EL ATAQUE QUE ESTO CIERRA se llama «host header poisoning», y no es
+// teórico: cualquiera puede mandar
+//     POST /forgot-password.php   Host: servidor-del-atacante.com
+//     email=ana@…
+// y el correo LEGÍTIMO que le llega a Ana —remitente de siempre, todo
+// correcto— lleva dentro
+//     http://servidor-del-atacante.com/reset-password.php?token=<token real>
+// Ana pincha y entrega su token de restablecimiento. Apache no lo
+// impide: httpd.conf pone ServerName localhost:80 pero UseCanonicalName
+// no aparece y de fábrica está en Off, así que HTTP_HOST es lo que
+// mande el cliente.
+//
+// Hasta hoy nos salvaba de casualidad el 'base_url' escrito a mano de
+// mail_config.php, que pisaba la detección. En cuanto alguien lo deja
+// vacío —que es lo que recomienda mail_config.sample.php— el agujero
+// se abre. Por eso el cerrojo va aquí y no en quien llama.
+//
+// La regla: un Host que no reconozcamos NO se usa; se cae a localhost.
+// Un enlace a localhost es inútil, pero inútil es infinitamente mejor
+// que apuntando al servidor de quien ataca.
+function planHostDeConfianza(string $host, array $extra = []): bool
+{
+    // Fuera el puerto para comparar. Los literales IPv6 vienen entre
+    // corchetes —[::1]:80— y ahí el separador es el corchete, no el ':'.
+    $limpio = strtolower(trim($host));
+    if ($limpio !== '' && $limpio[0] === '[') {
+        $cierre = strpos($limpio, ']');
+        $limpio = $cierre === false ? $limpio : substr($limpio, 1, $cierre - 1);
+    } elseif (($dp = strrpos($limpio, ':')) !== false) {
+        $limpio = substr($limpio, 0, $dp);
+    }
+    if ($limpio === '') return false;
+
+    // Lo que el equipo haya añadido a mano en mail_config.php.
+    foreach ($extra as $permitido) {
+        if ($limpio === strtolower(trim((string)$permitido))) return true;
+    }
+
+    // La propia máquina.
+    if (in_array($limpio, ['localhost', '127.0.0.1', '::1'], true)) return true;
+
+    // Tailscale (MagicDNS). Es la vía que eligió el equipo el 13/08/2026
+    // para trabajar desde casas distintas: 'tailscale serve' pone HTTPS
+    // delante del Apache local y da un nombre estable acabado en .ts.net.
+    // -7 y no -6: '.ts.net' son siete caracteres contando el punto. Con
+    // -6 se comparaba contra 'ts.net' y NUNCA daba verdadero, así que el
+    // host de Tailscale caía a localhost. Lo cazó la prueba de abajo.
+    // El punto tiene que ir dentro de la comparación: sin él, un dominio
+    // como 'evil-ts.net' o 'atacantets.net' entraría.
+    if (substr($limpio, -7) === '.ts.net') return true;
+
+    // Red local: LAN de casa, o el punto de acceso del móvil el día de
+    // la presentación.
+    if (preg_match('/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
+    if (preg_match('/^192\.168\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
+    if (preg_match('/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
+
+    return false;
+}
+
 // ── La dirección base del proyecto ───────────────────────────
 // Se deduce de la petición para que funcione se llame como se llame
 // la carpeta: antes iba escrita a mano y quien clonaba el repositorio
 // en otra carpeta recibía las invitaciones con un enlace roto.
 // mail_config.php puede imponer otra con 'base_url', que es lo que
 // haría falta el día que esto viva en un dominio de verdad.
+//
+// ES EL ÚNICO SITIO DEL PROYECTO QUE ARMA UNA URL ABSOLUTA. Si añades
+// otro correo con un enlace dentro, llámalo desde aquí y no te montes
+// la dirección por tu cuenta: forgot-password.php lo hacía y se le
+// olvidó el valor de reserva.
 function planInviteBase(): string
 {
+    $cfg = [];
+    if (is_file(__DIR__ . '/mail_config.php')) {
+        $leido = @include __DIR__ . '/mail_config.php';
+        if (is_array($leido)) $cfg = $leido;
+    }
+
+    // Si hay 'base_url' escrito, manda y no hay nada que deducir.
+    if (!empty($cfg['base_url'])) return rtrim($cfg['base_url'], '/');
+
     $base = 'http://localhost';
     if (!empty($_SERVER['HTTP_HOST'])) {
-        $esq  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        if (!planHostDeConfianza($host, (array)($cfg['hosts_permitidos'] ?? []))) {
+            $host = 'localhost';
+        }
+
+        $esq = 'http';
+        if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            $esq = 'https';
+        } elseif (
+            // Detrás de 'tailscale serve', de ngrok o de cloudflared, quien
+            // termina el TLS es ese programa y a Apache le llega HTTP pelado:
+            // sin esto los enlaces saldrían con http:// en un sitio https.
+            // Sólo nos fiamos de la cabecera si quien conecta es la propia
+            // máquina, que es de donde hablan esos programas. Un atacante
+            // remoto no puede fingir un REMOTE_ADDR de bucle local.
+            strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https'
+            && in_array((string)($_SERVER['REMOTE_ADDR'] ?? ''), ['127.0.0.1', '::1'], true)
+        ) {
+            $esq = 'https';
+        }
+
         $raiz = str_replace('\\', '/', dirname(__DIR__));
         $doc  = str_replace('\\', '/', rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/'));
         $sub  = ($doc !== '' && strpos($raiz, $doc) === 0) ? trim(substr($raiz, strlen($doc)), '/') : '';
         $ruta = $sub === '' ? '' : '/' . implode('/', array_map('rawurlencode', explode('/', $sub)));
-        $base = $esq . '://' . $_SERVER['HTTP_HOST'] . $ruta;
-    }
-    if (is_file(__DIR__ . '/mail_config.php')) {
-        $cfg = @include __DIR__ . '/mail_config.php';
-        if (is_array($cfg) && !empty($cfg['base_url'])) $base = rtrim($cfg['base_url'], '/');
+        $base = $esq . '://' . $host . $ruta;
     }
     return $base;
 }
