@@ -36,7 +36,15 @@
 // solo a partir de aquí. La mayor parte de México es
 // 'America/Mexico_City' (UTC-6).
 const RN_ZONA_HORARIA = 'America/Hermosillo';
-date_default_timezone_set(RN_ZONA_HORARIA);
+
+// El set va protegido porque una zona mal escrita —cambiar esa línea y
+// teclear 'America/Hermosilo'— no tumbaría una página: tumbaría TODA la
+// aplicación, porque este archivo lo incluye hasta el último endpoint.
+// PHP avisa por el registro y sigue con UTC en vez de morirse.
+if (!@date_default_timezone_set(RN_ZONA_HORARIA)) {
+    error_log('RN_ZONA_HORARIA no vale: "' . RN_ZONA_HORARIA . '". Revisa db.php.');
+    date_default_timezone_set('UTC');
+}
 
 if (!function_exists('getDB')) {
     function getDB(): PDO
@@ -66,14 +74,23 @@ if (!function_exists('getDB')) {
             // Y la misma hora del lado de MySQL, que hasta ahora iba con
             // la del sistema. El desfase NO va escrito a mano: se saca de
             // RN_ZONA_HORARIA, así que las dos mitades no pueden separarse
-            // nunca — que es justo el fallo que se está arreglando. Si
-            // algún día se pone una zona con horario de verano, esto lo
-            // sigue solo.
+            // — que es justo el fallo que se está arreglando.
+            //
+            // ⚠ Lo que se manda a MySQL es un DESFASE FIJO, no el nombre
+            // de la zona: MariaDB sólo entiende nombres si le han cargado
+            // las tablas de zonas horarias, y en este XAMPP no lo están.
+            // Se calcula en el momento de conectar, así que cada petición
+            // trae el desfase vigente. Con Hermosillo da igual —Sonora no
+            // cambia la hora—, pero SI ALGUIEN PONE UNA ZONA CON HORARIO
+            // DE VERANO, MySQL no lo seguirá dentro de una misma conexión
+            // y las cuentas de fechas que crucen el cambio saldrán con una
+            // hora de más o de menos. Con peticiones web cortas no se
+            // nota; en un proceso largo, sí.
             //
             // Se fija por conexión a propósito, para que NOW() y las
             // columnas TIMESTAMP sigan cuadrando con date() aunque la base
             // acabe viviendo en un servidor de otro país.
-            $desfase = (new DateTime('now', new DateTimeZone(RN_ZONA_HORARIA)))->format('P');
+            $desfase = (new DateTime('now', new DateTimeZone(date_default_timezone_get())))->format('P');
             $pdo->exec("SET time_zone = '{$desfase}'");
             return $pdo;
         } catch (PDOException $e) {

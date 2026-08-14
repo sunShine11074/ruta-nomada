@@ -64,9 +64,29 @@ require_once __DIR__ . '/../db.php';
 // apuntando al servidor de quien ataca.
 function planHostDeConfianza(string $host, array $extra = [], string $tailnet = ''): bool
 {
-    // Fuera el puerto para comparar. Los literales IPv6 vienen entre
-    // corchetes —[::1]:80— y ahí el separador es el corchete, no el ':'.
     $limpio = strtolower(trim($host));
+
+    // PRIMERO: ¿tiene siquiera FORMA de host? Antes se pasaba directo a
+    // recortar el puerto, y eso abría un bypass completo:
+    //     Host: localhost:80@evil.com
+    // El recorte por el último ':' dejaba 'localhost', que pasaba el
+    // filtro... y luego planInviteBase() armaba la URL con el host CRUDO,
+    // o sea 'http://localhost:80@evil.com/reset-password.php?token=REAL'.
+    // En una URL todo lo que va antes de la arroba es usuario:contraseña,
+    // así que el navegador se va a evil.com. El cerrojo decía «pasa» y el
+    // enlace apuntaba al atacante.
+    //
+    // Aquí se exige la forma entera, sobre el texto SIN recortar: sólo
+    // letras, dígitos, puntos y guiones, o un literal IPv6 entre
+    // corchetes, con un puerto opcional. Así no hay arroba, ni espacios,
+    // ni barras, ni saltos de línea que colar.
+    $formaOk = preg_match('/^\[[0-9a-f:.]+\](:\d{1,5})?$/', $limpio)
+            || preg_match('/^[a-z0-9.-]+(:\d{1,5})?$/', $limpio);
+    if (!$formaOk) return false;
+
+    // Y AHORA sí, fuera el puerto para comparar. Los literales IPv6
+    // vienen entre corchetes —[::1]:80— y ahí el separador es el
+    // corchete, no el ':'.
     if ($limpio !== '' && $limpio[0] === '[') {
         $cierre = strpos($limpio, ']');
         $limpio = $cierre === false ? $limpio : substr($limpio, 1, $cierre - 1);
@@ -150,24 +170,35 @@ function planInviteBase(): string
     $base = 'http://localhost';
     if (!empty($_SERVER['HTTP_HOST'])) {
         $host = $_SERVER['HTTP_HOST'];
-        if (!planHostDeConfianza(
+        $fiable = planHostDeConfianza(
             $host,
             (array)($cfg['hosts_permitidos'] ?? []),
             (string)($cfg['tailnet'] ?? '')
-        )) {
-            $host = 'localhost';
-        }
+        );
 
         $esq = 'http';
-        if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        if (!$fiable) {
+            // Host rechazado: se cae a localhost, y el esquema TAMBIÉN a
+            // http. Antes el esquema se decidía después y salían enlaces
+            // «https://localhost», que no existe: XAMPP no sirve TLS en
+            // ese nombre. Si vamos a dar un enlace inútil, que al menos
+            // sea uno que abra.
+            $host = 'localhost';
+        } elseif (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
             $esq = 'https';
         } elseif (
-            // Detrás de 'tailscale serve', de ngrok o de cloudflared, quien
-            // termina el TLS es ese programa y a Apache le llega HTTP pelado:
+            // Detrás de un proxy que termina el TLS —«tailscale serve» es
+            // el caso del equipo— a Apache le llega HTTP pelado, así que
             // sin esto los enlaces saldrían con http:// en un sitio https.
             // Sólo nos fiamos de la cabecera si quien conecta es la propia
-            // máquina, que es de donde hablan esos programas. Un atacante
-            // remoto no puede fingir un REMOTE_ADDR de bucle local.
+            // máquina, que es de donde habla ese proxy. Un atacante remoto
+            // no puede fingir un REMOTE_ADDR de bucle local.
+            //
+            // Ojo: esto NO basta para ngrok ni cloudflared. Ellos también
+            // hablan desde el bucle local, pero su nombre público
+            // (*.ngrok-free.dev, *.trycloudflare.com) no pasa el cerrojo
+            // de arriba, y hace bien: son dominios de terceros. Para
+            // usarlos hay que escribirlos en 'hosts_permitidos'.
             strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https'
             && in_array((string)($_SERVER['REMOTE_ADDR'] ?? ''), ['127.0.0.1', '::1'], true)
         ) {
