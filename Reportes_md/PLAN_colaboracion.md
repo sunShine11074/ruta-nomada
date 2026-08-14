@@ -135,6 +135,11 @@ cabecera de A al recargar.
 
 ## 4. Fase 2 · Que la base sepa cuándo cambió algo
 
+> **✅ HECHA el 13/08/2026.** Cuatro cosas salieron distintas de lo escrito
+> aquí abajo, y están explicadas al final de la sección, en «Lo que cambió al
+> implementarla». La más importante: **`rev` NO sube exactamente una vez por
+> acción**, y la verificación de más abajo estaba mal planteada.
+
 **1 día.** Sin esto no hay forma barata de preguntar «¿hay novedades?».
 
 ### Migración nueva: `basedatos/migrate_colaboracion.sql`
@@ -181,7 +186,58 @@ lista, marcar un pendiente, reaccionar, repartir un coste, entrar un miembro.
 
 ---
 
+### Lo que cambió al implementarla
+
+**1 · No son 15 disparadores, son 17. Y el recuento de partida estaba mal.**
+
+Tres por cada una de `plan_gastos`, `plan_listas`, `plan_lista_items`,
+`plan_item_gasto` y `plan_item_reacciones`, y sólo dos en `plan_miembros`.
+El proyecto pasa de **5 a 22 disparadores**, de **5 a 7 funciones** y de **6 a
+7 procedimientos** — no de «4 a 6 funciones y 5 a 6 procedimientos» como decía
+la nota académica, que se escribió con un recuento ya desfasado.
+
+**2 · ⚠️ `rev` es un TESTIGO DE CAMBIO, no una cuenta de acciones.**
+
+La verificación de arriba pide que suba «exactamente una vez» por cada cambio,
+y con los nueve casos de esa lista se cumple. Pero **hay una acción que la
+rompe**: guardar el reparto de un gasto. `api/plan_items.php` borra todas las
+filas de `plan_item_gasto` del lugar y vuelve a insertarlas, así que repartir
+entre cuatro personas sube `rev` **ocho veces**, no una.
+
+No es un fallo, pero sí una expectativa mal escrita. Lo único que se le pide a
+`rev` es que **cambie cuando algo cambió** y **no cambie cuando no cambió
+nada**; nadie va a interpretar el salto. Como todo eso ocurre dentro de una
+transacción, quien sondea ve un solo cambio neto.
+
+**3 · Las reacciones necesitaban también el disparador de UPDATE, y no era
+evidente.**
+
+`api/plan_reacciones.php` cambia de emoji con `INSERT ... ON DUPLICATE KEY
+UPDATE`. Comprobado en MariaDB 10.4: sobre una fila que ya existe eso dispara
+**sólo el `AFTER UPDATE`**, no el `AFTER INSERT`, así que no hay doble conteo.
+Y de regalo, reenviar el **mismo** emoji no dispara nada: `rev` no se mueve
+cuando en realidad no cambió nada.
+
+**4 · Los borrados en cascada no disparan nada, y de eso depende el diseño.**
+
+Comprobado antes de escribir una línea. Gracias a eso, borrar un lugar sube
+`rev` **una sola vez** aunque arrastre su reparto y sus reacciones, y borrar un
+viaje entero no intenta tocar una fila de `planes` que está desapareciendo.
+
+### Cómo se comprobó
+
+Doce casos contra la base real, con un usuario y un plan de usar y tirar:
+los nueve tipos de cambio de la lista, más cambiar de emoji, más los dos que
+**no** deben mover `rev` —reenviar el mismo emoji y el `UPDATE` sobre
+`plan_miembros` que hará el sondeo de la fase 6—. **12 de 12.** El plan se
+borró después sin error y no quedó nada de ensayo.
+
+---
+
 ## 5. Fase 3 · El latido
+
+> **✅ HECHA el 13/08/2026**, con **una desviación deliberada** y **un agujero
+> que este plan no vio**. Los dos, al final de la sección.
 
 **1 día.**
 
@@ -218,7 +274,77 @@ de B oculta, el registro de Apache no muestra peticiones suyas.
 
 ---
 
+### Lo que cambió al implementarla
+
+**1 · ⚠️ EL AGUJERO QUE ESTE PLAN NO VIO: quien edita se avisa a sí mismo.**
+
+Los disparadores de la fase 2 suben `rev` con **cualquier** cambio, y eso
+incluye los tuyos. Tal como estaba escrita esta fase, en cuanto alguien añadía
+un lugar su propio pulso veía el número distinto y le anunciaba «hay
+novedades» por algo que acababa de hacer él. El latido habría sido inútil
+desde el primer minuto.
+
+Se cierra en el servidor, no en el cliente: **`apiJson()` adjunta el `rev`
+resultante a toda respuesta correcta de un endpoint que trabaje sobre un
+plan**, y `_sync()` lo adopta en el mismo momento de escribir. Como el número
+viaja en la misma respuesta, **no queda ninguna ventana de carrera**: no hace
+falta un segundo viaje en el que otra persona pudiera colarse.
+
+Va en **un solo sitio** a propósito. Hacerlo endpoint por endpoint serían más
+de veinte llamadas a `apiJson()` repartidas por seis archivos, y bastaría
+olvidar una para que reapareciera el falso aviso justo en la acción olvidada.
+
+Detalle que importa: adoptar el número **no** borra un aviso que ya estuviera
+puesto. Si alguien cambió algo y todavía no lo has traído, ponerte a editar no
+debe hacer que ese aviso desaparezca.
+
+**2 · Esta fase AVISA; no trae los cambios. Y es a propósito.**
+
+El plan decía «si `rev` cambió → `fetch(plan_get.php)` → `_fusionar(j)`». Pero
+`_fusionar()` **es la fase 4**. Sustituir el estado sin ella se llevaría por
+delante el título a medio teclear o la nota a medio redactar — exactamente lo
+contrario de «nadie pierde trabajo sin enterarse».
+
+Así que la fase 3 entrega un aviso —«Alguien cambió algo en este viaje», con
+un botón **Actualizar** y otro para descartarlo— y deja que cada quien decida
+cuándo recargar. Ese botón recarga la página entera, que es lo único honesto
+que se puede hacer todavía; la fase 4 lo cambiará por la fusión selectiva.
+
+**3 · `session_write_close()` obligó a no usar `planAccess()`.**
+
+`planAccess()` consulta la sesión **y** la base en la misma llamada, así que
+usarlo obligaría a mantener el bloqueo del fichero de sesión durante la
+consulta, que es justo lo que había que evitar. El pulso lee de la sesión sólo
+el id de quien pregunta, la suelta, y **mete la comprobación de acceso dentro
+de la misma consulta que trae el número**: el `JOIN` con `plan_miembros` hace
+de guardián. Una sola consulta, y el bloqueo liberado antes de tocar la base.
+
+**4 · La respuesta pesa 19 bytes, no 25.**
+
+### Cómo se comprobó
+
+| Prueba | Resultado |
+|---|---|
+| Pestaña oculta, 14 s | **0 peticiones** en el registro de Apache (habrían sido ~3) |
+| Pestaña visible, 12 s | 2 pulsos, HTTP 200, **19 bytes** cada uno |
+| Otra sesión añade un lugar | Aviso en pantalla en **menos de 6 s** |
+| **Cambio propio** | `rev` sube 3→4, el cliente lo adopta y tras 8 s **cero avisos** |
+| 12 pulsos sin novedad | El ritmo pasa a 15 s |
+| Cualquier tecla o clic | Vuelve a 5 s |
+| Tres fallos seguidos | Se apaga y sale «Sin conexión con el plan» |
+| 12 s después de apagarse | **0 peticiones**: se apagó de verdad, no siguió insistiendo |
+
+> **Cómo se probó lo de la pestaña oculta.** El panel de navegador integrado se
+> declara **siempre** `document.hidden = true`, así que el latido no arrancaba
+> nunca. Eso verificó gratis el primer caso, y para el resto se sustituyó
+> **sólo esa propiedad del navegador** — el código del latido no se tocó.
+
+---
+
 ## 6. Fase 4 · Fusión selectiva
+
+> **✅ HECHA el 13/08/2026.** El botón «Actualizar» de la fase 3 desaparece:
+> los cambios entran solos. Lo que salió distinto, al final de la sección.
 
 **1½ días.** La parte con más riesgo de romper cosas que ya funcionan.
 
@@ -254,7 +380,81 @@ un elemento entre días.
 
 ---
 
+### Lo que cambió al implementarla
+
+**1 · Lo primero fue borrar código, no escribirlo.**
+
+`_boot()` traía el mapeo del JSON del servidor al estado escrito a mano dentro
+de sí mismo. La fusión necesita **exactamente el mismo mapeo**, y copiarlo
+habría dejado dos versiones que acabarían divergiendo. El día que divergieran,
+lo que se vería es que «a veces» un campo se pierde al llegar un cambio de
+otra persona — imposible de encontrar.
+
+Así que primero se extrajeron `_diasDe()`, `_mapearItems()`, `_mapearGastos()`
+y `_mapearListas()`. `_boot()` pasó a ser cuatro líneas y la fusión usa los
+mismos cuatro métodos. Es la misma lección que dejó `_mapMiembros()` en la
+fase 1.
+
+**2 · Lo que está en vuelo también hay que protegerlo, y el plan no lo decía.**
+
+La tabla de arriba cubre lo que se está *editando*, pero no lo que se acaba de
+crear y **el servidor todavía no conoce**: un lugar recién añadido, una lista
+recién creada, un gasto recién apuntado. Como no vienen en la respuesta del
+servidor, una fusión ingenua **los borraría de la pantalla** justo entre que se
+crean y se confirman.
+
+Se reconocen sin ambigüedad: los ids temporales son **cadenas** (`'l'+fecha`,
+`'g'+fecha`) frente a los números del servidor, y los lugares en vuelo no
+tienen `sid`.
+
+**3 · Si cambia el NÚMERO de días no se fusiona: se avisa.**
+
+`dayOpen`, `dayRecsOpen`, `placeTxts` y `daySubs` van indexados por día.
+Rehacerlos con menús abiertos por medio es pedir un fallo raro, así que ese
+caso —y sólo ese— conserva el aviso con botón **Actualizar** de la fase 3.
+
+**4 · Si alguien borra el lugar que tú tienes abierto, se cierran sus menús.**
+
+Proteger lo abierto es no *sobrescribir* lo que estás editando, no resucitar
+una fila que ya no existe. Si el lugar desaparece del servidor, desaparece — y
+`itemOpen`, `horaMenu` y `gastoMenu` que apuntaban a él se ponen a `null` en
+vez de dejar una ventana flotando sobre la nada.
+
+**5 · El reintento tras un arrastre lo hace el propio latido.**
+
+Enganchar «al soltar» habría significado tocar los **seis** sitios donde
+termina un arrastre, y bastaría olvidar uno para que un cambio se quedara
+guardado y sin aplicar para siempre. En vez de eso, cada pulso comprueba si
+quedó algo pendiente. Se aplica hasta 5 s después de soltar, y a cambio no hay
+ningún sitio que se pueda olvidar.
+
+### Cómo se comprobó
+
+Dos sesiones sobre el mismo viaje. B tenía una nota de 257 caracteres en
+edición **y** un lugar abierto; A hizo cinco cambios de golpe: tres lugares
+nuevos, uno borrado, y **renombró justo el lugar que B tenía abierto**.
+
+| Qué se miró | Resultado |
+|---|---|
+| Los tres lugares nuevos | Aparecieron, cada uno en su día |
+| El lugar borrado | Desapareció |
+| La nota de B | **257 caracteres, ni uno menos**, y seguía en edición |
+| El lugar abierto de B | Conservó **su** nombre; el de A no lo pisó |
+| Al recargar después | Sale el nombre de A: el servidor siempre lo tuvo bien |
+| El aviso | Apareció junto con el cambio y se fue **a los 4501 ms** |
+| **Arrastrando** | Durante: 6 lugares y fusión aparcada. Al soltar: 7, y `rev` adoptado |
+| Arranque normal tras el refactor | 3 días, 7 lugares en su sitio, lista, miembro y título |
+
+Un detalle que salió en la medición y no es un fallo: el aviso tardó 18,5 s en
+llegar porque el latido había retrocedido a 15 s tras doce pulsos sin novedad.
+Es el retroceso de la fase 3 haciendo su trabajo.
+
+---
+
 ## 7. Fase 5 · Bloqueo optimista y el 409
+
+> **✅ HECHA el 13/08/2026**, con **una corrección al plan**: el candado del
+> nombre del viaje **no** puede ir contra `rev`. Explicado al final.
 
 **1½ días.** Aquí es donde «sin sobrescribirse» deja de ser una promesa.
 
@@ -298,7 +498,80 @@ silencio).
 
 ---
 
+### Lo que cambió al implementarla
+
+**1 · ⚠️ CORRECCIÓN: el nombre del viaje no puede ir contra `rev`.**
+
+El plan pedía «el mismo tratamiento contra `planes.rev`». **No funciona.**
+`rev` se mueve con **cualquier** cambio del viaje: si alguien añade un lugar
+mientras tú escribes el título, tu guardado se rechazaría por algo que no
+tiene nada que ver con lo que tocaste. Serían conflictos falsos a todas horas,
+y con un latido cada 5 segundos y dos personas trabajando, casi siempre.
+
+Se resuelve con una columna aparte, **`planes.ver`**, que sólo mueve y sólo
+comprueba el cambio de nombre.
+
+**2 · Y ese candado NO se puede extender al resto de campos del plan.**
+
+Los subtítulos de los días y el presupuesto se guardan **con retardo de
+800 ms** desde el mismo navegador, así que dos escrituras propias se solapan
+con facilidad. La segunda llegaría con una versión ya vieja y **el cliente se
+daría un 409 a sí mismo**. Cerrar eso pide antes poner en cola las escrituras
+del plan, y eso no es de esta fase. Queda anotado en `api/plan_update.php`.
+
+**3 · La trampa del `rowCount()` era real, y ahora hay prueba.**
+
+Medido antes de escribir el candado, contra esta misma base:
+
+| | `rowCount()` |
+|---|---|
+| Sin `ver = ver + 1`, guardando el **mismo** valor | **0** → conflicto FALSO |
+| Con `ver = ver + 1`, guardando el **mismo** valor | 1 → bien |
+| Con `ver = ver + 1`, versión que ya no casa | 0 → conflicto DE VERDAD |
+
+**4 · La versión viaja sola, y vuelve sola.**
+
+`_sync()` adjunta el `ver` sin que los quince sitios que lo llaman tengan que
+acordarse — si hubiera que hacerlo en cada uno, el candado se quedaría fuera
+justo en la acción que se olvidara. Y el servidor **devuelve la versión
+nueva**, que el cliente adopta: sin eso, la siguiente edición del mismo lugar
+llegaría con la versión vieja y **chocaría consigo misma**.
+
+**5 · En un 409 hay que hacer lo CONTRARIO que en la fase 4.**
+
+La fusión protege lo que tienes abierto para no pisar lo que escribes. Pero
+cuando lo que escribiste **ya fue rechazado**, protegerlo deja en pantalla un
+valor que no existe en ningún sitio. Por eso `_conflicto()` marca ese lugar
+para que la siguiente fusión lo sustituya **saltándose la protección**.
+
+**6 · Falta poder decir QUIÉN se adelantó.**
+
+El aviso del plan decía «*Ana* cambió…». Hoy dice «*Alguien* cambió…»: ni
+`plan_items` ni `planes` guardan quién tocó la fila por última vez. Añadirlo
+es una columna `editado_por` y escribirla en cada guardado.
+
+### Cómo se comprobó
+
+Once casos contra el servidor real, y después el cliente en el navegador.
+
+| Caso | Resultado |
+|---|---|
+| A guarda con la versión buena | 200, `ver` 1 → 2 |
+| B guarda después con la versión vieja | **409** con la fila fresca y el nombre de A |
+| B reintenta con la versión buena | 200 |
+| **Guardar el mismo valor otra vez** | **200** — el conflicto falso no aparece |
+| `move` con versión vieja / buena | 409 / 200 |
+| `del` con versión vieja / buena | 409 / 200 |
+| **`del` de algo ya borrado** | **200 `ya_no_estaba`**, sin error rojo |
+| Renombrar el viaje, segunda vez con versión vieja | 200 / **409** |
+| **Dos subtítulos seguidos** | **200 y 200** — sin candado, no hay 409 contra uno mismo |
+| En el navegador, con el lugar **abierto** | Sale el aviso con el valor de A, **y el lugar pasa a mostrar el de A pese a estar abierto** |
+
+---
+
 ## 8. Fase 6 · Presencia
+
+> **✅ HECHA el 13/08/2026.** Dos detalles que el plan no menciona, al final.
 
 **½ día.**
 
@@ -316,7 +589,47 @@ colaborativa en lugar de tener que explicarse con palabras.
 
 ---
 
+### Lo que cambió al implementarla
+
+**1 · `TIMESTAMP NULL` hay que escribirlo con `DEFAULT NULL` explícito.**
+
+En MariaDB una columna `TIMESTAMP` declarada sin decir nada puede heredar
+`DEFAULT CURRENT_TIMESTAMP`. Si eso pasara, **todas las filas de
+`plan_miembros` que ya existen nacerían marcadas como «aquí ahora mismo»**, y
+al abrir el viaje saldrían en verde personas que llevan semanas sin entrar.
+Comprobado tras aplicarla: la columna queda `NULL`, sin `Extra`, y las ocho
+filas existentes en `NULL`.
+
+**2 · La presencia va dentro de un `try`, y el latido sobrevive sin ella.**
+
+Quien traiga el código sin poner la base al día no tiene la columna. Sin esa
+protección se le caería **el latido entero** —detección de cambios incluida—
+por no tener puntos verdes. Así, se queda sin puntos y conserva lo demás.
+
+**3 · Por qué 45 segundos y no menos.**
+
+Con el latido a 5 s, 45 dejan margen para tres fallos seguidos antes de que a
+alguien se le apague el punto. Con los 15 s a los que retrocede el latido
+cuando no pasa nada, el punto **parpadearía**; por eso importa que cualquier
+tecla o clic devuelva el ritmo a 5 s, que ya hacía la fase 3.
+
+### Cómo se comprobó
+
+| Prueba | Resultado |
+|---|---|
+| **Seis sondeos seguidos de dos personas** | **`rev` no se movió** — la trampa de §4 sigue cerrada |
+| Los dos con la pestaña abierta | `aqui: [34,35]` para ambos |
+| A B se le atrasa la marca 60 s | A pasa a ver `aqui: [34]` |
+| En el navegador | Dos puntos en el árbol: uno `block` y otro `none`, en `#41A24D` y 9 px |
+| Título del avatar | «Presencia Uno · propietario · **aqui ahora**» frente a «Presencia Dos · editor» |
+| **B vuelve y late** | El segundo punto aparece en la pantalla de A **sin recargar** |
+
+---
+
 ## 9. Fase 7 · Verificación, documentación y repositorio
+
+> **✅ HECHA el 13/08/2026, y encontró dos fallos reales.** Al final de la
+> sección.
 
 **½ día.**
 
@@ -331,6 +644,63 @@ colaborativa en lugar de tener que explicarse con palabras.
 - Ampliar `REPORTE_rutinas_bd.md` con las rutinas nuevas y escribir
   `REPORTE_colaboracion.md`.
 - Copiar al repositorio, commit y push.
+
+---
+
+### Lo que encontró
+
+**La matriz de concurrencia: nueve de nueve.**
+
+| A hace \ B hace después | `update` | `move` | `del` |
+|---|---|---|---|
+| **`update`** | 409 | 409 | 409 |
+| **`move`** | 409 | 409 | 409 |
+| **`del`** | 409 | 409 | **200 en silencio** |
+
+De paso cambió una cosa: editar o mover un lugar que otra persona acaba de
+borrar daba un **404 seco** («El lugar no existe en este plan»), que suena a
+fallo del programa cuando lo que pasa es que alguien lo borró. Ahora contesta
+**conflicto**, con esas palabras.
+
+**⚠️ La comparación limpia-contra-migrada encontró DOS diferencias reales.**
+
+Es la comprobación que el plan señalaba como la que ya había mordido una vez,
+y volvió a morder:
+
+1. **Siete tablas se habían quedado en `utf8mb4_general_ci`** —`destinos`,
+   `favoritos`, `password_resets`, `plan_destinos`, `planes`, `usuarios` y
+   `viajes_usuario`— mientras una instalación limpia las crea en
+   `utf8mb4_unicode_ci`. **No es cosmético**: comparar una columna
+   `general_ci` con un parámetro `unicode_ci` revienta con
+   `"Illegal mix of collations"`, y el error parece un fallo del PHP cuando no
+   lo es. La propia cabecera de `instalar.sql` ya avisaba de esto.
+
+2. **El índice de `viajes_usuario.plan_id` se llamaba distinto** según la vía:
+   `plan_id` en una instalación limpia, `viajes_usuario_ibfk_3` en una
+   migrada, heredado de la clave foránea que `migrate_borrar_plan.sql` rehízo.
+
+Las dos se cierran en `actualizar_bd.sql`. La segunda necesitó soltar y volver
+a poner la clave foránea porque **MariaDB 10.4 no tiene `RENAME INDEX`**
+(comprobado: error de sintaxis). Todo se probó antes sobre una copia de la
+estructura real; `viajes_usuario` tenía 0 filas.
+
+Después de aplicarlas, la comparación da **idénticas** en los siete bloques:
+21 tablas, 160 columnas, 50 índices, 23 claves foráneas, 14 rutinas, 22
+disparadores y 21 colaciones.
+
+**El diagnóstico ahora vigila las dos.** Comprueba las columnas de la
+colaboración (`rev`, `ver`, `visto_en`) y que las 21 tablas compartan
+colación, para que ese desajuste no pueda volver a colarse sin que nadie lo
+note.
+
+### Documentación
+
+- `REPORTE_rutinas_bd.md` decía 14 rutinas; ahora documenta las **36** en una
+  sección nueva, con las dos trampas de MariaDB que decidieron el diseño.
+- `REPORTE_base_de_datos.md` decía 19 tablas; ahora **21**, con las dos nuevas
+  y las seis columnas de la colaboración.
+- `REPORTE_colaboracion.md` es nuevo: qué problema resuelve cada pieza, por
+  qué sondeo y no WebSockets, y qué **no** hace.
 
 ---
 

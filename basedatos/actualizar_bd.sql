@@ -34,6 +34,8 @@
 --   · plan_invitaciones gana 3 columnas: usos, usos_max y token_claro,
 --     para que el enlace de invitación se pueda compartir con varias
 --     personas en vez de morir con la primera.
+--   · planes gana `rev` y plan_items gana `ver`: el testigo de cambio
+--     con el que la colaboración detecta novedades sin recargar.
 --   Nada más: ni tipos distintos, ni índices nuevos, ni cambios en
 --   el procedimiento sp_registrar_usuario.
 -- ============================================================
@@ -208,7 +210,106 @@ ALTER TABLE `plan_invitaciones`
 UPDATE `plan_invitaciones` SET `usos` = 1 WHERE `usada` = 1 AND `usos` = 0;
 
 
--- ── 6. Comprobación ─────────────────────────────────────────
+-- ── 6. El testigo de cambio del viaje (colaboración) ────────
+--
+-- Sin estas dos columnas no hay forma barata de preguntar «¿hay
+-- novedades en este viaje?»: habría que traerse el plan entero cada
+-- pocos segundos.
+--
+-- planes.rev     cambia cuando cambia CUALQUIER COSA del viaje. Lo
+--                mueven 20 disparadores; nadie lo escribe desde PHP.
+--                No sirve updated_at: `timestamp` tiene resolución de
+--                UN SEGUNDO, y dos ediciones dentro del mismo segundo
+--                serían indistinguibles.
+-- plan_items.ver la versión de un lugar concreto, para el bloqueo
+--                optimista. La sube la sentencia UPDATE del endpoint,
+--                nunca un disparador.
+--
+-- ⚠ Esto sólo trae las COLUMNAS. Los disparadores que mueven `rev`
+-- están en basedatos/rutinas.sql: hay que ejecutarlo también, o se
+-- quedan quietas para siempre. herramientas/actualizar.bat hace los dos.
+
+ALTER TABLE `planes`
+  ADD COLUMN IF NOT EXISTS `rev` bigint(20) unsigned NOT NULL DEFAULT 0
+      COMMENT 'Testigo de cambio del viaje; lo mueven los disparadores' AFTER `updated_at`;
+
+ALTER TABLE `plan_items`
+  ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
+      COMMENT 'Version del lugar para el bloqueo optimista' AFTER `plan_id`;
+
+ALTER TABLE `planes`
+  ADD COLUMN IF NOT EXISTS `ver` int(10) unsigned NOT NULL DEFAULT 1
+      COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista' AFTER `rev`;
+
+-- Presencia. NULL explicito: sin el, MariaDB puede darle DEFAULT
+-- CURRENT_TIMESTAMP y todas las filas existentes nacerian marcadas como
+-- "aqui ahora mismo". Y sin disparador: se escribe en CADA sondeo, y si
+-- moviera `rev` el servidor se realimentaria hasta fundirse.
+ALTER TABLE `plan_miembros`
+  ADD COLUMN IF NOT EXISTS `visto_en` timestamp NULL DEFAULT NULL
+      COMMENT 'Ultimo latido de esta persona en este viaje' AFTER `joined_at`;
+
+
+-- ── 7. Que una base MIGRADA quede idéntica a una LIMPIA ─────
+--
+-- Se comparó una instalación desde cero (instalar.sql + rutinas.sql)
+-- contra ésta, columna a columna, índice a índice y rutina a rutina.
+-- Salieron dos diferencias, y las dos se cierran aquí. El desajuste de
+-- viajes_usuario_ibfk_3 de la entrega anterior nació justo de no hacer
+-- nunca esta comparación.
+
+-- 7a. SIETE TABLAS SE QUEDARON EN utf8mb4_general_ci
+--
+-- Son las más viejas del proyecto. Todo lo creado después va en
+-- utf8mb4_unicode_ci, y mezclar colaciones no es cosmético: comparar
+-- una columna general_ci con un parámetro unicode_ci revienta con
+--     "Illegal mix of collations ... for operation '='"
+-- y el error parece un fallo del PHP cuando no lo es. La cabecera de
+-- instalar.sql ya avisaba de esto para sp_registrar_usuario.
+--
+-- Ninguna de las siete tiene columnas con colación propia, así que
+-- CONVERT TO no pisa nada. En particular NO se toca
+-- plan_item_reacciones, cuya columna `emoji` va en utf8mb4_bin a
+-- propósito: con la colación normal MySQL considera iguales a todos los
+-- emojis y el GROUP BY de las reacciones los fundiría en uno solo.
+--
+-- Probado antes sobre una copia de la estructura real: las 21 tablas
+-- acaban en unicode_ci, el emoji conserva su utf8mb4_bin y las 23
+-- claves foráneas siguen en pie.
+
+SET FOREIGN_KEY_CHECKS = 0;
+ALTER TABLE `destinos`        CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `favoritos`       CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `password_resets` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `plan_destinos`   CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `planes`          CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `usuarios`        CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `viajes_usuario`  CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- 7b. EL ÍNDICE DE viajes_usuario.plan_id SE LLAMABA DISTINTO
+--
+-- instalar.sql lo declara `plan_id`; en las bases migradas quedó
+-- `viajes_usuario_ibfk_3`, heredando el nombre de la clave foránea que
+-- migrate_borrar_plan.sql rehízo. Misma columna y mismo comportamiento,
+-- pero distinto nombre, y el objetivo es que las dos bases sean
+-- indistinguibles.
+--
+-- En MariaDB 10.4 no existe RENAME INDEX (comprobado: error de
+-- sintaxis), así que hay que soltar la clave foránea, renombrar por la
+-- vía larga y volver a ponerla. Es seguro: viajes_usuario es el
+-- historial de destinos guardados y las cuatro sentencias van con
+-- IF EXISTS / IF NOT EXISTS, así que esto se puede ejecutar dos veces.
+
+ALTER TABLE `viajes_usuario` DROP FOREIGN KEY IF EXISTS `viajes_usuario_ibfk_3`;
+ALTER TABLE `viajes_usuario` ADD KEY IF NOT EXISTS `plan_id` (`plan_id`);
+ALTER TABLE `viajes_usuario` DROP INDEX IF EXISTS `viajes_usuario_ibfk_3`;
+ALTER TABLE `viajes_usuario`
+  ADD CONSTRAINT `viajes_usuario_ibfk_3` FOREIGN KEY (`plan_id`)
+      REFERENCES `planes` (`id`) ON DELETE SET NULL;
+
+
+-- ── 8. Comprobación ─────────────────────────────────────────
 -- Si todo salió bien, esto imprime 5 columnas nuevas, 5 tablas nuevas
 -- y 3 columnas nuevas en plan_invitaciones.
 --
@@ -229,4 +330,12 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_invitaciones'
        AND COLUMN_NAME IN ('usos','usos_max','token_claro'))
-    AS `columnas_nuevas_en_plan_invitaciones (deben ser 3)`;
+    AS `columnas_nuevas_en_plan_invitaciones (deben ser 3)`,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND ((TABLE_NAME = 'planes' AND COLUMN_NAME = 'rev')
+         OR (TABLE_NAME = 'plan_items' AND COLUMN_NAME = 'ver')))
+    AS `testigo_de_cambio (deben ser 2)`,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'planes' AND COLUMN_NAME = 'ver')
+    AS `candado_del_nombre (debe ser 1)`;

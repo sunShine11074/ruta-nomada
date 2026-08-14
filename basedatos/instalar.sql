@@ -2,9 +2,13 @@
 --   instalar.sql — Instalación completa | Ruta Nómada
 --
 --   ESTE ES EL ÚNICO ARCHIVO QUE HACE FALTA para dejar la base de
---   datos lista: crea las 18 tablas, el procedimiento almacenado y
---   los destinos de ejemplo. NO trae usuarios ni planes; cada quien
---   se registra en su propia copia.
+--   datos lista: crea las 21 tablas y los destinos de ejemplo. NO trae
+--   usuarios ni planes; cada quien se registra en su propia copia.
+--
+--   ⚠ LAS RUTINAS NO ESTÁN AQUÍ. Las 7 funciones, los 7 procedimientos
+--   y los 22 disparadores viven en basedatos/rutinas.sql y hay que
+--   ejecutarlo DESPUÉS de este archivo, o el registro, crear y borrar
+--   planes y el testigo de cambio de la colaboración no funcionan.
 --
 --   Los migrate_*.sql de esta carpeta son el historial de cómo fue
 --   creciendo el esquema. Si partes de cero NO los necesitas:
@@ -196,6 +200,15 @@ CREATE TABLE `planes` (
   `presupuesto` decimal(12,2) DEFAULT NULL,
   `creado_en` datetime DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  -- Testigo de cambio del viaje. Sube cada vez que cambia cualquier cosa
+  -- suya, y lo mueven 20 disparadores; nadie lo escribe desde PHP. Existe
+  -- porque `timestamp` tiene resolucion de un segundo y dos ediciones
+  -- dentro del mismo segundo serian indistinguibles.
+  `rev` bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT 'Testigo de cambio del viaje; lo mueven los disparadores',
+  -- Version del NOMBRE del viaje, y solo del nombre: `rev` no sirve de
+  -- candado porque se mueve con cualquier cambio, y usar esta para el
+  -- resto de campos daria 409 contra uno mismo (se guardan con retardo).
+  `ver` int(10) unsigned NOT NULL DEFAULT 1 COMMENT 'Version del NOMBRE del viaje para el bloqueo optimista',
   `dia_subtitulos` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `usuario_id` (`usuario_id`),
@@ -288,6 +301,11 @@ CREATE TABLE `plan_invitaciones` (
 CREATE TABLE `plan_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `plan_id` int(11) NOT NULL,
+  -- Version de ESTE lugar, para el bloqueo optimista. La sube la propia
+  -- sentencia UPDATE del endpoint, NO un disparador: si la moviera un
+  -- disparador subiria dos veces por edicion y el numero que el cliente
+  -- tiene en la mano no volveria a coincidir nunca.
+  `ver` int(10) unsigned NOT NULL DEFAULT 1 COMMENT 'Version del lugar para el bloqueo optimista',
   `dia` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT '0 = sin asignar (guardado)',
   `orden` smallint(5) unsigned NOT NULL DEFAULT 0,
   `nombre` varchar(255) NOT NULL,
@@ -331,6 +349,11 @@ CREATE TABLE `plan_miembros` (
   `usuario_id` int(11) NOT NULL,
   `rol` enum('propietario','editor','lector') NOT NULL DEFAULT 'editor',
   `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  -- Presencia: ultimo latido. NULL explicito para que las filas nazcan
+  -- vacias y no marcadas como "aqui ahora". Sin disparador a proposito:
+  -- se escribe en CADA sondeo y mover `rev` desde aqui realimentaria el
+  -- servidor hasta fundirlo.
+  `visto_en` timestamp NULL DEFAULT NULL COMMENT 'Ultimo latido de esta persona en este viaje',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_plan_user` (`plan_id`,`usuario_id`),
   KEY `fk_planmiembros_user` (`usuario_id`),

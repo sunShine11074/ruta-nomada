@@ -20,13 +20,49 @@ $db = getDB();
 $action = $in['action'] ?? '';
 
 // Item propio del plan (evita tocar items ajenos)
+//
+// Si no esta, la respuesta NO es un 404 seco: es un conflicto. Que el
+// lugar haya desaparecido entre que lo abriste y que guardaste es
+// exactamente el caso que esta fase existe para contar, y "El lugar no
+// existe en este plan" sonaria a fallo del programa cuando lo que pasa
+// es que alguien lo borro. conflicto() sabe decirlo con esas palabras.
 function ownItem(PDO $db, int $planId, int $id): array
 {
     $stmt = $db->prepare('SELECT * FROM plan_items WHERE id = ? AND plan_id = ? LIMIT 1');
     $stmt->execute([$id, $planId]);
     $it = $stmt->fetch();
-    if (!$it) apiFail('El lugar no existe en este plan.', 404);
+    if (!$it) conflicto($db, $id);
     return $it;
+}
+
+// ── Bloqueo optimista ────────────────────────────────────────
+//
+// La versión con la que hay que comparar. Si el cliente no manda
+// ninguna se usa la que hay en la base, lo que equivale a "sin
+// candado" y deja el comportamiento de antes. Es a propósito: una
+// pestaña abierta desde antes de esta versión sigue funcionando en vez
+// de empezar a fallar de golpe, y en cuanto se recarga, protege.
+function verPedida(array $in, array $it): int
+{
+    return array_key_exists('ver', $in) ? (int)$in['ver'] : (int)$it['ver'];
+}
+
+// La respuesta cuando alguien se nos adelantó. Va con 409 -que es el
+// código de "conflicto"- y trae la fila fresca para que el navegador
+// pueda enseñar de qué versión se trata.
+function conflicto(PDO $db, int $id): void
+{
+    $st = $db->prepare('SELECT id, ver, nombre, dia, orden FROM plan_items WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $fresco = $st->fetch() ?: null;
+    apiJson([
+        'ok'        => false,
+        'conflicto' => true,
+        'item'      => $fresco,
+        'error'     => $fresco
+            ? ('Alguien cambió «' . $fresco['nombre'] . '» mientras lo editabas.')
+            : 'Alguien borró ese lugar mientras lo editabas.',
+    ], 409);
 }
 
 $reHora = '/^\d{1,2}:\d{2}(:\d{2})?$/';
@@ -112,10 +148,26 @@ switch ($action) {
             $sets[] = 'gasto_modo = ?'; $vals[] = $gm;
         }
 
-        if ($sets) {
-            $vals[] = $it['id'];
-            $db->prepare('UPDATE plan_items SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($vals);
-        }
+        // ⚠ `ver = ver + 1` NO ES COSMÉTICO, ES LO QUE HACE FIABLE EL 409.
+        //
+        // db.php no activa PDO::MYSQL_ATTR_FOUND_ROWS, así que rowCount()
+        // cuenta filas MODIFICADAS, no filas que casaron con el WHERE.
+        // Sin esa columna subiendo, guardar un valor idéntico al que ya
+        // había devolvería 0 y el cliente vería un conflicto FALSO.
+        // Comprobado: con el mismo valor y sin `ver = ver + 1`,
+        // rowCount() = 0; con él, 1. Un 0 significa entonces de verdad
+        // "alguien se me adelantó".
+        //
+        // Se ejecuta SIEMPRE, aunque no haya campos que cambiar: la
+        // petición puede traer sólo `reparto`, y ese caso también tiene
+        // que pasar por el candado.
+        $sets[] = 'ver = ver + 1';
+        $vals[] = $it['id'];
+        $vals[] = verPedida($in, $it);
+        $upd = $db->prepare('UPDATE plan_items SET ' . implode(', ', $sets) . ' WHERE id = ? AND ver = ?');
+        $upd->execute($vals);
+        if ($upd->rowCount() === 0) conflicto($db, (int)$it['id']);
+        $verNueva = verPedida($in, $it) + 1;
 
         // ── Reparto entre los compañeros de viaje ───────────────
         // Llega la lista completa y se reemplaza entera: con tan pocas
@@ -155,7 +207,10 @@ switch ($action) {
         } elseif (!$sets) {
             apiFail('Nada que actualizar.');
         }
-        apiJson(['ok' => true]);
+        // La version nueva viaja de vuelta. Sin esto el navegador se
+        // quedaria con la vieja y su SIGUIENTE edicion del mismo lugar
+        // chocaria consigo misma.
+        apiJson(['ok' => true, 'item_id' => (int)$it['id'], 'ver' => $verNueva]);
     }
 
     case 'move': {
@@ -164,6 +219,13 @@ switch ($action) {
         $orden = max(0, min(500, (int)($in['orden'] ?? 0)));
         $db->beginTransaction();
         try {
+            // El candado va PRIMERO y dentro de la transacción: si
+            // alguien movió este lugar antes, no hay que renumerar nada,
+            // porque los órdenes de partida ya no son los que creemos.
+            $g = $db->prepare('UPDATE plan_items SET ver = ver + 1 WHERE id = ? AND ver = ?');
+            $g->execute([$it['id'], verPedida($in, $it)]);
+            if ($g->rowCount() === 0) { $db->rollBack(); conflicto($db, (int)$it['id']); }
+
             // Compactar el día de origen (cerrar el hueco)
             $db->prepare('UPDATE plan_items SET orden = orden - 1 WHERE plan_id = ? AND dia = ? AND orden > ?')
                ->execute([$planId, (int)$it['dia'], (int)$it['orden']]);
@@ -179,14 +241,28 @@ switch ($action) {
             error_log('plan_items move: ' . $e->getMessage());
             apiFail('No se pudo mover el lugar.', 500);
         }
-        apiJson(['ok' => true]);
+        apiJson(['ok' => true, 'item_id' => (int)$it['id'], 'ver' => verPedida($in, $it) + 1]);
     }
 
     case 'del': {
-        $it = ownItem($db, $planId, (int)($in['id'] ?? 0));
+        // Borrar algo que YA no está no es un error: es el resultado que
+        // se pedía. Pasa de verdad -dos personas borrando el mismo lugar
+        // a la vez, o un reintento tras una conexión mala- y sacar un
+        // aviso rojo por ello sólo asusta sin motivo. Por eso aquí no se
+        // usa ownItem(), que cortaría con un 404.
+        $st = $db->prepare('SELECT * FROM plan_items WHERE id = ? AND plan_id = ? LIMIT 1');
+        $st->execute([(int)($in['id'] ?? 0), $planId]);
+        $it = $st->fetch();
+        if (!$it) apiJson(['ok' => true, 'ya_no_estaba' => true]);
+
         $db->beginTransaction();
         try {
-            $db->prepare('DELETE FROM plan_items WHERE id = ?')->execute([$it['id']]);
+            // El mismo candado: borrar un lugar que otra persona acaba
+            // de cambiar tira su trabajo sin que se entere.
+            $del = $db->prepare('DELETE FROM plan_items WHERE id = ? AND ver = ?');
+            $del->execute([$it['id'], verPedida($in, $it)]);
+            if ($del->rowCount() === 0) { $db->rollBack(); conflicto($db, (int)$it['id']); }
+
             $db->prepare('UPDATE plan_items SET orden = orden - 1 WHERE plan_id = ? AND dia = ? AND orden > ?')
                ->execute([$planId, (int)$it['dia'], (int)$it['orden']]);
             $db->commit();

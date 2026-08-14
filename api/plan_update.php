@@ -75,6 +75,51 @@ if (array_key_exists('dia_subtitulos', $in)) {
 
 if (!$tocado) apiFail('Nada que actualizar.');
 
+// ── Bloqueo optimista, y SÓLO sobre el nombre ────────────────
+//
+// Este endpoint escribe la fila COMPLETA (así está diseñado, para que
+// se pueda poner un campo a NULL), de modo que dos personas cambiando
+// el título a la vez se pisaban sin remedio. Aquí se corta ese caso.
+//
+// ⚠ POR QUÉ SÓLO EL NOMBRE, Y POR QUÉ NO SE USA `rev`
+//
+//   · `rev` no vale de candado: se mueve con CUALQUIER cambio del
+//     viaje. Si alguien añade un lugar mientras escribes el título, tu
+//     guardado se rechazaría por algo que no tiene nada que ver con lo
+//     que tocaste. Serían conflictos falsos a todas horas.
+//
+//   · Y el candado no se puede extender al resto de campos de este
+//     endpoint: los subtítulos de los días y el presupuesto se guardan
+//     CON RETARDO de 800 ms desde el mismo navegador, así que dos
+//     escrituras propias se solapan con facilidad. La segunda llegaría
+//     con una versión ya vieja y el cliente SE DARÍA UN 409 A SÍ MISMO.
+//     Cerrar eso pide antes poner en cola las escrituras del plan, y
+//     eso no es de esta fase.
+//
+// El nombre es el caso que de verdad se pisa entre dos personas, y es
+// el que el plan pedía resolver.
+if (array_key_exists('nombre', $in)) {
+    $verCli = array_key_exists('ver', $in) ? (int)$in['ver'] : (int)($acc['plan']['ver'] ?? 1);
+    // `ver = ver + 1` por lo mismo que en plan_items.php: sin él,
+    // reguardar el mismo nombre daría rowCount() = 0 y un conflicto
+    // falso, porque db.php no activa PDO::MYSQL_ATTR_FOUND_ROWS.
+    $g = getDB()->prepare('UPDATE planes SET ver = ver + 1 WHERE id = ? AND ver = ?');
+    $g->execute([$planId, $verCli]);
+    if ($g->rowCount() === 0) {
+        $q = getDB()->prepare('SELECT ver, nombre FROM planes WHERE id = ? LIMIT 1');
+        $q->execute([$planId]);
+        $fresco = $q->fetch() ?: null;
+        apiJson([
+            'ok'        => false,
+            'conflicto' => true,
+            'plan'      => $fresco,
+            'error'     => $fresco
+                ? ('Alguien renombró el viaje a «' . $fresco['nombre'] . '» mientras lo editabas.')
+                : 'Alguien cambió el viaje mientras lo editabas.',
+        ], 409);
+    }
+}
+
 $st = getDB()->prepare('CALL sp_actualizar_plan(?,?,?,?,?,?,?,?,?,?)');
 $st->execute([
     $planId,
@@ -89,4 +134,9 @@ $st->execute([
     $fila['dia_subtitulos'],
 ]);
 $st->closeCursor();
-apiJson(['ok' => true]);
+
+// La version nueva del nombre, para que el navegador la adopte y su
+// siguiente renombrado no choque consigo mismo.
+$q = getDB()->prepare('SELECT ver FROM planes WHERE id = ? LIMIT 1');
+$q->execute([$planId]);
+apiJson(['ok' => true, 'plan_ver' => (int)$q->fetchColumn()]);

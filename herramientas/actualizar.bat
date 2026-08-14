@@ -83,9 +83,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo   Listo. Arriba deben verse:  5 columnas, 5 tablas y 3 columnas
-echo   mas en plan_invitaciones; y de rutinas, FUNCTION 5,
-echo   PROCEDURE 6 y TRIGGER 5.
+echo   Listo. Arriba deben verse:  5 columnas, 5 tablas, 3 columnas
+echo   mas en plan_invitaciones y 2 del testigo de cambio; y de
+echo   rutinas, FUNCTION 7, PROCEDURE 7 y TRIGGER 22.
 echo.
 echo   2/2  Comprobando la instalacion...
 echo.

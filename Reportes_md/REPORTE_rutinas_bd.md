@@ -7,7 +7,12 @@ escribió sólo para cumplir un requisito.
 
 - **Motor:** MariaDB 10.4 (XAMPP)
 - **Base:** `ruta_nomada`
-- **Total:** 14 rutinas — 4 funciones, 5 procedimientos, 5 disparadores
+- **Total:** **36 rutinas** — 7 funciones, 7 procedimientos, 22 disparadores
+
+> **Las secciones 3 a 5 describen las 14 primeras**, escritas para la entrega
+> de rutinas. Las **22 que llegaron después** —con el freno a la fuerza bruta
+> del login y con la colaboración en tiempo real— están en la **sección 9**, al
+> final.
 
 ---
 
@@ -749,8 +754,8 @@ auditoría funciona.
 Debe imprimir:
 
 ```
-[ok]  Están las 19 tablas que crea instalar.sql
-[ok]  Están las 14 rutinas de rutinas.sql (funciones, procedimientos y triggers)
+[ok]  Están las 21 tablas que crea instalar.sql
+[ok]  Están las 36 rutinas de rutinas.sql (funciones, procedimientos y triggers)
 ```
 
 Si falta alguna, la nombra y da la orden exacta para reponerla. La lista
@@ -783,9 +788,9 @@ mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"
 
 | Requisito | Mínimo pedido | Entregado |
 |-----------|---------------|-----------|
-| Procedimientos almacenados (CRUD) | 4 | **5** |
-| Funciones | 4 | **4** |
-| Disparadores | 3 | **5** |
+| Procedimientos almacenados (CRUD) | 4 | **7** |
+| Funciones | 4 | **7** |
+| Disparadores | 3 | **22** |
 
 Más allá del conteo, lo que aportan al proyecto:
 
@@ -805,5 +810,89 @@ Más allá del conteo, lo que aportan al proyecto:
 
 ---
 
-*Reporte generado sobre el estado del repositorio en el commit `0bee7d2`
-(«feat: 14 rutinas de base de datos»).*
+---
+
+## 9. Las 22 rutinas que llegaron después
+
+Las secciones anteriores describen el estado en el commit `0bee7d2`. Desde
+entonces se añadieron 22 más, en dos tandas.
+
+### 9.1 · El freno a la fuerza bruta del login (2)
+
+| Rutina | Qué hace |
+|---|---|
+| `fn_login_bloqueado(email, ip)` | ¿Está esta persona frenada ahora mismo por haber fallado demasiadas veces? |
+| `sp_registrar_intento(email, ip, exito)` | Apunta el intento en `intentos_login` |
+
+> **⚠️ La trampa que costó encontrarlas.** Las rutinas heredan la colación de
+> la conexión con la que se crean, y la consola de Windows da `cp850_general_ci`.
+> Creadas así, la comparación de correos fallaba y **el límite de intentos
+> quedaba desactivado sin que nada avisara**. Por eso `rutinas.sql` empieza con
+> `SET NAMES utf8mb4` y estas dos declaran `CHARACTER SET`/`COLLATE` en sus
+> parámetros.
+
+### 9.2 · La colaboración en tiempo real (20)
+
+Todas sirven a lo mismo: que `planes.rev` —el testigo de cambio del viaje—
+suba cuando cambia **cualquier cosa** del viaje. El detalle de para qué está
+en `REPORTE_colaboracion.md`.
+
+| Rutina | Qué hace |
+|---|---|
+| `sp_tocar_plan(plan_id)` | Sube `rev` y mueve `updated_at`. **Es la única línea que escriben los veinte disparadores**: si mañana cambia cómo se marca un plan como modificado, se cambia aquí y no en veinte sitios |
+| `fn_plan_de_item(item_id)` | El `plan_id` de un lugar |
+| `fn_plan_de_lista(lista_id)` | El `plan_id` de una lista |
+
+Las dos funciones existen porque las tablas **nietas** no saben a qué plan
+pertenecen: `plan_item_gasto` y `plan_item_reacciones` sólo guardan `item_id`,
+y `plan_lista_items` sólo `lista_id`.
+
+**Los 17 disparadores nuevos**, tres por tabla salvo el último caso:
+
+| Tabla | Eventos |
+|---|---|
+| `plan_gastos` | `INSERT`, `UPDATE`, `DELETE` |
+| `plan_listas` | `INSERT`, `UPDATE`, `DELETE` |
+| `plan_lista_items` | `INSERT`, `UPDATE`, `DELETE` |
+| `plan_item_gasto` | `INSERT`, `UPDATE`, `DELETE` |
+| `plan_item_reacciones` | `INSERT`, `UPDATE`, `DELETE` |
+| `plan_miembros` | `INSERT`, `DELETE` — **y nada más** |
+
+Y los tres que ya existían sobre `plan_items` pasaron a llamar a
+`sp_tocar_plan` en vez de escribir su `UPDATE` a mano.
+
+Son tantos porque en MariaDB **un disparador es por tabla y por evento**: no
+existe «uno para insertar, borrar y actualizar». Cada uno tiene tres líneas y
+todos hacen lo mismo, así que la lista es larga pero no tiene nada que
+entender.
+
+> ### ⚠️ El hueco de `plan_miembros UPDATE` es deliberado
+>
+> Ahí **no hay** disparador, y es lo más importante de esta sección. El sondeo
+> de presencia escribe en `plan_miembros` **en cada latido de cada persona**.
+> Si ese `UPDATE` subiera `rev`, cada sondeo contaría como una novedad, cada
+> cliente se traería el plan entero, ese trabajo generaría más sondeos, y se
+> realimenta hasta fundir el servidor.
+>
+> Quien añada aquí un `trg_miembro_upd` estará encendiendo esa mecha. Se
+> comprobó a propósito: seis sondeos seguidos de dos personas dejaron `rev`
+> **quieto**.
+
+### 9.3 · Dos detalles de MariaDB que decidieron el diseño
+
+Los dos se comprobaron en una base de ensayo **antes** de escribir nada:
+
+1. **Los borrados en cascada NO disparan disparadores.** Gracias a eso, borrar
+   un lugar sube `rev` una sola vez aunque arrastre su reparto y sus
+   reacciones, y borrar un viaje entero no intenta tocar una fila de `planes`
+   que está desapareciendo.
+2. **`INSERT ... ON DUPLICATE KEY UPDATE` sobre una fila que ya existe dispara
+   sólo el `AFTER UPDATE`**, no los dos. Por eso las reacciones necesitan el
+   disparador de `UPDATE` —que no era evidente— y no hay doble conteo. Y
+   reenviar el mismo emoji no dispara nada, así que `rev` no se mueve cuando
+   en realidad no cambió nada.
+
+---
+
+*Secciones 1 a 8 sobre el commit `0bee7d2` («feat: 14 rutinas de base de
+datos»); sección 9 sobre las fases 1 y 2 de la colaboración robusta.*

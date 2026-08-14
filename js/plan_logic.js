@@ -151,7 +151,14 @@ class Component extends DCLogic {
       //             bien de verdad (ver _invCopiar)
       invModal: false, invPant: 'invitar', invLink: '', invLinkErr: '',
       invCopiado: false, invEmail: '', invMsg: '', invMsgMal: false,
-      invEnviando: false
+      invEnviando: false,
+      // El latido (fase 3 de PLAN_colaboracion.md).
+      //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
+      pulsoCaido: false, presentes: [],
+      // El aviso de la fusion. avisoRecarga distingue "ya esta traido,
+      // esto es solo para que te enteres" -se va solo- de "esto no se
+      // pudo fusionar, hace falta recargar" -se queda-.
+      avisoTxt: '', avisoRecarga: false
     };
     this._boot();   // siembra desde window.PLAN_BOOT (Ruta Nómada) — sin servidor conserva el demo
   }
@@ -169,46 +176,18 @@ class Component extends DCLogic {
     if (!B || !B.plan) { this.DAYS = this._mkDays('2026-07-30', '2026-07-31', 2); this.state.destinoDesc = this.DESC_ENSENADA; return; }
     const P = B.plan;
     this.PLAN_ID = Number(P.id);
+    // El testigo de cambio con el que arranca esta pestana. Todo lo que
+    // haga el latido es comparar este numero con el del servidor.
+    this.REV = Number(P.rev) || 0;
+    // La version del NOMBRE del viaje. Solo la mueve renombrarlo.
+    this.PLAN_VER = Number(P.ver) || 1;
     this.ROL = B.rol || 'lector';
     this.puedeEditar = this.ROL === 'editor' || this.ROL === 'propietario';
-    let maxDia = 1;
-    (B.items || []).forEach(it => { if (Number(it.dia) > maxDia) maxDia = Number(it.dia); });
-    this.DAYS = this._mkDays(P.fecha_inicio, P.fecha_fin, maxDia);
+    this.DAYS = this._diasDe(B);
     const N = this.DAYS.length;
-    const dayItems = Array.from({ length: N }, () => []);
-    (B.items || []).slice().sort((a, b) => (a.dia - b.dia) || (a.orden - b.orden) || (a.id - b.id)).forEach(it => {
-      const di = Math.min(N, Math.max(1, Number(it.dia) || 1)) - 1;
-      const h0 = (it.hora || '').slice(0, 5), h1 = (it.hora_fin || '').slice(0, 5);
-      dayItems[di].push({
-        uid: 'i' + it.id, sid: Number(it.id),
-        name: it.nombre, nota: it.nota || '',
-        horario: h0 ? (h1 ? h0 + ' - ' + h1 : h0) : '',
-        costo: Number(it.precio) || 0, travel: null,
-        // El horario también se guarda suelto: la cadena 'horario' es
-        // para pintar, pero para editarlo hacen falta los dos extremos.
-        hora: (it.hora || '').slice(0, 5), horaFin: (it.hora_fin || '').slice(0, 5),
-        moneda: it.moneda || 'MXN', gastoCat: it.gasto_cat || '',
-        gastoDesc: it.gasto_desc || '', gastoModo: it.gasto_modo || 'no',
-        reparto: Array.isArray(it.reparto) ? it.reparto.map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })) : [],
-        // Cómo se va de este lugar al siguiente. null = el de por defecto.
-        modo: it.modo_viaje || null,
-        reacts: Array.isArray(it.reacts) ? it.reacts.map(r => ({ e: r.e, n: Number(r.n) || 0, mine: !!r.mine })) : [],
-        pid: it.place_id || null,
-        lat: (it.lat === null || it.lat === undefined) ? null : Number(it.lat),
-        lng: (it.lng === null || it.lng === undefined) ? null : Number(it.lng),
-        img: it.imagen_url || null, catg: it.categoria || 'custom'
-      });
-    });
-    const gastos = (B.gastos || []).map((g, i) => ({
-      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0, cat: g.categoria || 'Otro',
-      fecha: this._fmtDia(g.fecha), fiso: g.fecha || '', ts: (B.gastos.length - i)
-    }));
-    const lists = (B.listas || []).map(L => ({
-      id: Number(L.id), title: L.titulo, type: L.tipo === 'nota' ? 'note' : 'check',
-      open: true, cardTitle: L.titulo, newTxt: '', placeTxt: '',
-      text: L.texto || '',
-      items: (L.items || []).map(x => ({ iid: Number(x.id), t: x.texto, done: !!Number(x.hecho) }))
-    }));
+    const dayItems = this._mapearItems(B, N);
+    const gastos = this._mapearGastos(B);
+    const lists = this._mapearListas(B);
     this.MIEMBROS = this._mapMiembros(B.miembros);
     if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
     const dest = P.destino || 'mi destino';
@@ -291,18 +270,340 @@ class Component extends DCLogic {
     return a.d + '/' + a.m + ' – ' + b.d + '/' + b.m;
   }
   // fetch de persistencia (optimista, fuego-y-olvida con aviso en consola)
+  // Busca un lugar por su id de servidor, en cualquier dia.
+  _itemPorSid(sid) {
+    const dias = this.state.dayItems || [];
+    for (let d = 0; d < dias.length; d++) {
+      const it = dias[d].find(x => x.sid === Number(sid));
+      if (it) return it;
+    }
+    return null;
+  }
   _sync(endpoint, body, onOk) {
     if (!this.PLAN_ID) return;   // modo demo sin servidor
     body = Object.assign({ plan_id: this.PLAN_ID }, body);
+    // La version viaja SOLA, aqui y no en los quince sitios que llaman
+    // a _sync: si hubiera que acordarse en cada uno, el candado se
+    // quedaria fuera justo en la accion que se olvidara.
+    if (endpoint === 'plan_items.php' && body.id && body.ver === undefined) {
+      const it = this._itemPorSid(body.id);
+      if (it && it.ver) body.ver = it.ver;
+    }
+    if (endpoint === 'plan_update.php' && body.nombre !== undefined && body.ver === undefined) {
+      body.ver = this.PLAN_VER;
+    }
     fetch('api/' + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
       body: JSON.stringify(body)
     }).then(r => r.json()).then(j => {
-      if (!j.ok) console.warn('[plan] ' + endpoint + ':', j.error);
-      else if (onOk) onOk(j);
+      if (!j.ok) {
+        // ⚠ 409: alguien se adelanto. No es un error de red ni un fallo
+        // del programa; es la otra persona, y hay que ensenar SU version.
+        if (j.conflicto) { this._conflicto(j); return; }
+        console.warn('[plan] ' + endpoint + ':', j.error);
+        return;
+      }
+      // Se adoptan las versiones nuevas. Sin esto, la SIGUIENTE edicion
+      // del mismo lugar llegaria con la version vieja y chocaria
+      // consigo misma: un 409 provocado por uno mismo.
+      if (typeof j.ver === 'number' && j.item_id) {
+        const it = this._itemPorSid(j.item_id);
+        if (it) it.ver = j.ver;
+      }
+      if (typeof j.plan_ver === 'number') this.PLAN_VER = j.plan_ver;
+      // Se adopta el testigo que devuelve el servidor. Sin esto, el
+      // latido veria cambiado el numero por MI PROPIA escritura y me
+      // anunciaria "hay novedades" por algo que acabo de hacer yo.
+      // Viene en la misma respuesta, asi que no hay ninguna ventana en
+      // la que otra persona pueda colarse. Ver apiJson() en
+      // includes/plan_auth.php.
+      //
+      // OJO: adoptar el numero NO borra un aviso que ya estuviera
+      // puesto. Si alguien cambio algo y todavia no lo he traido,
+      // ponerme a editar no debe hacer que ese aviso desaparezca.
+      if (typeof j.rev === 'number') this.REV = j.rev;
+      if (onOk) onOk(j);
     }).catch(err => console.warn('[plan] ' + endpoint + ':', err));
   }
+
+  // ════ El latido: ¿alguien mas toco el viaje? ══════════════
+  // Fase 3 de Reportes_md/PLAN_colaboracion.md
+  //
+  // Pregunta a api/plan_pulso.php por el testigo de cambio del viaje.
+  // La respuesta pesa unos 25 bytes, asi que preguntar cada 5 s cuesta
+  // menos que cargar un icono.
+  //
+  // Esta fase SOLO DETECTA Y AVISA. Traer los cambios sin pisar lo que
+  // la otra persona esta escribiendo es la fase 4, y hacerlo antes
+  // seria justo lo contrario de lo que persigue el plan: sustituir el
+  // estado de golpe borraria el titulo a medio teclear o la nota a
+  // medio redactar. Hasta entonces, el aviso deja que cada quien
+  // decida cuando recargar.
+  _pulsoArranca() {
+    if (!this.PLAN_ID) return;          // modo demo sin servidor
+    this._pulsoMs = 5000;
+    this._pulsoQuietos = 0;
+    this._pulsoFallos = 0;
+    this._pulsoPrograma(this._pulsoMs);
+    // Una pestana en segundo plano no consume nada: ni red, ni base de
+    // datos, ni bateria. Al volver se pregunta EN EL ACTO, porque
+    // mientras estuvo oculta pudo cambiar cualquier cosa.
+    this._pulsoVis = () => {
+      if (document.hidden) { clearTimeout(this._pulsoT); return; }
+      if (this.state.pulsoCaido) return;
+      this._pulsoMs = 5000; this._pulsoQuietos = 0;
+      this._pulsoPrograma(0);
+    };
+    document.addEventListener('visibilitychange', this._pulsoVis);
+  }
+  _pulsoPrograma(ms) {
+    clearTimeout(this._pulsoT);
+    if (document.hidden || this.state.pulsoCaido) return;
+    this._pulsoT = setTimeout(() => this._latir(), ms);
+  }
+  _latir() {
+    if (document.hidden || !this.PLAN_ID) return;
+    // Si quedo una fusion pendiente por un arrastre, se intenta ahora.
+    // Se reintenta AQUI y no al soltar el raton a proposito: los sitios
+    // donde termina un arrastre son seis, y bastaria olvidar uno para
+    // que un cambio se quedara guardado y sin aplicar para siempre.
+    if (this._fusionPend) this._fusionar(this._fusionPend);
+    fetch('api/plan_pulso.php?id=' + this.PLAN_ID, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.json())
+      .then(j => {
+        if (!j || !j.ok) throw new Error((j && j.error) || 'pulso');
+        this._pulsoFallos = 0;
+        // Quien mas esta mirando el viaje ahora. Se compara antes de
+        // llamar a setState: sin eso, cada pulso repintaria el arbol
+        // entero para dejarlo exactamente igual.
+        const aqui = Array.isArray(j.aqui) ? j.aqui : [];
+        const ant = this.state.presentes || [];
+        if (aqui.length !== ant.length || aqui.some((u, i) => u !== ant[i])) {
+          this.setState({ presentes: aqui });
+        }
+        if (typeof j.rev === 'number' && j.rev !== this.REV) {
+          // Cambio de OTRA persona: los propios ya se adoptaron en
+          // _sync() en el momento de escribirlos.
+          this._pulsoMs = 5000; this._pulsoQuietos = 0;
+          // Desde la fase 4 no se avisa y ya: se TRAE. _fusionar()
+          // decide que se sustituye y que se respeta. `this.REV` lo
+          // pone la propia fusion, no aqui: si se pusiera antes y la
+          // peticion fallara, este cambio no se volveria a intentar.
+          this._fusionTraer();
+        } else {
+          // Retroceso progresivo: si no pasa nada, se pregunta menos.
+          // Un viaje que nadie toca no tiene por que costar doce
+          // peticiones por minuto durante horas.
+          this._pulsoQuietos++;
+          if (this._pulsoQuietos >= 12) this._pulsoMs = 15000;
+        }
+        this._pulsoPrograma(this._pulsoMs);
+      })
+      .catch(() => {
+        this._pulsoFallos = (this._pulsoFallos || 0) + 1;
+        if (this._pulsoFallos >= 3) {
+          // Se apaga solo. Insistir contra un servidor que no responde
+          // no arregla nada y llena la consola de rojo; mejor decirlo
+          // una vez y callarse.
+          clearTimeout(this._pulsoT);
+          this.setState({ pulsoCaido: true });
+          return;
+        }
+        this._pulsoPrograma(this._pulsoMs);
+      });
+  }
+  // Cualquier cosa que haga la persona vuelve a poner el ritmo rapido:
+  // si esta trabajando, es cuando mas importa enterarse de los demas.
+  _pulsoDespierta() {
+    if (!this.PLAN_ID || this.state.pulsoCaido || document.hidden) return;
+    if (this._pulsoMs === 5000 && this._pulsoQuietos === 0) return;
+    this._pulsoMs = 5000; this._pulsoQuietos = 0;
+    this._pulsoPrograma(this._pulsoMs);
+  }
+  _pulsoRecargar() { window.location.reload(); }
+
+  // ════ Alguien se adelanto (HTTP 409) ═════════════════════
+  // Fase 5 de Reportes_md/PLAN_colaboracion.md
+  //
+  // Mi cambio NO se guardo, asi que la pantalla no puede seguir
+  // ensenandolo: seria mentir sobre lo que hay en la base. Se trae la
+  // version del servidor y se avisa de que paso.
+  //
+  // El truco esta en _forzarUid: ese lugar es justo el que la fusion
+  // protegeria por tenerlo abierto, y aqui hay que hacer lo contrario.
+  // Proteger sirve para no pisar lo que estas ESCRIBIENDO; cuando lo
+  // que escribiste ya fue RECHAZADO, protegerlo solo deja en pantalla
+  // un valor que no existe en ningun sitio.
+  _conflicto(j) {
+    if (j.item && j.item.id) this._forzarUid = 'i' + j.item.id;
+    if (j.plan && typeof j.plan.ver !== 'undefined') this.PLAN_VER = Number(j.plan.ver) || 1;
+    const parche = { avisoTxt: j.error || 'Alguien se adelanto y tu cambio no se guardo.', avisoRecarga: false };
+    // Si el choque fue con el nombre, se suelta la edicion del titulo
+    // para que la fusion pueda poner el de la otra persona.
+    if (j.plan) parche.titleEdit = false;
+    this.setState(parche);
+    clearTimeout(this._avisoT);
+    this._avisoT = setTimeout(() => {
+      if (!this.state.avisoRecarga) this.setState({ avisoTxt: '' });
+    }, 6000);
+    this._fusionTraer();
+  }
+
+  // ════ Fusion selectiva ═══════════════════════════════════
+  // Fase 4 de Reportes_md/PLAN_colaboracion.md
+  //
+  // Trae del servidor lo que cambio SIN tocar lo que esta persona esta
+  // haciendo ahora mismo. La regla es una sola:
+  //
+  //     LO LOCAL GANA MIENTRAS ESTE VIVO.
+  //
+  // Un lugar abierto, una nota en edicion, un titulo a medio teclear o
+  // un horario a medio poner son trabajo de alguien que todavia no ha
+  // terminado. Sustituirlos por la version del servidor es exactamente
+  // el "perder trabajo sin enterarse" que este plan existe para evitar.
+  _fusionTraer() {
+    if (!this.PLAN_ID || this._fusionPidiendo) return;
+    this._fusionPidiendo = true;
+    fetch('api/plan_get.php?id=' + this.PLAN_ID, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.json())
+      .then(j => { this._fusionPidiendo = false; this._fusionar(j); })
+      .catch(() => { this._fusionPidiendo = false; });
+  }
+  _fusionar(j) {
+    if (!j || !j.ok || !j.plan) return;
+    const s = this.state;
+
+    // ⚠ ARRASTRANDO NO SE FUSIONA NADA. Reordenar la lista por debajo
+    // del dedo que arrastra deja el elemento en un sitio que nadie
+    // eligio. Se guarda y se aplica al soltar (ver _fusionReintenta).
+    if (s.drag || s.ckDrag) { this._fusionPend = j; return; }
+    this._fusionPend = null;
+
+    const P = j.plan;
+    const dias = this._diasDe(j);
+
+    // Si cambio el NUMERO de dias no se fusiona: dayOpen, dayRecsOpen,
+    // placeTxts y daySubs van indexados por dia, y rehacerlos con
+    // menus abiertos por medio es pedir un fallo raro. Se avisa y se
+    // deja que la persona recargue cuando le venga bien.
+    if (dias.length !== this.DAYS.length) {
+      if (typeof j.rev === 'number') this.REV = j.rev;
+      this.setState({ avisoTxt: 'Cambiaron las fechas del viaje', avisoRecarga: true });
+      return;
+    }
+
+    // ── Lo que esta protegido ahora mismo ──
+    const forzado = !!this._forzarUid;
+    const prot = {};
+    if (s.itemOpen) prot[s.itemOpen] = true;
+    if (s.horaMenu && s.horaMenu.uid) prot[s.horaMenu.uid] = true;
+    if (s.gastoMenu && s.gastoMenu.uid) prot[s.gastoMenu.uid] = true;
+
+    const local = {};
+    (s.dayItems || []).forEach(col => col.forEach(it => { local[it.uid] = it; }));
+
+    const dayItems = this._mapearItems(j, dias.length).map(col => col.map(it => {
+      const mio = local[it.uid];
+      if (!mio) return it;
+      // Protegido: se conserva ENTERO el de pantalla. Sus borradores
+      // -hora, horaFin, gastoCat, gastoDesc...- viven en el propio
+      // objeto, asi que basta con no sustituirlo.
+      //
+      // Salvo que venga de un 409: ahi mi valor fue rechazado y hay que
+      // ensenar el del servidor aunque lo tenga abierto. Ver _conflicto.
+      if (prot[it.uid] && this._forzarUid !== it.uid) return mio;
+      // `travel` lo calcula el mapa con las rutas reales; no viene del
+      // servidor y volveria a null en cada fusion.
+      if (mio.travel) it.travel = mio.travel;
+      return it;
+    }));
+
+    // Lo que esta EN VUELO: creado aqui y todavia sin confirmar. El
+    // servidor no lo conoce, asi que no viene en j y descartarlo lo
+    // perderia. Los temporales se reconocen por no tener sid.
+    (s.dayItems || []).forEach((col, d) => col.forEach(it => {
+      if (!it.sid && dayItems[d]) dayItems[d].push(it);
+    }));
+
+    // Si alguien borro el lugar que yo tenia abierto, el lugar ya no
+    // existe: se cierran los menus que apuntaban a el en vez de dejar
+    // una ventana flotando sobre la nada.
+    const vivos = {};
+    dayItems.forEach(col => col.forEach(it => { vivos[it.uid] = true; }));
+    const parche = {};
+    if (s.itemOpen && !vivos[s.itemOpen]) parche.itemOpen = null;
+    if (s.horaMenu && !vivos[s.horaMenu.uid]) parche.horaMenu = null;
+    if (s.gastoMenu && !vivos[s.gastoMenu.uid]) parche.gastoMenu = null;
+
+    // ── Listas ──
+    const listasSrv = this._mapearListas(j);
+    const idsSrv = {};
+    listasSrv.forEach(L => { idsSrv[L.id] = true; });
+    const lists = listasSrv.map(L => {
+      const mia = (s.lists || []).find(x => x.id === L.id);
+      if (!mia) return L;
+      // Estado de interfaz que solo vive en esta pantalla.
+      L.open = mia.open; L.newTxt = mia.newTxt; L.placeTxt = mia.placeTxt;
+      // La nota en edicion gana: es texto que se esta escribiendo.
+      if (s.noteEdit === L.id) { L.text = mia.text; L.title = mia.title; L.cardTitle = mia.cardTitle; }
+      return L;
+    });
+    // Listas y gastos en vuelo: sus ids temporales son CADENAS
+    // ('l'+fecha, 'g'+fecha) y los del servidor son numeros.
+    (s.lists || []).forEach(L => { if (typeof L.id === 'string' && !idsSrv[L.id]) lists.push(L); });
+
+    const gastosSrv = this._mapearGastos(j);
+    const idsG = {};
+    gastosSrv.forEach(g => { idsG[g.id] = true; });
+    const gastos = gastosSrv.slice();
+    (s.gastos || []).forEach(g => { if (typeof g.id === 'string' && !idsG[g.id]) gastos.push(g); });
+
+    // ── Miembros y cabecera ──
+    this.MIEMBROS = this._mapMiembros(j.miembros);
+    if (!this.MIEMBROS.length) this.MIEMBROS = [{ uid: Number(this.USER.id) || 0, inicial: this.USER.inicial, nombre: this.USER.nombre, rol: 'propietario', foto: this.USER.foto || null }];
+    const dest = P.destino || this.META.destino;
+    // El titulo en edicion gana; la portada y el destino se aceptan.
+    this.META = {
+      titulo: s.titleEdit ? this.META.titulo : (P.nombre || this.META.titulo),
+      destino: dest,
+      fechas: this._fmtRango(P.fecha_inicio, P.fecha_fin),
+      hero: P.portada_url || this.META.hero
+    };
+    // `added` y `_addedSid` son derivados: se rehacen enteros.
+    const added = {};
+    this._addedSid = {};
+    (j.items || []).forEach(it => {
+      if (it.place_id) { added[it.place_id] = true; this._addedSid[it.place_id] = Number(it.id); }
+    });
+
+    const subs = Array.isArray(P.dia_subtitulos) ? P.dia_subtitulos.slice(0, dias.length) : (s.daySubs || []);
+    while (subs.length < dias.length) subs.push('');
+
+    if (typeof j.rev === 'number') this.REV = j.rev;
+    this._forzarUid = null;
+    this.setState(Object.assign(parche, {
+      dayItems, lists, gastos, added,
+      // El presupuesto no se pisa si se esta escribiendo.
+      budget: s.budgetEdit ? s.budget : (Number(P.presupuesto) || 0),
+      daySubs: subs,
+      // Si venimos de un 409, su aviso manda: explica por que tu
+      // cambio no esta, y sustituirlo por "se trajeron cambios" dejaria
+      // a la persona sin saber que paso con lo suyo.
+      avisoTxt: forzado ? s.avisoTxt : 'Se trajeron los cambios de otra persona', avisoRecarga: false
+    }));
+    // El aviso se va solo: es una confirmacion, no una tarea.
+    clearTimeout(this._avisoT);
+    this._avisoT = setTimeout(() => {
+      if (!this.state.avisoRecarga) this.setState({ avisoTxt: '' });
+    }, 4500);
+
+    // Los pines son un overlay propio calculado con MERC(), asi que
+    // recolocarlos es todo lo que hace falta para que el mapa quede al
+    // dia. Nada de Google Maps se toca.
+    this._reproject();
+  }
+
   // Abre la ventana y lleva el foco dentro. Se recuerda desde donde se
   // abrio para devolverlo al cerrar: si no, el foco vuelve al principio
   // del documento y quien navega con teclado se pierde.
@@ -322,6 +623,62 @@ class Component extends DCLogic {
     const volver = this._fotoVolverA;
     this._fotoVolverA = null;
     if (volver && volver.focus) setTimeout(() => volver.focus(), 60);
+  }
+
+  // ════ Del JSON del servidor al estado ════════════════════
+  // Estos cuatro los usan DOS sitios: la siembra inicial (_boot) y la
+  // fusion del latido (_fusionar). Viven aparte justo por eso: dos
+  // copias del mismo mapeo acabarian divergiendo, y el dia que lo
+  // hicieran se veria como que "a veces" un campo se pierde al llegar
+  // un cambio de otra persona. Imposible de encontrar.
+  _diasDe(B) {
+    const P = B.plan || {};
+    let maxDia = 1;
+    (B.items || []).forEach(it => { if (Number(it.dia) > maxDia) maxDia = Number(it.dia); });
+    return this._mkDays(P.fecha_inicio, P.fecha_fin, maxDia);
+  }
+  _mapearItems(B, N) {
+    const dayItems = Array.from({ length: N }, () => []);
+    (B.items || []).slice().sort((a, b) => (a.dia - b.dia) || (a.orden - b.orden) || (a.id - b.id)).forEach(it => {
+      const di = Math.min(N, Math.max(1, Number(it.dia) || 1)) - 1;
+      const h0 = (it.hora || '').slice(0, 5), h1 = (it.hora_fin || '').slice(0, 5);
+      dayItems[di].push({
+        uid: 'i' + it.id, sid: Number(it.id),
+        // La version del lugar: el candado de la fase 5.
+        ver: Number(it.ver) || 1,
+        name: it.nombre, nota: it.nota || '',
+        horario: h0 ? (h1 ? h0 + ' - ' + h1 : h0) : '',
+        costo: Number(it.precio) || 0, travel: null,
+        // El horario también se guarda suelto: la cadena 'horario' es
+        // para pintar, pero para editarlo hacen falta los dos extremos.
+        hora: (it.hora || '').slice(0, 5), horaFin: (it.hora_fin || '').slice(0, 5),
+        moneda: it.moneda || 'MXN', gastoCat: it.gasto_cat || '',
+        gastoDesc: it.gasto_desc || '', gastoModo: it.gasto_modo || 'no',
+        reparto: Array.isArray(it.reparto) ? it.reparto.map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })) : [],
+        // Cómo se va de este lugar al siguiente. null = el de por defecto.
+        modo: it.modo_viaje || null,
+        reacts: Array.isArray(it.reacts) ? it.reacts.map(r => ({ e: r.e, n: Number(r.n) || 0, mine: !!r.mine })) : [],
+        pid: it.place_id || null,
+        lat: (it.lat === null || it.lat === undefined) ? null : Number(it.lat),
+        lng: (it.lng === null || it.lng === undefined) ? null : Number(it.lng),
+        img: it.imagen_url || null, catg: it.categoria || 'custom'
+      });
+    });
+    return dayItems;
+  }
+  _mapearGastos(B) {
+    return (B.gastos || []).map((g, i) => ({
+      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0, cat: g.categoria || 'Otro',
+      fecha: this._fmtDia(g.fecha), fiso: g.fecha || '', ts: ((B.gastos || []).length - i)
+    }));
+  }
+  _mapearListas(B) {
+    return (B.listas || []).map(L => ({
+      id: Number(L.id), title: L.titulo, type: L.tipo === 'nota' ? 'note' : 'check',
+      open: true, cardTitle: L.titulo, newTxt: '', placeTxt: '',
+      text: L.texto || '',
+      items: (L.items || []).map(x => ({ iid: Number(x.id), t: x.texto, done: !!Number(x.hecho) }))
+    }));
   }
 
   // Filas de plan_miembros -> la forma que usa el resto del codigo.
@@ -2356,6 +2713,13 @@ class Component extends DCLogic {
       if (panel && !panel.contains(e.target)) this.setState({ catAllOpen: false });
     };
     document.addEventListener('mousedown', this._outside);
+    // El latido, y lo que lo devuelve al ritmo rapido. Van en captura
+    // para enterarse aunque algo mas se coma el evento por el camino.
+    this._pulsoArranca();
+    this._pulsoActividad = () => this._pulsoDespierta();
+    document.addEventListener('mousedown', this._pulsoActividad, true);
+    document.addEventListener('keydown', this._pulsoActividad, true);
+
     this._onResize = () => {
       const w = window.innerWidth;
       const patch = { winW: w, narrow: w <= 1024, mobile: w <= 640 };
@@ -2381,7 +2745,7 @@ class Component extends DCLogic {
         }).catch(() => {});
     }
   }
-  componentWillUnmount() { window.removeEventListener('keydown', this._esc); window.removeEventListener('keydown', this._modalTab); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
+  componentWillUnmount() { clearTimeout(this._pulsoT); document.removeEventListener('visibilitychange', this._pulsoVis); document.removeEventListener('mousedown', this._pulsoActividad, true); document.removeEventListener('keydown', this._pulsoActividad, true); window.removeEventListener('keydown', this._esc); window.removeEventListener('keydown', this._modalTab); window.removeEventListener('resize', this._onResize); document.removeEventListener('mousedown', this._outside); clearInterval(this._si); clearTimeout(this._sf); clearInterval(this._sr); clearInterval(this._ext); clearTimeout(this._ex); clearInterval(this._chtI); clearTimeout(this._cht); clearTimeout(this._exScrollT); }
 
   _printTripSummary() {
     const s = this.state;
@@ -3154,6 +3518,16 @@ class Component extends DCLogic {
     // Solo el propietario. api/plan_invitar.php ya exige ese rol, asi
     // que dibujar el boton a los demas seria ofrecer algo que siempre
     // responde 403.
+    // ── El latido ───────────────────────────────────────────
+    // Los dos avisos son excluyentes: si el pulso se cayo, anunciar
+    // novedades seria mentir, porque ya no hay quien las vea llegar.
+    V.pulsoCaido    = !!s.pulsoCaido;
+    V.avisoHay      = !!s.avisoTxt && !s.pulsoCaido;
+    V.avisoTxt      = s.avisoTxt || '';
+    V.avisoRecarga  = !!s.avisoTxt && !!s.avisoRecarga && !s.pulsoCaido;
+    V.pulsoRecargar  = () => this._pulsoRecargar();
+    V.pulsoDescartar = () => this.setState({ avisoTxt: '' });
+
     // OJO: V se construye clave a clave, no copiando el estado. Si
     // esta linea falta, el sc-if de la plantilla lee undefined y la
     // ventana no se pinta NUNCA, sin dar ningun error.
@@ -4155,11 +4529,19 @@ class Component extends DCLogic {
     V.chatTitle = this.META.titulo;
     V.conceptoPlaceholder = 'Concepto (p. ej. Boletos ' + this.META.destino + ')';
     V.exSearchPh = this.META.destino;
-    V.miembrosVM = this.MIEMBROS.map(m => ({
-      inicial: m.inicial,
-      titulo: m.nombre + ' · ' + m.rol,
-      hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || ''
-    }));
+    const aqui = s.presentes || [];
+    V.miembrosVM = this.MIEMBROS.map(m => {
+      // El punto verde: estuvo activa en los ultimos 45 s. La persona
+      // que mira SIEMPRE se cuenta -su propio latido acaba de marcarla-,
+      // asi que el punto tambien dice "el latido funciona".
+      const esta = aqui.indexOf(m.uid) >= 0;
+      return {
+        inicial: m.inicial,
+        titulo: m.nombre + ' · ' + m.rol + (esta ? ' · aqui ahora' : ''),
+        hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || '',
+        punto: esta ? 'block' : 'none'
+      };
+    });
     return V;
   }
 }
