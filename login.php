@@ -9,6 +9,7 @@ session_start();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/intentos.php';
+require_once __DIR__ . '/includes/email_dominio.php';
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
     header('Location: inicio.php');
@@ -43,7 +44,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
     } else {
-        // AQUÍ NO SE FILTRA POR DOMINIO, Y ES A PROPÓSITO.
+        // ⚠ CONFLICTO RESUELTO A MANO EL 13/08/2026.
+        //
+        // Aquí llegaron dos cambios opuestos el mismo día: éste, que
+        // quita el filtro de dominio, y otro que además le añadía una
+        // comprobación de DNS. Se conserva ÉSTE, y el motivo es medible:
+        // la lista de proveedores dejaba fuera a TRES de las siete
+        // cuentas de la base -entre ellas ana@rutanomada.mx-, y la
+        // comprobación de DNS no arreglaba eso.
+        //
+        // El caza-erratas de DNS NO se pierde: sigue en register.php,
+        // que es donde sirve. Al registrarte escribes tu correo por
+        // primera vez y una errata te deja esperando un aviso que nunca
+        // llega; al entrar, una errata simplemente no casa con ninguna
+        // cuenta y ya recibes «correo o contraseña incorrectos», que es
+        // la respuesta correcta y además no revela si la cuenta existe.
+        //
         //
         // Había una lista de proveedores copiada de register.php. No
         // aportaba nada: quien ya tiene cuenta pasó ese control cuando la
