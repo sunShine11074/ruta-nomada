@@ -9,6 +9,7 @@ session_start();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/intentos.php';
+require_once __DIR__ . '/includes/email_dominio.php';
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
     header('Location: inicio.php');
@@ -95,6 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
         if (!$dominio_valido) {
             $error_form = 'Solo se permiten direcciones de correo de Gmail, Outlook, Yahoo, Hotmail, Icloud o Live. '
                         . 'Por favor, usa un email de estos proveedores.';
+        } elseif (!correoConDominioReal($email)) {
+            // Caza-erratas, no control de seguridad: sólo dice que ese
+            // dominio no tiene por dónde recibir correo. Ver el comentario
+            // largo de includes/email_dominio.php.
+            $error_form = 'El dominio «' . dominioDeCorreo($email) . '» no puede recibir correo. '
+                        . 'Revisa que esté bien escrito.';
         } else {
             try {
                 $db = getDB();
