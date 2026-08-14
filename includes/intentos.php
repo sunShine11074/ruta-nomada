@@ -13,17 +13,54 @@
 
 require_once __DIR__ . '/../db.php';
 
-// La IP de quien pide, como la ve Apache.
+// La IP de quien pide.
 //
-// A propósito NO se mira X-Forwarded-For ni X-Real-IP: son cabeceras
-// que envía el propio cliente y se pueden inventar. Si el freno por IP
-// se fiara de ellas, saltárselo sería tan fácil como mandar una
-// cabecera distinta en cada intento. El día que esto viva detrás de un
-// proxy de verdad habrá que leerlas, pero SOLO confiando en el proxy.
+// EL DÍA QUE ANUNCIABA EL COMENTARIO DE ANTES YA LLEGÓ (13/08/2026).
+// Aquí ponía que NO se miraba X-Forwarded-For porque es una cabecera
+// que manda el propio cliente y se puede inventar, y que el día que
+// esto viviera detrás de un proxy de verdad habría que leerla «pero
+// SOLO confiando en el proxy». Ese día es hoy: el equipo trabaja a
+// través de «tailscale serve», que termina el TLS y habla con Apache
+// por bucle local.
+//
+// Sin este cambio, Apache ve REMOTE_ADDR = 127.0.0.1 en TODAS las
+// peticiones, así que el freno contaba a las cuatro personas como una
+// sola: tres contraseñas falladas por cualquiera y quedaban todas
+// bloqueadas, sin entender por qué.
+//
+// LA REGLA DE CONFIANZA, que es lo único que hace esto seguro:
+// sólo se hace caso a la cabecera si quien abre la conexión es la
+// PROPIA MÁQUINA. Un atacante remoto no puede fingir un REMOTE_ADDR de
+// bucle local, y quien ya está dentro de la máquina no necesita
+// saltarse este freno para nada. Es el mismo criterio que usa
+// planInviteBase() en includes/plan_invite_lib.php para el esquema.
+//
+// Y SE COGE LA ÚLTIMA DE LA LISTA, no la primera. X-Forwarded-For es
+// una cadena «cliente, proxy1, proxy2» y los proxys AÑADEN al final.
+// Si el cliente se inventa una, queda a la izquierda y la que escribió
+// el proxy queda a la derecha: la última es la única que no ha podido
+// falsificar. Coger la primera —el error habitual— sería regalarle el
+// salto del freno a quien mande la cabecera que quiera.
 function ipCliente(): string
 {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    return mb_substr((string)$ip, 0, 45);
+    $remota = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+
+    if (in_array($remota, ['127.0.0.1', '::1'], true)) {
+        $cadena = (string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
+        if ($cadena !== '') {
+            $trozos = array_map('trim', explode(',', $cadena));
+            $ultima = end($trozos);
+            // Los corchetes de un literal IPv6 sobran para guardarla.
+            $ultima = trim((string)$ultima, '[]');
+            if (filter_var($ultima, FILTER_VALIDATE_IP)) {
+                return mb_substr($ultima, 0, 45);
+            }
+            // Cabecera presente pero ilegible: se ignora y se sigue con
+            // la de Apache. Frenar de más es preferible a no frenar.
+        }
+    }
+
+    return mb_substr($remota, 0, 45);
 }
 
 // ¿Se han pasado los intentos para este correo o esta IP?
