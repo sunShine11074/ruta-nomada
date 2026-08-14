@@ -7,7 +7,26 @@
 --   Si vas a empezar de cero, no uses este archivo: importa
 --   basedatos/instalar.sql, que ya lo trae todo.
 --
---   CÓMO USARLO — un solo comando en la terminal de VS Code
+--   ⚠ HACEN FALTA DOS COMANDOS, Y EN ESTE ORDEN
+--
+--     mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
+--     mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"
+--
+--   NO BASTA CON EL PRIMERO. Este archivo cambia la colación de la base
+--   y de siete tablas, pero las RUTINAS ya creadas conservan la vieja en
+--   sus parámetros, y entonces sp_registrar_usuario compara su parámetro
+--   contra usuarios.email y revienta:
+--       SQLSTATE[HY000] 1267 Illegal mix of collations
+--   El síntoma es que NADIE PUEDE REGISTRARSE, y el error parece un
+--   fallo del PHP. rutinas.sql las recrea con la colación buena.
+--
+--   Comprobado el 13/08/2026 sobre una base de ensayo en el estado en
+--   que la tienen los compañeros: con el primer comando solo, el
+--   registro falla; con los dos, funciona.
+--
+--   Con doble clic en herramientas/actualizar.bat se hacen los dos.
+--
+--   CÓMO USARLO — el primero de los dos comandos
 --
 --     mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"
 --
@@ -294,7 +313,10 @@ ALTER TABLE `plan_miembros`
 -- archivo para que las rutinas se recreen con la colación buena.
 -- herramientas/actualizar.bat ya lo hace en ese orden.
 
-ALTER DATABASE `ruta_nomada` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- Sin nombre a propósito: así actúa sobre la base que se esté usando y
+-- no sobre una escrita a mano. Si alguien llamó a la suya de otra forma,
+-- esto sigue funcionando y no puede tocar la equivocada.
+ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 0;
 ALTER TABLE `destinos`        CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

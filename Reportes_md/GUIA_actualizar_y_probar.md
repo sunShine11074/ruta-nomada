@@ -121,15 +121,31 @@ tablas_nuevas (deben ser 5)                         5
 columnas_nuevas_en_plan_invitaciones (deben ser 3)  3
 ```
 
-**Y ahora el segundo comando, el que se olvida.** `actualizar_bd.sql` sólo trae
-tablas y columnas; las **rutinas** —funciones, procedimientos y
-disparadores— viven en otro archivo:
+### ⚠️ Y ahora el segundo comando. Sin él, NADIE PUEDE REGISTRARSE.
+
+Esto no es un «además»: es obligatorio. `actualizar_bd.sql` cambia la colación
+de la base y de siete tablas, pero **las rutinas ya creadas conservan la vieja
+en sus parámetros**. Entonces `sp_registrar_usuario` compara su parámetro
+contra `usuarios.email` y revienta con
+
+```
+SQLSTATE[HY000] 1267 Illegal mix of collations
+```
+
+El síntoma es que **el registro deja de funcionar**, y el error parece un fallo
+del PHP cuando no lo es. `rutinas.sql` las vuelve a crear con la colación
+buena:
 
 ```bash
 mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"
 ```
 
-Tiene que imprimir `FUNCTION 5`, `PROCEDURE 6` y `TRIGGER 5`.
+Tiene que imprimir `FUNCTION 7`, `PROCEDURE 7` y `TRIGGER 22`.
+
+> Se comprobó el 13/08/2026 sobre una base de ensayo puesta en el mismo estado
+> que la vuestra: **con el primer comando solo, registrarse falla; con los dos,
+> funciona.** Si te saltas el segundo, el diagnóstico del paso 4 te lo dirá
+> —«N parámetros de rutinas con otra colación»—, pero es más fácil no saltárselo.
 
 **Los dos son seguros de ejecutar dos veces.** Todo va con `IF NOT EXISTS` o
 con su `DROP` delante: lo que ya esté se queda como está, y no se vacía ninguna
@@ -151,7 +167,7 @@ prueba a cada servicio. **No toca nada: sólo lee.**
 Lo único que importa de la última línea es que **los fallos sean 0**:
 
 ```
-  24 correctos · 0 avisos · 0 fallos
+  28 correctos · 0 avisos · 0 fallos
 ```
 
 Los **avisos** `[!]` no son fallos: son cosas que la app sobrevive sin tener.
@@ -168,8 +184,8 @@ arregla.
 > contraseñas sin freno y nada lo dice. Por eso conviene acabar el paso 4 con
 > **0 fallos** de verdad, no «casi».
 
-Números clave, por si quieres compararlos a ojo: **21 tablas** y **16 rutinas**
-(5 funciones, 6 procedimientos y 5 disparadores).
+Números clave, por si quieres compararlos a ojo: **21 tablas**, **14 rutinas**
+(7 funciones y 7 procedimientos) y **22 disparadores**.
 
 ---
 
