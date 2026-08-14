@@ -43,59 +43,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_form = 'El correo electrónico no tiene un formato válido.';
     } else {
-        // Validar que el email pertenezca a dominios permitidos
-        $dominios_permitidos = [
-            // Gmail
-            'gmail.com',
-            // Outlook
-            'outlook.com',
-            'outlook.es',
-            'outlook.com.ar',
-            'outlook.com.br',
-            'outlook.fr',
-            'outlook.de',
-            'outlook.it',
-            'outlook.jp',
-            // Yahoo
-            'yahoo.com',
-            'yahoo.es',
-            'yahoo.com.br',
-            'yahoo.com.ar',
-            'yahoo.fr',
-            'yahoo.de',
-            'yahoo.it',
-            'yahoo.jp',
-            // Hotmail
-            'hotmail.com',
-            'hotmail.es',
-            'hotmail.com.ar',
-            'hotmail.com.br',
-            'hotmail.fr',
-            'hotmail.de',
-            'hotmail.it',
-            'hotmail.jp',
-            // Icloud
-            'icloud.com',
-            'me.com',
-            'mac.com',
-            // Live
-            'live.com',
-            'live.es',
-            'live.com.ar',
-            'live.com.br',
-            'live.fr',
-            'live.de',
-            'live.it',
-            'live.jp',
-        ];
-        
-        $dominio_email = strtolower(substr(strrchr($email, '@'), 1));
-        $dominio_valido = in_array($dominio_email, $dominios_permitidos, true);
-        
-        if (!$dominio_valido) {
-            $error_form = 'Solo se permiten direcciones de correo de Gmail, Outlook, Yahoo, Hotmail, Icloud o Live. '
-                        . 'Por favor, usa un email de estos proveedores.';
-        } else {
+        // AQUÍ NO SE FILTRA POR DOMINIO, Y ES A PROPÓSITO.
+        //
+        // Había una lista de proveedores copiada de register.php. No
+        // aportaba nada: quien ya tiene cuenta pasó ese control cuando la
+        // creó, así que filtrar al entrar sólo puede dejar fuera a gente
+        // que sí la tiene —y lo estaba haciendo con tres de las siete
+        // cuentas de la base, entre ellas ana@rutanomada.mx—.
+        //
+        // Tampoco valía con mantener las dos listas iguales: el día que
+        // alguien recorte la del registro, las cuentas ya creadas con esos
+        // dominios se quedan sin poder entrar. Sin esta comprobación,
+        // «quien pudo registrarse puede entrar» se cumple solo.
+        //
+        // Lo que sí protege el inicio de sesión está más abajo: el token
+        // CSRF y el freno a la fuerza bruta.
+        {
             try {
                 $db = getDB();
                 $ip = ipCliente();

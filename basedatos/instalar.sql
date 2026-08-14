@@ -38,7 +38,13 @@
 --
 --   Tres detalles que parecen menores y no lo son:
 --
---   · CREA LA BASE CON utf8mb4_unicode_ci, tal cual dice arriba. Todas
+--   · CREA LA BASE CON utf8mb4_unicode_ci, tal cual dice arriba. Y no
+--     es un consejo: paso el 13/08/2026. La base estaba en
+--     utf8mb4_general_ci, los PARAMETROS de las rutinas heredan de ahi,
+--     y en cuanto las tablas pasaron a unicode_ci el registro empezo a
+--     fallar con el 1267. Se arregla con
+--         ALTER DATABASE ruta_nomada CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+--     y volviendo a ejecutar rutinas.sql para que se recreen. Todas
 --     las tablas de este archivo usan esa colación, y el procedimiento
 --     almacenado hereda la de la BASE para sus parámetros. Si creas la
 --     base con otra (utf8mb4_general_ci, por ejemplo), el parámetro y

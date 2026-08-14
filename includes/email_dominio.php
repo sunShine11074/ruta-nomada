@@ -98,3 +98,59 @@ function correoConDominioReal(string $email): bool
     $d = dominioDeCorreo($email);
     return $d === '' ? false : dominioRecibeCorreo($d);
 }
+
+
+// ── Los proveedores que se aceptan AL REGISTRARSE ────────────
+//
+// Esta lista vivía COPIADA en login.php y en register.php. Las dos
+// copias ya se desincronizaron una vez —el 13/08/2026 el registro
+// aceptaba Hotmail, iCloud y Live y el inicio de sesión no—, y el
+// resultado fue que se podía crear una cuenta con la que después no se
+// podía entrar. Ahora vive en un solo sitio y eso no puede repetirse.
+//
+// ⚠ SÓLO SE USA EN EL REGISTRO, NO EN EL INICIO DE SESIÓN.
+//
+// Filtrar por dominio al entrar no protege de nada: quien ya tiene
+// cuenta pasó este control cuando la creó. Lo único que consigue es
+// dejar fuera a gente que sí la tiene, y lo estaba haciendo con TRES de
+// las siete cuentas de la base.
+//
+// Y no bastaba con copiar la misma lista en los dos sitios: el día que
+// alguien recorte ésta, las cuentas que ya existan con esos dominios se
+// quedan sin poder entrar aunque las dos listas coincidan. Quitando la
+// comprobación del login, la promesa «quien pudo registrarse puede
+// entrar» se cumple sola, sin depender de que nadie recuerde nada.
+function dominiosPermitidos(): array
+{
+    return [
+        // Gmail
+        'gmail.com',
+        // Outlook
+        'outlook.com', 'outlook.es', 'outlook.com.ar', 'outlook.com.br',
+        'outlook.fr', 'outlook.de', 'outlook.it', 'outlook.jp',
+        // Yahoo
+        'yahoo.com', 'yahoo.es', 'yahoo.com.br', 'yahoo.com.ar',
+        'yahoo.fr', 'yahoo.de', 'yahoo.it', 'yahoo.jp',
+        // Hotmail
+        'hotmail.com', 'hotmail.es', 'hotmail.com.ar', 'hotmail.com.br',
+        'hotmail.fr', 'hotmail.de', 'hotmail.it', 'hotmail.jp',
+        // iCloud
+        'icloud.com', 'me.com', 'mac.com',
+        // Live
+        'live.com', 'live.es', 'live.com.ar', 'live.com.br',
+        'live.fr', 'live.de', 'live.it', 'live.jp',
+    ];
+}
+
+// ¿El dominio de este correo está en la lista de arriba?
+function dominioPermitido(string $email): bool
+{
+    return in_array(dominioDeCorreo($email), dominiosPermitidos(), true);
+}
+
+// El mensaje de rechazo, aquí para que no haya dos redacciones sueltas.
+function mensajeDominioNoPermitido(): string
+{
+    return 'Solo se permiten direcciones de correo de Gmail, Outlook, Yahoo, '
+         . 'Hotmail, iCloud o Live. Por favor, usa un email de estos proveedores.';
+}

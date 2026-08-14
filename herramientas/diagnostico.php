@@ -274,6 +274,40 @@ if ($pdo) {
             . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"')
         : linea('ok', 'Las 21 tablas comparten colación (utf8mb4_unicode_ci)');
 
+    // La colación de la BASE, que es de donde heredan los PARÁMETROS de
+    // las rutinas que no la declaran. Si no coincide con la de las
+    // tablas, sp_registrar_usuario compara su parámetro contra
+    // usuarios.email y revienta con el 1267 «Illegal mix of
+    // collations»: el registro deja de funcionar y el error parece un
+    // fallo del PHP. Paso de verdad el 13/08/2026.
+    $colBase = (string)$pdo->query(
+        "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA
+          WHERE SCHEMA_NAME = DATABASE()"
+    )->fetchColumn();
+    $colBase === 'utf8mb4_unicode_ci'
+        ? linea('ok', 'La base también (de ahí heredan las rutinas)')
+        : linea('falla', 'La BASE está en ' . $colBase . ', no en utf8mb4_unicode_ci',
+            'Las rutinas heredan de aquí y chocarán con las tablas al comparar.' . "
+"
+            . 'Se arregla, y hay que reponer las rutinas después:' . "
+"
+            . '    mysql -u root ruta_nomada -e "source basedatos/actualizar_bd.sql"' . "
+"
+            . '    mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"');
+
+    // Y los propios parámetros, que es donde se ve el problema.
+    $malPar = (int)$pdo->query(
+        "SELECT COUNT(*) FROM information_schema.PARAMETERS
+          WHERE SPECIFIC_SCHEMA = DATABASE() AND COLLATION_NAME IS NOT NULL
+            AND COLLATION_NAME <> 'utf8mb4_unicode_ci'"
+    )->fetchColumn();
+    $malPar
+        ? linea('falla', $malPar . ' parámetros de rutinas con otra colación',
+            'Se quedaron con la colación vieja de la base. Reponlas:' . "
+"
+            . '    mysql -u root ruta_nomada -e "source basedatos/rutinas.sql"')
+        : linea('ok', 'Los parámetros de las rutinas también');
+
     // ── Rutinas: funciones, procedimientos y triggers ────────
     // Igual que con las tablas, la lista NO va escrita a mano: se lee
     // de basedatos/rutinas.sql, que es el archivo canónico. Si mañana

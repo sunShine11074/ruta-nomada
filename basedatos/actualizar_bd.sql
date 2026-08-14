@@ -277,6 +277,25 @@ ALTER TABLE `plan_miembros`
 -- acaban en unicode_ci, el emoji conserva su utf8mb4_bin y las 23
 -- claves foráneas siguen en pie.
 
+-- ⚠ Y PRIMERO, LA BASE. Este es el fallo de origen: `ruta_nomada` se
+-- creó con utf8mb4_general_ci, aunque la cabecera de instalar.sql pide
+-- utf8mb4_unicode_ci. De la colación de la BASE heredan los PARÁMETROS
+-- de las rutinas que no la declaran, así que sp_registrar_usuario,
+-- sp_crear_plan, sp_actualizar_plan, fn_estado_plan y fn_rol_en_plan
+-- los tenían en general_ci.
+--
+-- Mientras las tablas también estaban en general_ci la cosa cuadraba por
+-- casualidad. Al convertirlas -aquí abajo- el registro empezó a fallar
+-- con el 1267 "Illegal mix of collations", que es EXACTAMENTE lo que
+-- avisa la cabecera de instalar.sql.
+--
+-- Cambiar la base sólo afecta a lo que se cree a partir de ahora, así
+-- que hay que volver a ejecutar basedatos/rutinas.sql DESPUÉS de este
+-- archivo para que las rutinas se recreen con la colación buena.
+-- herramientas/actualizar.bat ya lo hace en ese orden.
+
+ALTER DATABASE `ruta_nomada` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 0;
 ALTER TABLE `destinos`        CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE `favoritos`       CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
