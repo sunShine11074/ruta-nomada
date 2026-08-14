@@ -38,10 +38,31 @@ require_once __DIR__ . '/../db.php';
 // vacío —que es lo que recomienda mail_config.sample.php— el agujero
 // se abre. Por eso el cerrojo va aquí y no en quien llama.
 //
-// La regla: un Host que no reconozcamos NO se usa; se cae a localhost.
-// Un enlace a localhost es inútil, pero inútil es infinitamente mejor
-// que apuntando al servidor de quien ataca.
-function planHostDeConfianza(string $host, array $extra = []): bool
+// LA REGLA, y hay que entenderla bien para no repetir el error de la
+// primera versión: sólo pasa un Host que NO PUEDA RESOLVER A UNA
+// MÁQUINA DEL ATACANTE. Los rangos privados y los nombres que sólo
+// existen en la red local valen, porque quien pincha el enlace acaba
+// en su propia red y no en la de nadie. Un dominio público NO vale
+// aunque «suene» a nuestro, salvo que esté escrito a mano en la
+// configuración.
+//
+// EL ERROR QUE ESTO CORRIGE (13/08/2026, mismo día)
+// La primera versión aceptaba cualquier cosa acabada en '.ts.net'. Se
+// razonó «.ts.net es Tailscale, o sea nuestro». Es falso: '.ts.net' es
+// el dominio PÚBLICO de Tailscale, cualquiera abre una cuenta gratis y
+// se lleva un 'loquesea.sutailnet.ts.net' que resuelve en el DNS
+// público y trae certificado de Let's Encrypt. Es decir, el filtro
+// dejaba pasar el dominio del atacante, con candado verde, que es
+// exactamente el ataque que decía cerrar. Comprobado ejecutándolo:
+// 'evil.tail1a2b3c.ts.net' pasaba igual que el nuestro.
+//
+// Ahora el tailnet propio se nombra a mano en mail_config.php, con
+// 'tailnet' o metiendo el nombre entero en 'hosts_permitidos'.
+//
+// Un Host que no reconozcamos se cae a localhost. Un enlace a
+// localhost es inútil, pero inútil es infinitamente mejor que
+// apuntando al servidor de quien ataca.
+function planHostDeConfianza(string $host, array $extra = [], string $tailnet = ''): bool
 {
     // Fuera el puerto para comparar. Los literales IPv6 vienen entre
     // corchetes —[::1]:80— y ahí el separador es el corchete, no el ':'.
@@ -62,21 +83,44 @@ function planHostDeConfianza(string $host, array $extra = []): bool
     // La propia máquina.
     if (in_array($limpio, ['localhost', '127.0.0.1', '::1'], true)) return true;
 
-    // Tailscale (MagicDNS). Es la vía que eligió el equipo el 13/08/2026
-    // para trabajar desde casas distintas: 'tailscale serve' pone HTTPS
-    // delante del Apache local y da un nombre estable acabado en .ts.net.
-    // -7 y no -6: '.ts.net' son siete caracteres contando el punto. Con
-    // -6 se comparaba contra 'ts.net' y NUNCA daba verdadero, así que el
-    // host de Tailscale caía a localhost. Lo cazó la prueba de abajo.
-    // El punto tiene que ir dentro de la comparación: sin él, un dominio
-    // como 'evil-ts.net' o 'atacantets.net' entraría.
-    if (substr($limpio, -7) === '.ts.net') return true;
+    // NUESTRO tailnet de Tailscale, nombrado a mano — nunca el comodín.
+    // El punto de delante importa: sin él, 'maltail82e9ec.ts.net' —que
+    // alguien puede registrar— colaría por 'tail82e9ec.ts.net'.
+    if ($tailnet !== '') {
+        $sufijo = '.' . ltrim(strtolower(trim($tailnet)), '.');
+        if (substr($limpio, -strlen($sufijo)) === $sufijo) return true;
+    }
 
-    // Red local: LAN de casa, o el punto de acceso del móvil el día de
-    // la presentación.
+    // Rangos IPv4 que sólo existen dentro de una red privada.
     if (preg_match('/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
     if (preg_match('/^192\.168\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
     if (preg_match('/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
+    // 100.64.0.0/10: el rango que reparte Tailscale de verdad. Esta
+    // máquina tiene la 100.82.212.28. Faltaba, así que entrar por la IP
+    // que enseña «tailscale status» daba enlaces a localhost.
+    if (preg_match('/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
+    // 169.254.x.x: enlace local, cuando no hay quien reparta direcciones.
+    if (preg_match('/^169\.254\.\d{1,3}\.\d{1,3}$/', $limpio)) return true;
+
+    // IPv6 privado: fc00::/7 son las direcciones locales únicas —ahí cae
+    // el fd7a:115c:a1e0::/48 de Tailscale, que es lo que tiene esta
+    // máquina— y fe80::/10 el enlace local. Ninguna se enruta por
+    // internet, así que nadie de fuera puede estar al otro lado.
+    if (preg_match('/^f[cd][0-9a-f]{0,2}:/', $limpio)) return true;
+    if (preg_match('/^fe[89ab][0-9a-f]?:/', $limpio)) return true;
+
+    // Un nombre SIN PUNTOS sólo lo resuelve la red local: el nombre de
+    // equipo de Windows, «DESKTOP-DE-RAMON». Y los .local son mDNS, que
+    // viaja por multidifusión y tampoco sale de la red. Quien pinche un
+    // enlace así acaba en su propia red, nunca en la de quien ataca.
+    //
+    // Los dos puntos tienen que descartarse aparte: UNA IPv6 TAMPOCO
+    // TIENE PUNTOS, así que sin esta condición se colaba cualquier IPv6
+    // pública. Lo cazó la prueba con 2001:4860:4860::8888, que es el DNS
+    // de Google y pasaba el filtro. Las IPv6 privadas ya se admitieron
+    // arriba, así que aquí sólo pueden quedar las de internet.
+    if (strpos($limpio, '.') === false && strpos($limpio, ':') === false) return true;
+    if (substr($limpio, -6) === '.local') return true;
 
     return false;
 }
@@ -106,7 +150,11 @@ function planInviteBase(): string
     $base = 'http://localhost';
     if (!empty($_SERVER['HTTP_HOST'])) {
         $host = $_SERVER['HTTP_HOST'];
-        if (!planHostDeConfianza($host, (array)($cfg['hosts_permitidos'] ?? []))) {
+        if (!planHostDeConfianza(
+            $host,
+            (array)($cfg['hosts_permitidos'] ?? []),
+            (string)($cfg['tailnet'] ?? '')
+        )) {
             $host = 'localhost';
         }
 

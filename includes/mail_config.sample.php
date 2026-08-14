@@ -44,4 +44,30 @@ return [
     // petición, que es lo correcto en XAMPP se llame como se llame tu
     // carpeta. Sólo hace falta ponerlo si el sitio vive en un dominio.
     'base_url'  => '',
+
+    // ── Sólo si sirves el proyecto fuera de localhost ──────────
+    //
+    // Cuando 'base_url' está vacío, la dirección se deduce de la
+    // cabecera Host de la petición, y esa cabecera la escribe quien
+    // llama: si nos fiásemos de cualquiera, bastaría con mandar
+    //     POST /forgot-password.php   Host: servidor-del-atacante.com
+    // para que el correo LEGÍTIMO de recuperación que recibe la
+    // víctima llevara dentro un enlace al servidor de quien ataca,
+    // con su token de verdad. Se llama «host header poisoning».
+    //
+    // Por eso sólo se aceptan host que no puedan llevar a la máquina
+    // de nadie de fuera: localhost, los rangos privados (10.x,
+    // 192.168.x, 172.16-31.x, el 100.64/10 de Tailscale, IPv6
+    // fc00::/7 y fe80::/10), los nombres sin puntos y los .local.
+    // Todo lo demás se descarta y el enlace sale hacia localhost.
+    //
+    // Si entráis por un nombre PÚBLICO —el de Tailscale, un túnel, un
+    // dominio— hay que nombrarlo aquí, porque por sí solo no pasa.
+    // OJO: no vale poner 'ts.net' a secas. Ese dominio es de Tailscale
+    // y cualquiera se hace una cuenta gratis: hay que poner VUESTRO
+    // tailnet, que es lo que sale en «tailscale status».
+    'tailnet'   => '',                  // p. ej. 'tail82e9ec.ts.net'
+
+    // Y aquí, cualquier otro host entero que queráis admitir.
+    'hosts_permitidos' => [],           // p. ej. ['midominio.com']
 ];

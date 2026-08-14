@@ -27,9 +27,14 @@
 // la aplicación coincide con el reloj que se ve en la pantalla y, de
 // paso, con la hora bajo la que se escribieron los datos que ya hay.
 //
-// ⚠ SI EL EQUIPO NO ESTÁ EN SONORA, CAMBIA ESTA LÍNEA. La mayor parte
-// de México es 'America/Mexico_City' (UTC-6). Es lo único que hay que
-// tocar: el desfase de MySQL se calcula solo a partir de aquí.
+// CONFIRMADO el 13/08/2026: todo el equipo está en el mismo estado, así
+// que esta constante vale para las cuatro máquinas y no hace falta que
+// sea configurable por persona. No la reabras sin ese dato.
+//
+// Si algún día el equipo se reparte o esto acaba en un servidor de otro
+// país, es lo único que hay que tocar: el desfase de MySQL se calcula
+// solo a partir de aquí. La mayor parte de México es
+// 'America/Mexico_City' (UTC-6).
 const RN_ZONA_HORARIA = 'America/Hermosillo';
 date_default_timezone_set(RN_ZONA_HORARIA);
 
