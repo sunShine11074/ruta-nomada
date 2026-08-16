@@ -232,7 +232,30 @@ class Component extends DCLogic {
     const DL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const ML = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const MA = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
-    const COLS = ['#41A24D', '#6F42C1', '#1E86D8', '#E8365D', '#E7AD00', '#12808C', '#8e44ad'];
+    // UN COLOR POR DIA, del 1 al 30, elegidos por el diseño. Antes eran
+    // SIETE en ciclo, asi que el dia 8 repetia el del 1 y el color dejaba
+    // de identificar el dia. Ahora hay tantos como dias permite la regla
+    // (1 a 30, ver planRangoError en includes/plan_auth.php), asi que no
+    // se repite ninguno.
+    //
+    // Pintan el pin del mapa Y la ruta de ese dia: las dos salen de
+    // DAYS[di].color. El numero del pin va en blanco, asi que TODOS pasan
+    // 3.1:1 contra #FFFFFF; el mas justo es 3.13:1 y el mas holgado 11.5:1.
+    //
+    // NO TOQUES UNO SUELTO SIN MEDIR. Los 30 estan tan separados como cabe:
+    // en 435 parejas la distancia perceptiva (dE2000) mas corta es 8.6, y
+    // solo baja de 11.7 en esa. El techo teorico para 30 colores vivos que
+    // pasen 3.1:1 es 15.8, o sea que aqui ya casi no queda sitio: cualquier
+    // color nuevo cae encima de alguno de los otros 29.
+    const COLS = [
+      '#F850AA', '#518FFC', '#2DA800', '#FF0033', '#A352FF',   // dias 1-5
+      '#214ECC', '#E47200', '#008647', '#FF4082', '#9F9400',   // dias 6-10
+      '#002A9E', '#EA6B4B', '#00674B', '#FF00FF', '#874A2B',   // dias 11-15
+      '#009CD5', '#A47300', '#00A489', '#7700FF', '#CC3000',   // dias 16-20
+      '#005F8F', '#CC216B', '#1F6800', '#69009E', '#00A1AD',   // dias 21-25
+      '#9E002A', '#008376', '#CC00CC', '#5269FF', '#9E198C'   // dias 26-30
+    ];
+
     // Tope de dias del viaje. La regla de verdad NO esta aqui: vive en el
     // servidor (planRangoError, includes/plan_auth.php) y en la base (la
     // restriccion chk_planes_dias), asi que un plan de mas de 30 dias ya no
@@ -243,9 +266,9 @@ class Component extends DCLogic {
     // un viaje de 40 dias se guardaba entero en la base y aqui se dibujaban
     // 30. Los dias 31 a 40 existian para la base y no para la persona.
     //
-    // Que sean 30 y no otro numero sale de COLS, la linea de arriba: son
-    // SIETE colores en ciclo, asi que pasado el mes el color deja de
-    // identificar el dia (el 8 repite el del 1).
+    // Que sean 30 y no otro numero sale de COLS, la linea de arriba: hay
+    // exactamente 30, uno por dia. El % de mas abajo ya no da la vuelta
+    // nunca, pero se queda por si algun dia la lista se acorta.
     const DIAS_MAX = 30;
     const parse = (x) => { if (!x || x === '0000-00-00') return null; const a = String(x).split('-'); return a.length === 3 && +a[0] ? new Date(+a[0], +a[1] - 1, +a[2]) : null; };
     const out = [];

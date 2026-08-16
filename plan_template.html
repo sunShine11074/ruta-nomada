@@ -997,6 +997,40 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
     <div data-screen-label="Mapa" style="flex:1;min-width:0;position:{{ mapPos }};inset:{{ mapInset }};height:{{ mapH }};z-index:{{ mapZ }};background:#e8ecdc;overflow:hidden">
       <div style="position:absolute;inset:0;overflow:hidden;background:#F3F0E9">
   <div id="rnGmap" style="position:absolute;inset:0;z-index:0"></div>
+  <!-- Sombra interior del mapa. Marca el corte entre el panel de la
+       izquierda y el mapa, que sin ella quedan pegados y cuesta ver
+       donde acaba uno y empieza el otro.
+
+       Figma dictaba x 6, y 0, blur 20, spread 20, negro al 25%. La
+       opacidad va al 22% por decision de diseño: sale algo mas suave que
+       el frame en los primeros pixeles y clava el resto de la rampa.
+
+       EL SPREAD SE QUEDA EN 0 A PROPOSITO, y no es un descuido: Figma y
+       CSS no miden igual el alcance de una sombra interior. En CSS el
+       alcance es desplazamiento + spread + blur, o sea 6+20+20 = 46 px; en
+       el frame la banda mide 26, que es 6+20: el blur y nada mas.
+
+       Medido sobre el propio frame (P4_ New chat with assistant.png), en
+       una zona de mar liso: la rampa va de 159,9 a 193,9 de luminosidad y
+       se aplana exactamente a los 26 px. Con el spread literal salia 145,5
+       en el primer pixel y se extendia 45: bastante mas oscura y mas ancha
+       de lo diseñado. Con spread 0 y el 22% sale 165,6 en el primero y
+       193,9 en el 26; error medio 2,0 sobre 255 frente al frame, y casi
+       todo ese error esta en los tres primeros pixeles.
+
+       Toca los cuatro lados, no solo el izquierdo: 26 px a la izquierda, 20
+       arriba y abajo y 14 a la derecha (blur menos desplazamiento). El
+       izquierdo es el mas ancho y por eso es el que se nota.
+
+       Va en una capa aparte y no en el contenedor porque una sombra
+       interior se pinta DEBAJO del contenido, y el mapa de Google es
+       un hijo que la taparia entera.
+
+       z-index 1: encima de las teselas (rnGmap va en 0) y debajo de
+       los pines (40 y 55) y de los botones (60), asi que los pines no
+       se oscurecen. Y pointer-events:none, o se tragaria el arrastre
+       del mapa en una franja de 26 px. -->
+  <div style="position:absolute;inset:0;z-index:1;pointer-events:none;box-shadow:inset 6px 0 20px 0 rgba(0,0,0,.22)"></div>
 
   <sc-for list="{{ mapPois }}" as="p" hint-placeholder-count="8">
     <div style="position:absolute;left:{{ p.left }};top:{{ p.top }};transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;pointer-events:none">
