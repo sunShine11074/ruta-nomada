@@ -2005,7 +2005,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
             <p style="margin:14px 0 0;font-size:12.5px;font-weight:700;color:#212529;font-family:Poppins,sans-serif">Enviando a</p>
           </sc-if>
 
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:7px">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px">
             <sc-for list="{{ invDestVM }}" as="d" hint-placeholder-count="1">
               <!-- Borde y tinta se ponen rojos cuando esa dirección
                    falló en el último envío. EL COLOR NO ES EL ÚNICO
@@ -2014,25 +2014,30 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                    de pantalla ni se distingue sin ver el color. -->
               <span title="{{ d.titulo }}" style="display:inline-flex;align-items:center;gap:8px;max-width:100%;height:34.5px;box-sizing:border-box;padding:0 6px 0 12px;border:1px solid {{ d.borde }};border-radius:17.25px;background:none">
                 <span style="min-width:0;font-size:13px;color:{{ d.tinta }};text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.email }}</span>
-                <button onClick="{{ d.quitar }}" aria-label="Quitar a {{ d.titulo }}" style="flex-shrink:0;width:22px;height:22px;border:none;border-radius:50%;background:none;color:#6C757D;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease,color .15s ease" style-hover="background:#F1F3F5 !important;color:#212529 !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:1px !important">
-                  <svg width="10" height="10" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg>
+                <button onClick="{{ d.quitar }}" aria-label="Quitar a {{ d.titulo }}" style="flex-shrink:0;width:22px;height:22px;border:none;border-radius:50%;background:none;color:#7F7F7F;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease,color .15s ease" style-hover="background:#F1F3F5 !important;color:#212529 !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:1px !important">
+                  <svg width="12" height="12" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg>
                 </button>
               </span>
             </sc-for>
 
-            <!-- Añadir a la lista. Hace LO MISMO que Intro, a
-                 propósito: es la pista visual para quien no adivine
-                 que Intro sirve.
+            <!-- Este botón HABILITA EL CAMPO para escribir la siguiente
+                 dirección: lleva el cursor arriba y a teclear. No es
+                 «mete lo que hay escrito» —eso lo hace Intro—, aunque
+                 si quedaba algo a medias lo cierra antes en vez de
+                 dejarlo perdido (ver _invAddOtro).
 
-                 EL viewBox VA RECORTADO A LA TINTA (40 32 600 576) y
-                 no al lienzo 0 0 640 640. Este icono NO está centrado
-                 en su lienzo: la tinta llega hasta el borde derecho y
-                 deja 40 libres a la izquierda, así que centrando el
-                 lienzo se vería descolgado. Medido rasterizando, que
-                 es lo que avisa includes/iconos_planes.php: a ojo no
-                 se acierta. Es el mismo fallo que tuvo el + del zoom. -->
-            <button onClick="{{ invAddDest }}" aria-label="Añadir a la lista de destinatarios" style="flex-shrink:0;width:34.5px;height:34.5px;border:1px solid #E1E4E8;border-radius:50%;background:none;color:#212529;opacity:{{ invAddOpac }};cursor:{{ invAddCursor }};display:flex;align-items:center;justify-content:center;transition:background .15s ease,border-color .15s ease" style-hover="background:#F1F3F5 !important;border-color:#ADB5BD !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:1px !important">
-              <svg width="17" height="16.3" viewBox="40 32 600 576" fill="currentColor" style="display:block"><path d="M280 88C280 57.1 254.9 32 224 32C193.1 32 168 57.1 168 88C168 118.9 193.1 144 224 144C254.9 144 280 118.9 280 88zM304 300.7L341 350.6C353.8 333.1 369.5 317.9 387.3 305.6L331.1 229.9C306 196 266.3 176 224 176C181.7 176 142 196 116.8 229.9L46.3 324.9C35.8 339.1 38.7 359.1 52.9 369.7C67.1 380.3 87.1 377.3 97.7 363.1L144 300.7L144 576C144 593.7 158.3 608 176 608C193.7 608 208 593.7 208 576L208 416C208 407.2 215.2 400 224 400C232.8 400 240 407.2 240 416L240 576C240 593.7 254.3 608 272 608C289.7 608 304 593.7 304 576L304 300.7zM496 608C575.5 608 640 543.5 640 464C640 384.5 575.5 320 496 320C416.5 320 352 384.5 352 464C352 543.5 416.5 608 496 608zM512 400L512 448L560 448C568.8 448 576 455.2 576 464C576 472.8 568.8 480 560 480L512 480L512 528C512 536.8 504.8 544 496 544C487.2 544 480 536.8 480 528L480 480L432 480C423.2 480 416 472.8 416 464C416 455.2 423.2 448 432 448L480 448L480 400C480 391.2 487.2 384 496 384C504.8 384 512 391.2 512 400z"></path></svg>
+                 EL viewBox VA RECORTADO A LA TINTA (40 32 600 576) y no
+                 al lienzo 0 0 640 640. Este icono NO está centrado en su
+                 lienzo: la tinta llega al borde derecho y deja 40 libres
+                 a la izquierda, así que centrando el lienzo se vería
+                 descolgado. Medido rasterizando, que es lo que avisa
+                 includes/iconos_planes.php: a ojo no se acierta. Es el
+                 mismo fallo que tuvo el + del zoom.
+
+                 23x22 sale de Figma, y encaja con la tinta: 600/576 da
+                 1,042 y 23/22 da 1,045. -->
+            <button onClick="{{ invAddDest }}" aria-label="Escribir otra dirección" style="flex-shrink:0;width:34.5px;height:34.5px;border:1px solid #E1E4E8;border-radius:50%;background:none;color:#6C757D;opacity:{{ invAddOpac }};cursor:{{ invAddCursor }};display:flex;align-items:center;justify-content:center;transition:background .15s ease,border-color .15s ease" style-hover="background:#F1F3F5 !important;border-color:#ADB5BD !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:1px !important">
+              <svg width="23" height="22" viewBox="40 32 600 576" fill="currentColor" style="display:block"><path d="M280 88C280 57.1 254.9 32 224 32C193.1 32 168 57.1 168 88C168 118.9 193.1 144 224 144C254.9 144 280 118.9 280 88zM304 300.7L341 350.6C353.8 333.1 369.5 317.9 387.3 305.6L331.1 229.9C306 196 266.3 176 224 176C181.7 176 142 196 116.8 229.9L46.3 324.9C35.8 339.1 38.7 359.1 52.9 369.7C67.1 380.3 87.1 377.3 97.7 363.1L144 300.7L144 576C144 593.7 158.3 608 176 608C193.7 608 208 593.7 208 576L208 416C208 407.2 215.2 400 224 400C232.8 400 240 407.2 240 416L240 576C240 593.7 254.3 608 272 608C289.7 608 304 593.7 304 576L304 300.7zM496 608C575.5 608 640 543.5 640 464C640 384.5 575.5 320 496 320C416.5 320 352 384.5 352 464C352 543.5 416.5 608 496 608zM512 400L512 448L560 448C568.8 448 576 455.2 576 464C576 472.8 568.8 480 560 480L512 480L512 528C512 536.8 504.8 544 496 544C487.2 544 480 536.8 480 528L480 480L432 480C423.2 480 416 472.8 416 464C416 455.2 423.2 448 432 448L480 448L480 400C480 391.2 487.2 384 496 384C504.8 384 512 391.2 512 400z"></path></svg>
             </button>
           </div>
 
@@ -2047,19 +2052,27 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
 
                Su viewBox también va recortado a la tinta (64 64 512
                512), que en éste sí es cuadrada y centrada. -->
-          <div style="display:flex;align-items:center;gap:7px;margin-top:16px">
+          <div style="display:flex;align-items:center;gap:7px;margin-top:12px">
             <span style="font-size:12.5px;font-weight:700;color:#212529;font-family:Poppins,sans-serif">Mensaje</span>
-            <button onClick="{{ invMsgFoco }}" aria-label="Escribir el mensaje" tabindex="-1" style="width:20px;height:20px;border:none;border-radius:5px;background:none;color:#6C757D;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease,color .15s ease" style-hover="background:#E9ECEF !important;color:#212529 !important">
-              <svg width="12" height="12" viewBox="64 64 512 512" fill="currentColor" style="display:block"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg>
+            <button onClick="{{ invMsgFoco }}" aria-label="Escribir el mensaje" tabindex="-1" style="width:20px;height:20px;border:none;border-radius:5px;background:none;color:#212529;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease" style-hover="background:#E9ECEF !important">
+              <svg width="15" height="15" viewBox="64 64 512 512" fill="currentColor" style="display:block"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg>
             </button>
           </div>
-          <textarea data-inv-msg="1" value="{{ invMsg }}" onChange="{{ invMsgCambia }}" maxlength="{{ invMsgMax }}" aria-label="Mensaje de la invitación" rows="6" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:0;border:none;outline:none;background:none;resize:none;font-family:inherit;font-size:13.5px;line-height:1.55;color:#212529"></textarea>
+          <textarea data-inv-msg="1" value="{{ invMsg }}" onChange="{{ invMsgCambia }}" maxlength="{{ invMsgMax }}" aria-label="Mensaje de la invitación" rows="5" style="display:block;width:100%;box-sizing:border-box;margin-top:0;padding:0;border:none;outline:none;background:none;resize:none;font-family:inherit;font-size:13px;line-height:18px;color:#495057"></textarea>
 
-          <!-- Centrado, como en el frame. Se apaga mientras no haya a
-               quién mandar y mientras esté mandando, en vez de dejar
-               pulsar y contestar con un error. -->
-          <div style="display:flex;justify-content:center;margin-top:14px">
-            <button onClick="{{ invEnviar }}" style="width:184px;height:37.5px;border:none;border-radius:18.75px;background:{{ invEnviarBg }};color:#ffffff;font-family:inherit;font-size:14px;font-weight:700;cursor:{{ invEnviarCursor }};transition:background .15s ease" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">{{ invEnviarTxt }}</button>
+          <!-- A LA DERECHA, no centrado, y SALIÉNDOSE DEL RELLENO DEL
+               PANEL a propósito. El relleno es de 12 a los lados y 16
+               por abajo -medido: el subrayado del campo va de 12 a 12
+               exactos-, pero el botón cae a 9 del borde derecho y 10
+               del inferior, así que lleva margen negativo: 12-9 = 3 y
+               16-10 = 6.
+
+               Rasterizando el frame salen 6,8 y 7,5 en vez de 9 y 10
+               porque el borde de la pastilla va con antialias y los
+               píxeles del filo no cuentan como azul. Mandan los 9 y 10
+               de Figma, que son la caja de verdad. -->
+          <div style="display:flex;justify-content:flex-end;margin:24px -3px -6px 0">
+            <button onClick="{{ invEnviar }}" style="width:184px;height:37.5px;border:none;border-radius:18.75px;background:{{ invEnviarBg }};color:#ffffff;font-family:Poppins,sans-serif;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:{{ invEnviarCursor }};transition:background .15s ease" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">{{ invEnviarTxt }}</button>
           </div>
         </div>
 

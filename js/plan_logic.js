@@ -878,6 +878,29 @@ class Component extends DCLogic {
     this.setState({ invDest: dest.concat([e]), invEmail: '', invAviso: '', invAvisoMal: false, invRes: [] });
   }
 
+  // Lo que hace el boton redondo: HABILITAR EL CAMPO para escribir la
+  // siguiente direccion. No es lo mismo que _invAddDest, y la
+  // diferencia importa.
+  //
+  // En el frame el campo aparece con su texto de ayuda y ya hay una
+  // ficha debajo, asi que el boton no significa "mete lo que hay
+  // escrito", significa "quiero anadir a otra persona": lleva el cursor
+  // al campo y a escribir.
+  //
+  // Aun asi, si quedaba algo tecleado sin convertir en ficha, primero
+  // se convierte. Si no, pulsar + con una direccion a medias la
+  // perderia de vista sin decir nada, y el cursor acabaria encima de un
+  // texto que el usuario cree que ya conto. Intro sigue siendo la otra
+  // forma de cerrar la ficha.
+  _invAddOtro() {
+    if ((this.state.invEmail || '').trim() !== '') this._invAddDest();
+    setTimeout(() => {
+      const c = document.querySelector('[role="dialog"][data-inv="1"]');
+      const i = c && c.querySelector('input[type="email"]');
+      if (i) i.focus();
+    }, 0);
+  }
+
   _invQuitarDest(email) {
     this.setState({
       invDest: (this.state.invDest || []).filter(d => d !== email),
@@ -3718,13 +3741,13 @@ class Component extends DCLogic {
       mal: !!fallos[email],
       // El borde rojo tiene que ser visible sin depender del color, asi
       // que el motivo va tambien en el title y en el aria-label.
-      borde: fallos[email] ? '#C0392B' : '#DEE2E6',
-      tinta: fallos[email] ? '#C0392B' : '#212529',
+      borde: fallos[email] ? '#C0392B' : '#E1E4E8',
+      tinta: fallos[email] ? '#C0392B' : '#6C757D',
       motivo: fallos[email] || '',
       titulo: fallos[email] ? (email + ' — ' + fallos[email]) : email,
       quitar: () => this._invQuitarDest(email)
     }));
-    V.invAddDest = () => this._invAddDest();
+    V.invAddDest = () => this._invAddOtro();
     // El boton redondo se apaga al llegar al tope, en vez de dejar
     // pulsar y contestar con un error.
     V.invAddPuede = dest.length < Component.INV_DEST_MAX;
