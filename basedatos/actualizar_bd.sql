@@ -359,6 +359,41 @@ ALTER TABLE `viajes_usuario`
 -- aparte. Quien use herramientas/actualizar.bat las tiene cubiertas:
 -- ese archivo ejecuta los dos.
 
+
+-- ── 9. Un viaje dura de 1 a 30 días ──────────────────────────
+--
+-- Hasta ahora no había regla en ninguna parte. El cliente truncaba en
+-- SILENCIO: js/plan_logic.js generaba los días con
+--     while (cur <= d1 && out.length < 30)
+-- así que un viaje de 40 días se guardaba entero aquí y la pantalla
+-- dibujaba 30. Los días 31 a 40 existían para la base y no para la
+-- persona, sin aviso y sin error.
+--
+-- El tope tiene motivo: los pines del mapa se colorean con SIETE colores
+-- en ciclo, así que pasado el mes el color deja de identificar el día.
+--
+-- Va también en la base y no sólo en el PHP porque es la única capa que
+-- no se puede saltar: vale para las dos rutas de escritura (crear y
+-- actualizar), para phpMyAdmin y para cualquier consulta a mano.
+--
+-- DATEDIFF entre 0 y 29 son 1 a 30 días contando los dos extremos. La
+-- comprobación admite NULL a propósito: un plan sin fechas es legítimo,
+-- se crean así y se rellenan después. Y de paso rechaza los rangos al
+-- revés, porque un DATEDIFF negativo no entra en el intervalo.
+--
+-- Comprobado sobre MariaDB 10.4 el 15/08/2026: acepta sin fechas, 1 día
+-- y 30; rechaza 31, 40 y el rango invertido, tanto al INSERTAR como al
+-- ACTUALIZAR.
+--
+-- No lleva IF NOT EXISTS porque MariaDB 10.4 no lo admite en ADD
+-- CONSTRAINT, así que primero se quita si estaba. DROP CONSTRAINT IF
+-- EXISTS sí existe desde 10.0.2.
+ALTER TABLE `planes` DROP CONSTRAINT IF EXISTS `chk_planes_dias`;
+ALTER TABLE `planes` ADD CONSTRAINT `chk_planes_dias` CHECK (
+  `fecha_inicio` IS NULL OR `fecha_fin` IS NULL
+  OR (DATEDIFF(`fecha_fin`, `fecha_inicio`) BETWEEN 0 AND 29)
+);
+
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_items'
@@ -379,4 +414,8 @@ SELECT
     AS `testigo_de_cambio (deben ser 2)`,
   (SELECT COUNT(*) FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'planes' AND COLUMN_NAME = 'ver')
-    AS `candado_del_nombre (debe ser 1)`;
+    AS `candado_del_nombre (debe ser 1)`,
+  (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'planes'
+       AND CONSTRAINT_NAME = 'chk_planes_dias')
+    AS `tope_de_30_dias (debe ser 1)`;

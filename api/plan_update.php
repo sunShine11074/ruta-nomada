@@ -44,6 +44,16 @@ foreach (['fecha_inicio', 'fecha_fin'] as $f) {
         $tocado = true;
     }
 }
+// De 1 a 30 días, con la misma regla que api/plan_create.php.
+//
+// Se valida el PAR RESULTANTE, no lo que llega en la petición: la pantalla
+// manda las dos fechas por separado, así que alguien puede tocar sólo la de
+// fin y convertir un viaje de tres días en uno de cincuenta sin que la
+// petición mencione siquiera la de inicio. Como $fila arranca siendo la
+// fila actual (línea 25), aquí ya está el rango que quedaría guardado.
+if ($errRango = planRangoError($fila['fecha_inicio'] ?? null, $fila['fecha_fin'] ?? null)) {
+    apiFail($errRango);
+}
 if (array_key_exists('privacidad', $in)) {
     if (!in_array($in['privacidad'], ['solo', 'amigos', 'publico'], true)) apiFail('Privacidad inválida.');
     $fila['privacidad'] = $in['privacidad'];

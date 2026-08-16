@@ -79,6 +79,66 @@ function validDate($s): ?string
     return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
 }
 
+// ── Cuántos días puede durar un viaje: de 1 a 30 ─────────────
+//
+// Antes no había regla en ninguna parte, y el cliente TRUNCABA EN
+// SILENCIO: js/plan_logic.js generaba los días con
+//     while (cur <= d1 && out.length < 30)
+// así que un viaje de 40 días se guardaba entero en la base y la pantalla
+// dibujaba 30. Los días 31 a 40 existían para la base y no para la
+// persona: sin aviso y sin error, y cualquier lugar puesto ahí quedaba
+// invisible.
+//
+// El tope de 30 tiene motivo: los pines del mapa se colorean con SIETE
+// colores en ciclo (js/plan_logic.js:235), así que pasado el mes el color
+// deja de identificar el día —el 8 repite el del 1— y la barra de días se
+// vuelve impracticable.
+//
+// La comprobación vive AQUÍ y no en cada endpoint porque son dos —crear y
+// actualizar— y en este proyecto ya se pagó el precio de duplicar una
+// regla: la lista de dominios de correo estaba copiada en login.php y
+// register.php, las dos copias se separaron, y se podían crear cuentas
+// con las que después no se podía entrar. Ver includes/email_dominio.php.
+const PLAN_DIAS_MIN = 1;
+const PLAN_DIAS_MAX = 30;
+
+/**
+ * Días que dura el viaje, contando los dos extremos: del 1 al 1 es un día.
+ * Devuelve null si el rango no está completo, y eso NO es un error: un
+ * plan sin fechas es legítimo —se crean así a menudo y se rellenan
+ * después—, simplemente no hay nada que validar todavía.
+ */
+function planDias(?string $fi, ?string $ff): ?int
+{
+    if (!$fi || !$ff || $fi === '0000-00-00' || $ff === '0000-00-00') return null;
+    try {
+        $a = new DateTimeImmutable($fi);
+        $b = new DateTimeImmutable($ff);
+    } catch (Throwable $e) {
+        return null;
+    }
+    return (int)$a->diff($b)->days + 1;
+}
+
+/**
+ * El mensaje de rechazo, o null si el rango vale. Se devuelve el texto ya
+ * redactado para que crear y actualizar digan exactamente lo mismo, y
+ * para que el día que cambie el tope no haya que tocar dos frases.
+ */
+function planRangoError(?string $fi, ?string $ff): ?string
+{
+    $d = planDias($fi, $ff);
+    if ($d === null) return null;              // sin fechas: nada que validar
+    if ($d < PLAN_DIAS_MIN) {
+        return 'El viaje tiene que durar al menos ' . PLAN_DIAS_MIN . ' día.';
+    }
+    if ($d > PLAN_DIAS_MAX) {
+        return 'Un viaje no puede durar más de ' . PLAN_DIAS_MAX . ' días, y ése dura ' . $d . '. '
+             . 'Acorta las fechas o divídelo en varios planes.';
+    }
+    return null;
+}
+
 // ── CSRF ─────────────────────────────────────────────────────
 // csrfToken(), csrfCampo() y csrfValido() viven en includes/csrf.php,
 // que también usan los formularios HTML de sesión. El token es el

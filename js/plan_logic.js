@@ -233,13 +233,27 @@ class Component extends DCLogic {
     const ML = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const MA = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
     const COLS = ['#41A24D', '#6F42C1', '#1E86D8', '#E8365D', '#E7AD00', '#12808C', '#8e44ad'];
+    // Tope de dias del viaje. La regla de verdad NO esta aqui: vive en el
+    // servidor (planRangoError, includes/plan_auth.php) y en la base (la
+    // restriccion chk_planes_dias), asi que un plan de mas de 30 dias ya no
+    // puede ni guardarse. Esto queda de red de seguridad para los planes
+    // creados ANTES de la regla, que si podian pasarse.
+    //
+    // Antes este 30 era el UNICO limite que existia, y truncaba en silencio:
+    // un viaje de 40 dias se guardaba entero en la base y aqui se dibujaban
+    // 30. Los dias 31 a 40 existian para la base y no para la persona.
+    //
+    // Que sean 30 y no otro numero sale de COLS, la linea de arriba: son
+    // SIETE colores en ciclo, asi que pasado el mes el color deja de
+    // identificar el dia (el 8 repite el del 1).
+    const DIAS_MAX = 30;
     const parse = (x) => { if (!x || x === '0000-00-00') return null; const a = String(x).split('-'); return a.length === 3 && +a[0] ? new Date(+a[0], +a[1] - 1, +a[2]) : null; };
     const out = [];
     const d0 = parse(fi); let d1 = parse(ff);
     if (d0) {
       if (!d1 || d1 < d0) d1 = d0;
       const cur = new Date(d0);
-      while (cur <= d1 && out.length < 30) {
+      while (cur <= d1 && out.length < DIAS_MAX) {
         out.push({
           label: DS[cur.getDay()] + '. ' + cur.getDate() + '/' + (cur.getMonth() + 1),
           num: String(cur.getDate()), mes: MA[cur.getMonth()],
