@@ -230,7 +230,15 @@ function planInviteLink(string $token): string
 //           las máquinas de los compañeros el envío falla siempre, y
 //           sin este dato la ventana diría «invitación enviada»
 //           mientras no ha salido nada.
-function planInviteCreate(int $planId, string $rol, ?string $email = null, ?int $usosMax = 1, ?bool &$enviado = null): ?string
+// Tope del mensaje que escribe quien invita. Se corta aquí y no sólo en
+// el endpoint porque esta función es la única puerta al correo: si
+// mañana la llama otro sitio, el tope viaja con ella.
+const PLAN_INV_MSG_MAX = 1000;
+
+// $mensaje va DESPUÉS de $enviado, que es por referencia, para no
+// romper a quien ya llama con cinco argumentos (api/plan_invitar.php) ni
+// con tres (api/plan_create.php).
+function planInviteCreate(int $planId, string $rol, ?string $email = null, ?int $usosMax = 1, ?bool &$enviado = null, ?string $mensaje = null): ?string
 {
     $enviado = false;
     if (!in_array($rol, ['editor', 'lector'], true)) $rol = 'editor';
@@ -265,10 +273,41 @@ function planInviteCreate(int $planId, string $rol, ?string $email = null, ?int 
             require_once __DIR__ . '/../mailer.php';
             $titulo   = htmlspecialchars($plan['nombre'], ENT_QUOTES, 'UTF-8');
             $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+            // ── EL MENSAJE QUE ESCRIBE QUIEN INVITA ──────────────
+            //
+            // Esto es texto de una persona metido dentro de un correo
+            // HTML que sale con NUESTRO remite, así que se trata como
+            // lo que es: hostil hasta que se demuestre lo contrario.
+            //
+            //   · htmlspecialchars ANTES de nada. Sin esto, quien
+            //     invita mete <a href> y manda desde nuestra cuenta un
+            //     correo con el enlace que quiera. No es un riesgo
+            //     teórico: es lo que pasa el primer día.
+            //   · nl2br DESPUÉS, y sólo después, para que los saltos
+            //     de línea se vean. Al revés metería <br> antes de
+            //     escapar y el propio <br> saldría escapado.
+            //   · Recortado a PLAN_INV_MSG_MAX, y en CARACTERES
+            //     (mb_substr), no en bytes: cortar UTF-8 a la brava
+            //     parte una tilde por la mitad.
+            //   · NO toca el asunto ni ninguna cabecera. Sólo el
+            //     cuerpo.
+            $limpio = trim((string)$mensaje);
+            $bloque = '';
+            $altMsg = '';
+            if ($limpio !== '') {
+                $limpio = mb_substr($limpio, 0, PLAN_INV_MSG_MAX);
+                $altMsg = $limpio . "\n\n";
+                $bloque = '<p style="margin:0 0 18px;white-space:pre-wrap;">'
+                        . nl2br(htmlspecialchars($limpio, ENT_QUOTES, 'UTF-8'))
+                        . '</p>';
+            }
+
             $enviado = enviarCorreo(
                 $email,
                 'Te invitaron a un plan de viaje — Ruta Nómada',
                 "<h2 style=\"margin-top:0;\">¡Te invitaron a un viaje!</h2>
+                 {$bloque}
                  <p>Te invitaron a colaborar en <strong>{$titulo}</strong> en Ruta Nómada.</p>
                  <p style=\"text-align:center;margin:28px 0;\">
                    <a href=\"{$safeLink}\" style=\"display:inline-block;background:#1b3a40;color:#fff;
@@ -277,7 +316,7 @@ function planInviteCreate(int $planId, string $rol, ?string $email = null, ?int 
                  esperabas esta invitación puedes ignorar este correo.</p>
                  <p style=\"font-size:12px;color:#8a9794;word-break:break-all;\">Si el botón no funciona,
                  copia y pega esta dirección en tu navegador:<br>{$safeLink}</p>",
-                "Te invitaron a colaborar en \"{$plan['nombre']}\" en Ruta Nómada.\nAbre este enlace (expira en 7 días):\n{$link}"
+                "{$altMsg}Te invitaron a colaborar en \"{$plan['nombre']}\" en Ruta Nómada.\nAbre este enlace (expira en 7 días):\n{$link}"
             );
         } catch (Throwable $e) {
             error_log('planInviteCreate mail: ' . $e->getMessage());

@@ -149,9 +149,17 @@ class Component extends DCLogic {
       //             servidor; '' mientras se pide
       //   invCopiado  el boton dice "Copiado" SOLO si la copia salio
       //             bien de verdad (ver _invCopiar)
+      //   invEmail  lo que se esta TECLEANDO, que todavia no es un
+      //             destinatario: se vuelve ficha con Intro o con el
+      //             boton redondo
+      //   invDest   las fichas ya anadidas, o sea a quien se envia
+      //   invMsg    el CUERPO del correo. Ojo con el parecido: el aviso
+      //             de estado es invAviso, y se llamaba invMsg hasta
+      //             que esta pantalla tuvo un mensaje de verdad
+      //   invRes    que paso con cada direccion del ultimo envio
       invModal: false, invPant: 'invitar', invLink: '', invLinkErr: '',
-      invCopiado: false, invEmail: '', invMsg: '', invMsgMal: false,
-      invEnviando: false,
+      invCopiado: false, invEmail: '', invAviso: '', invAvisoMal: false,
+      invEnviando: false, invDest: [], invMsg: '', invRes: [],
       // El latido (fase 3 de PLAN_colaboracion.md).
       //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
       pulsoCaido: false, presentes: [],
@@ -737,11 +745,33 @@ class Component extends DCLogic {
   //   screens_ref/Invita a companeros de viaje*.png
   //   medidas y decisiones en Reportes_md/PLAN_invitar.md
 
+  // El texto que sale ya escrito al abrir, el del frame. Con una
+  // correccion: el frame dice "nuestro proxima aventura" y aqui va
+  // "nuestra". Es una errata, y esto sale por correo a gente de fuera.
+  //
+  // Se repone ENTERO en cada apertura y NO se guarda en ningun sitio.
+  // Guardarlo pediria una columna nueva y abre preguntas que el frame
+  // no contesta: si es por plan o por persona, y que hacer si alguien
+  // lo deja vacio. Se puede anadir despues sin deshacer nada de esto.
+  static get INV_MSG_DEF() {
+    return '¡Consulta mi itinerario en Ruta Nómada! Podemos colaborar en tiempo '
+         + 'real y planificar los sitios que visitaremos en nuestros días de viaje, '
+         + 'así como planear nuestros gastos, definir nuestro presupuesto y tiempos '
+         + 'de estancia. ¡Planifiquemos nuestra próxima aventura!';
+  }
+  // Los mismos dos topes que el servidor: PLAN_INV_MSG_MAX en
+  // includes/plan_invite_lib.php e INVITAR_DESTINOS_MAX en
+  // api/plan_invitar.php. Aqui solo sirven para avisar ANTES de mandar;
+  // quien decide es el servidor, que es el unico que no se puede saltar.
+  static get INV_MSG_MAX() { return 1000; }
+  static get INV_DEST_MAX() { return 10; }
+
   _invAbrir() {
     this._invVolverA = document.activeElement;
     this.setState({
       invModal: true, invPant: 'invitar', invCopiado: false,
-      invEmail: '', invMsg: '', invMsgMal: false, invEnviando: false
+      invEmail: '', invAviso: '', invAvisoMal: false, invEnviando: false,
+      invDest: [], invRes: [], invMsg: Component.INV_MSG_DEF
     });
     this._invPedirEnlace();
     // Se espera al repintado del runtime antes de buscar el boton.
@@ -815,34 +845,105 @@ class Component extends DCLogic {
     } catch (e) { return false; }
   }
 
+  // Anade lo que se esta tecleando como ficha. Lo llaman Intro y el
+  // boton redondo, que hacen lo mismo a proposito: el boton es la
+  // pista visual para quien no adivina que Intro sirve.
+  //
+  // OJO, ESTO CAMBIA UNA COSTUMBRE: antes Intro ENVIABA, porque el
+  // campo no tenia boton. Ahora Intro anade y solo envia el boton
+  // azul. Ctrl+Intro se deja como atajo para quien tenga el dedo
+  // hecho al de antes.
+  //
+  // Valida aqui ademas de en el servidor porque una direccion mal
+  // escrita no puede esperar al envio: para entonces ya hay otras
+  // cuatro buenas en la lista y el aviso llega tarde.
+  _invAddDest() {
+    const e = (this.state.invEmail || '').trim();
+    if (!e) return;
+    const dest = this.state.invDest || [];
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) {
+      this.setState({ invAviso: 'Ese correo no parece válido.', invAvisoMal: true });
+      return;
+    }
+    // Sin distinguir mayusculas: para el servidor de correo Ana@ y
+    // ana@ son la misma persona y recibiria el mensaje dos veces.
+    if (dest.some(d => d.toLowerCase() === e.toLowerCase())) {
+      this.setState({ invEmail: '', invAviso: 'Esa dirección ya está en la lista.', invAvisoMal: true });
+      return;
+    }
+    if (dest.length >= Component.INV_DEST_MAX) {
+      this.setState({ invAviso: 'Como mucho ' + Component.INV_DEST_MAX + ' personas por envío.', invAvisoMal: true });
+      return;
+    }
+    this.setState({ invDest: dest.concat([e]), invEmail: '', invAviso: '', invAvisoMal: false, invRes: [] });
+  }
+
+  _invQuitarDest(email) {
+    this.setState({
+      invDest: (this.state.invDest || []).filter(d => d !== email),
+      invAviso: '', invAvisoMal: false, invRes: []
+    });
+  }
+
+  // Manda la lista ENTERA en una peticion, no una por ficha, para que
+  // el tope por hora se compruebe una sola vez con el lote completo:
+  // de una en una, cinco direcciones podrian mandar tres y toparse a
+  // mitad, dejando el envio hecho a medias.
   _invEnviar() {
-    const email = (this.state.invEmail || '').trim();
-    if (!email || this.state.invEnviando || !this.PLAN_ID) return;
-    this.setState({ invEnviando: true, invMsg: '', invMsgMal: false });
+    // Lo que quedo escrito sin pulsar Intro tambien cuenta. Si no,
+    // teclear una direccion y darle a Enviar no manda nada, que es
+    // justo lo que haria cualquiera la primera vez.
+    const suelto = (this.state.invEmail || '').trim();
+    const dest = (this.state.invDest || []).slice();
+    if (suelto && !dest.some(d => d.toLowerCase() === suelto.toLowerCase())) dest.push(suelto);
+
+    if (!dest.length || this.state.invEnviando || !this.PLAN_ID) return;
+    this.setState({ invEnviando: true, invAviso: '', invAvisoMal: false, invRes: [] });
     fetch('api/plan_invitar.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
-      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'correo', email: email, rol: 'editor' })
+      body: JSON.stringify({
+        plan_id: this.PLAN_ID, action: 'correo', emails: dest,
+        mensaje: (this.state.invMsg || '').slice(0, Component.INV_MSG_MAX), rol: 'editor'
+      })
     })
       .then(r => r.json())
       .then(j => {
         if (!j || !j.ok) {
-          this.setState({ invEnviando: false, invMsg: (j && j.error) || 'No se pudo invitar.', invMsgMal: true });
+          this.setState({ invEnviando: false, invAviso: (j && j.error) || 'No se pudo invitar.', invAvisoMal: true });
           return;
         }
+        const res     = j.resultados || [];
+        const ok      = res.filter(r => r.estado === 'enviado');
+        const creadas = res.filter(r => r.estado === 'creado');
+        const malas   = res.filter(r => r.estado === 'error');
+
+        // Solo se van de la lista las que salieron. Las que fallaron SE
+        // QUEDAN como ficha, con su motivo al lado: borrarlas obligaria
+        // a teclearlas otra vez para reintentar.
+        const quedan = malas.map(r => r.email);
+
         // Se dice la verdad. includes/mail_config.php esta en
         // .gitignore, asi que en las maquinas de los companeros el
         // envio falla siempre: anunciar "enviada" seria mentir, y la
         // persona se quedaria esperando un correo que no existe.
+        let aviso = '';
+        if (ok.length) aviso = ok.length === 1
+          ? ('Invitación enviada a ' + ok[0].email)
+          : ('Invitaciones enviadas a ' + ok.length + ' personas.');
+        if (creadas.length) {
+          aviso += (aviso ? ' ' : '')
+            + (creadas.length === 1 ? 'Una invitación quedó creada' : creadas.length + ' invitaciones quedaron creadas')
+            + ', pero el correo no salió: pásales el enlace de arriba.';
+        }
+        if (!aviso && malas.length) aviso = 'No se pudo invitar a nadie.';
+
         this.setState({
-          invEnviando: false, invEmail: '',
-          invMsg: j.correo_enviado
-            ? ('Invitación enviada a ' + email)
-            : 'La invitación quedó creada, pero el correo no salió. Pásale el enlace de arriba.',
-          invMsgMal: !j.correo_enviado
+          invEnviando: false, invDest: quedan, invEmail: '', invRes: res,
+          invAviso: aviso, invAvisoMal: !ok.length
         });
       })
-      .catch(() => this.setState({ invEnviando: false, invMsg: 'No se pudo invitar. Inténtalo de nuevo.', invMsgMal: true }));
+      .catch(() => this.setState({ invEnviando: false, invAviso: 'No se pudo invitar. Inténtalo de nuevo.', invAvisoMal: true }));
   }
 
   // ── Gestionar companeros ────────────────────────────────
@@ -855,13 +956,13 @@ class Component extends DCLogic {
     })
       .then(r => r.json())
       .then(j => {
-        if (!j || !j.ok) { this.setState({ invMsg: (j && j.error) || 'No se pudo quitar.', invMsgMal: true }); return; }
+        if (!j || !j.ok) { this.setState({ invAviso: (j && j.error) || 'No se pudo quitar.', invAvisoMal: true }); return; }
         this.MIEMBROS = this._mapMiembros(j.miembros);
         // MIEMBROS no es estado, asi que hace falta un setState para
         // que el runtime repinte la lista y los avatares de arriba.
-        this.setState({ invMsg: '', invMsgMal: false });
+        this.setState({ invAviso: '', invAvisoMal: false });
       })
-      .catch(() => this.setState({ invMsg: 'No se pudo quitar. Inténtalo de nuevo.', invMsgMal: true }));
+      .catch(() => this.setState({ invAviso: 'No se pudo quitar. Inténtalo de nuevo.', invAvisoMal: true }));
   }
 
   // ── Fotos propias: listar, subir y borrar ────────────────
@@ -2690,7 +2791,7 @@ class Component extends DCLogic {
       // otra ventana: Escape retrocede a la de invitar antes de
       // cerrar, igual que hace el menu de gasto con sus desplegables.
       if (s.invModal) {
-        if (s.invPant === 'gestiona') { this.setState({ invPant: 'invitar', invMsg: '', invMsgMal: false }); return; }
+        if (s.invPant === 'gestiona') { this.setState({ invPant: 'invitar', invAviso: '', invAvisoMal: false }); return; }
         this._invCerrar(); return;
       }
       if (s.gastoMenu) {
@@ -3575,8 +3676,8 @@ class Component extends DCLogic {
     V.invEsInvitar  = s.invPant !== 'gestiona';
     V.invEsGestiona = s.invPant === 'gestiona';
     V.invTitulo = V.invEsGestiona ? 'Gestiona compañeros de viaje' : 'Invita a compañeros de viaje';
-    V.invGestiona = () => this.setState({ invPant: 'gestiona', invMsg: '', invMsgMal: false });
-    V.invVolver   = () => this.setState({ invPant: 'invitar', invMsg: '', invMsgMal: false });
+    V.invGestiona = () => this.setState({ invPant: 'gestiona', invAviso: '', invAvisoMal: false });
+    V.invVolver   = () => this.setState({ invPant: 'invitar', invAviso: '', invAvisoMal: false });
 
     // Tres estados para la ranura del enlace: pidiendolo, error, o la
     // URL. El texto se corta con puntos suspensivos por CSS, como en
@@ -3593,10 +3694,73 @@ class Component extends DCLogic {
 
     V.invEmail = s.invEmail || '';
     V.invEmailCambia = (e) => this.setState({ invEmail: e.target.value });
-    V.invEmailTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); this._invEnviar(); } };
-    V.invHayMsg = !!s.invMsg;
+    // Intro ANADE, no envia. Es un cambio respecto a como estaba, donde
+    // el campo no tenia boton y Intro era la unica forma de mandar. Se
+    // deja Ctrl+Intro enviando para quien ya tuviera el dedo hecho.
+    V.invEmailTecla = (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) this._invEnviar(); else this._invAddDest();
+    };
+    V.invHayAviso = !!s.invAviso;
+    V.invAviso = s.invAviso || '';
+    V.invAvisoColor = s.invAvisoMal ? '#C0392B' : '#2E7D32';
+
+    // ── Los destinatarios, en fichas ─────────────────────────
+    // El motivo del ultimo envio viaja PEGADO a la ficha y no en el
+    // aviso de abajo: con cinco direcciones, "una falló" no dice cual.
+    const fallos = {};
+    (s.invRes || []).forEach(r => { if (r.estado === 'error') fallos[r.email] = r.motivo || 'No se pudo.'; });
+    const dest = s.invDest || [];
+    V.invHayDest = dest.length > 0;
+    V.invDestVM = dest.map(email => ({
+      email: email,
+      mal: !!fallos[email],
+      // El borde rojo tiene que ser visible sin depender del color, asi
+      // que el motivo va tambien en el title y en el aria-label.
+      borde: fallos[email] ? '#C0392B' : '#DEE2E6',
+      tinta: fallos[email] ? '#C0392B' : '#212529',
+      motivo: fallos[email] || '',
+      titulo: fallos[email] ? (email + ' — ' + fallos[email]) : email,
+      quitar: () => this._invQuitarDest(email)
+    }));
+    V.invAddDest = () => this._invAddDest();
+    // El boton redondo se apaga al llegar al tope, en vez de dejar
+    // pulsar y contestar con un error.
+    V.invAddPuede = dest.length < Component.INV_DEST_MAX;
+    V.invAddOpac  = dest.length < Component.INV_DEST_MAX ? '1' : '.4';
+    V.invAddCursor = dest.length < Component.INV_DEST_MAX ? 'pointer' : 'default';
+
+    // ── El mensaje del correo ────────────────────────────────
+    // Siempre editable: el lapiz es la pista visual, no un interruptor.
+    // Un interruptor anadiria un estado y una pulsacion mas sin dar
+    // nada a cambio, porque quien quiere cambiar el texto hace clic en
+    // el texto.
     V.invMsg = s.invMsg || '';
-    V.invMsgColor = s.invMsgMal ? '#C0392B' : '#2E7D32';
+    V.invMsgCambia = (e) => this.setState({ invMsg: e.target.value.slice(0, Component.INV_MSG_MAX) });
+    V.invMsgMax = Component.INV_MSG_MAX;
+    // El lapiz lleva el cursor al final del texto, que es donde se
+    // suele querer escribir.
+    V.invMsgFoco = () => {
+      const t = document.querySelector('[role="dialog"][data-inv="1"] textarea[data-inv-msg]');
+      if (!t) return;
+      t.focus();
+      t.setSelectionRange(t.value.length, t.value.length);
+    };
+
+    V.invEnviar = () => this._invEnviar();
+    V.invEnviarTxt = s.invEnviando ? 'Enviando…' : 'Enviar correo electrónico';
+    // Hay algo que mandar si hay fichas O si queda algo escrito sin
+    // convertir en ficha, que es el caso de quien teclea y pulsa
+    // Enviar directamente.
+    //
+    // El boton NO lleva `disabled`: se apaga de color y _invEnviar()
+    // vuelve solo si no hay nada. Asi sigue recibiendo el foco del
+    // teclado, que es lo que permite descubrir que existe; un boton
+    // deshabilitado se salta al tabular y desaparece del recorrido.
+    const puede = (dest.length > 0 || (s.invEmail || '').trim() !== '') && !s.invEnviando;
+    V.invEnviarBg = puede ? '#3F52E3' : '#AFB6E9';
+    V.invEnviarCursor = puede ? 'pointer' : 'default';
 
     // La lista de la segunda pantalla. El propietario NO lleva aspa:
     // quitarlo dejaria el viaje sin dueno, y planes.usuario_id y
