@@ -1281,6 +1281,39 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                 <sc-if value="{{ hasDetDwell }}" hint-placeholder-val="{{ true }}"><span style="display:flex;align-items:center;gap:10px;font-size:12.6px;color:#33454e"><svg width="14" height="14" viewBox="0 0 640 640" style="flex-shrink:0"><path d="M160 64C142.3 64 128 78.3 128 96C128 113.7 142.3 128 160 128L160 139C160 181.4 176.9 222.1 206.9 252.1L274.8 320L206.9 387.9C176.9 417.9 160 458.6 160 501L160 512C142.3 512 128 526.3 128 544C128 561.7 142.3 576 160 576L480 576C497.7 576 512 561.7 512 544C512 526.3 497.7 512 480 512L480 501C480 458.6 463.1 417.9 433.1 387.9L365.2 320L433.1 252.1C463.1 222.1 480 181.4 480 139L480 128C497.7 128 512 113.7 512 96C512 78.3 497.7 64 480 64L160 64zM224 139L224 128L416 128L416 139C416 158 410.4 176.4 400 192L240 192C229.7 176.4 224 158 224 139zM240 448C243.5 442.7 247.6 437.7 252.1 433.1L320 365.2L387.9 433.1C392.5 437.7 396.5 442.7 400.1 448L240 448z" fill="#6C757D"></path></svg>La gente suele pasar 10 min aquí</span></sc-if>
                 <sc-if value="{{ hasDetPhone }}" hint-placeholder-val="{{ true }}"><a href="#" onClick="{{ noop }}" style="display:flex;align-items:center;gap:10px;font-size:12.6px;text-decoration:none" style-hover="text-decoration:underline !important"><svg width="14" height="14" viewBox="0 0 640 640" style="flex-shrink:0"><path d="M224.2 89C216.3 70.1 195.7 60.1 176.1 65.4L170.6 66.9C106 84.5 50.8 147.1 66.9 223.3C104 398.3 241.7 536 416.7 573.1C493 589.3 555.5 534 573.1 469.4L574.6 463.9C580 444.2 569.9 423.6 551.1 415.8L453.8 375.3C437.3 368.4 418.2 373.2 406.8 387.1L368.2 434.3C297.9 399.4 241.3 341 208.8 269.3L253 233.3C266.9 222 271.6 202.9 264.8 186.3L224.2 89z" fill="#6C757D"></path></svg>{{ detPhone }}</a></sc-if>
                 <sc-if value="{{ hasDetWebsite }}" hint-placeholder-val="{{ true }}"><a href="#" onClick="{{ detOpenWeb }}" style="display:flex;align-items:center;gap:10px;font-size:12.6px;text-decoration:none" style-hover="text-decoration:underline !important"><svg width="14" height="14" viewBox="0 0 640 640" style="flex-shrink:0"><path d="M119.7 263.7L150.6 294.6C156.6 300.6 164.7 304 173.2 304L194.7 304C203.2 304 211.3 307.4 217.3 313.4L246.6 342.7C252.6 348.7 256 356.8 256 365.3L256 402.8C256 411.3 259.4 419.4 265.4 425.4L278.7 438.7C284.7 444.7 288.1 452.8 288.1 461.3L288.1 480C288.1 497.7 302.4 512 320.1 512C337.8 512 352.1 497.7 352.1 480L352.1 477.3C352.1 468.8 355.5 460.7 361.5 454.7L406.8 409.4C412.8 403.4 416.2 395.3 416.2 386.8L416.2 352.1C416.2 334.4 401.9 320.1 384.2 320.1L301.5 320.1C293 320.1 284.9 316.7 278.9 310.7L262.9 294.7C258.7 290.5 256.3 284.7 256.3 278.7C256.3 266.2 266.4 256.1 278.9 256.1L313.6 256.1C326.1 256.1 336.2 246 336.2 233.5C336.2 227.5 333.8 221.7 329.6 217.5L309.9 197.8C306 194 304 189.1 304 184C304 178.9 306 174 309.7 170.3L327 153C332.8 147.2 336.1 139.3 336.1 131.1C336.1 123.9 333.7 117.4 329.7 112.2C326.5 112.1 323.3 112 320.1 112C224.7 112 144.4 176.2 119.8 263.7zM528 320C528 285.4 519.6 252.8 504.6 224.2C498.2 225.1 491.9 228.1 486.7 233.3L473.3 246.7C467.3 252.7 463.9 260.8 463.9 269.3L463.9 304C463.9 321.7 478.2 336 495.9 336L520 336C522.5 336 525 335.7 527.3 335.2C527.7 330.2 527.8 325.1 527.8 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z" fill="#6C757D"></path></svg>{{ detWebsite }}</a></sc-if>
+                <!-- ══ SABER ANTES DE IR ══════════════════════════
+                     Cuatro consejos prácticos, entre el contacto y
+                     «Abrir en:», como en screens_ref/F_ site (Acerca de).png.
+
+                     El bloque entero desaparece si no hay consejos, en
+                     vez de dejar el título con un hueco debajo.
+
+                     EL TEXTO NO SALE DE ESTE SITIO CONCRETO, y eso no
+                     es un recorte de calidad: son consejos del tipo de
+                     sitio y de la ciudad. El motivo está entero en la
+                     cabecera de api/plan_tips.php — los términos de
+                     Maps prohíben usar su contenido para entrenar
+                     modelos, y la capa gratuita de Gemini entrena con
+                     los prompts—, así que no se le manda ni el nombre
+                     del negocio ni sus reseñas.
+
+                     El icono es de Flaticon y EXIGE ATRIBUCIÓN: está en
+                     img/iconos/CREDITOS.md y se publica en creditos.php.
+                     Va con srcset porque es PNG: a 18 px sin la versión
+                     @2x se ve borroso en cualquier portátil de hoy. -->
+                <sc-if value="{{ hayTips }}" hint-placeholder-val="{{ true }}">
+                  <div style="margin-bottom:18px">
+                    <p style="margin:0 0 9px;font-size:12.6px;font-weight:700;color:#0D1F27">Saber antes de ir</p>
+                    <sc-for list="{{ tipsVM }}" as="c" hint-placeholder-count="4">
+                      <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:9px">
+                        <img src="img/iconos/idea.png" srcset="img/iconos/idea.png 1x, img/iconos/idea@2x.png 2x, img/iconos/idea@3x.png 3x" alt="" style="width:18px;height:18px;flex-shrink:0;margin-top:1px">
+                        <span style="font-size:12.6px;line-height:1.5;color:#33454e">{{ c.t }}</span>
+                      </div>
+                    </sc-for>
+                    <p style="margin:2px 0 0;font-size:11px;line-height:1.4;color:#8a9794">{{ tipsNota }}</p>
+                  </div>
+                </sc-if>
+
                 <div>
                   <p style="margin:0 0 7px;font-size:12.6px;font-weight:700;color:#0D1F27">Abrir en:</p>
                   <div style="display:flex;gap:8px">

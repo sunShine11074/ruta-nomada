@@ -90,6 +90,18 @@ window.gmapsReady = new Promise(function (res) { window.__plMapReady = res; });
 // baja a Wikipedia y, si no, a la plantilla armada con los datos de Places.
 // Requiere tener habilitada "Places API (New)" en Google Cloud.
 window.PLAN_ACERCA_GOOGLE = true;
+// «Saber antes de ir»: los cuatro consejos de la ficha del sitio.
+//
+//   true  → los redacta Gemini a partir del TIPO de sitio y la ciudad
+//   false → los pone una plantilla del servidor, y NO SALE NADA hacia
+//           Gemini. Es la configuración sin exposición ninguna.
+//
+// Ni encendido se le manda nada de Google Places: ni el nombre del
+// negocio, ni reseñas, ni horarios. El porqué está en la cabecera de
+// api/plan_tips.php, y resumido es que los términos de Maps prohíben
+// usar su contenido para entrenar modelos y la capa gratuita de Gemini
+// entrena con los prompts.
+window.PLAN_TIPS_IA = true;
 </script>
 <script src="./js/emojis.js"></script>
 <script src="./libs/dc/support.js"></script>

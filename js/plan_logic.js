@@ -2303,6 +2303,51 @@ class Component extends DCLogic {
       cb(d);
     });
   }
+  // ════ "Saber antes de ir": cuatro consejos ════════════════════
+  //  Cascada de dos niveles, como la del "Acerca de" de aqui arriba:
+  //    1. Gemini, si PLAN_TIPS_IA esta encendido
+  //    2. Plantilla determinista en el servidor, que siempre responde
+  //
+  //  ⚠ NO SE MANDA NADA DE GOOGLE. Ni el nombre del negocio, ni las
+  //  resenas, ni la valoracion, ni los horarios. El porque esta escrito
+  //  entero en la cabecera de api/plan_tips.php, y en dos lineas es:
+  //  los terminos de Maps prohiben usar su contenido para entrenar
+  //  modelos, y la capa gratuita de Gemini entrena con los prompts.
+  //
+  //  De ahi que los consejos sean del TIPO de sitio y de la ciudad, no
+  //  del negocio. Se pierde punteria a cambio de no pisar los terminos.
+  //
+  //  El resultado se guarda en `d.tips`, o sea en memoria y por ficha
+  //  abierta. NO va a la base: un consejo derivado de datos del viaje
+  //  no tiene por que persistir, y asi tampoco hay que preguntarse
+  //  cuanto tiempo se puede guardar.
+  _tipsDe(d, cb) {
+    if (d.tips) { cb(d.tips); return; }
+    const fin = (r) => { d.tips = r; cb(r); };
+    if (!this.PLAN_ID) { fin(null); return; }
+    // La ciudad sale del destino del viaje, recortando lo que va tras
+    // la primera coma: "Ensenada, Baja California, Mexico" -> "Ensenada".
+    const dest = String((this.BOOT && this.BOOT.plan && this.BOOT.plan.destino) || '');
+    fetch('api/plan_tips.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+      body: JSON.stringify({
+        plan_id: this.PLAN_ID,
+        categoria: d.cat || 'custom',
+        ciudad: dest,
+        // El extracto de Wikipedia es CC BY-SA, asi que este SI se puede
+        // mandar sin reparos. Solo existe para monumentos; para un
+        // restaurante llega vacio y los consejos salen mas genericos.
+        wiki: (d.acerca && d.acerca.fuente === 'wiki') ? d.acerca.texto : '',
+        nota: d.nota || '',
+        ia: !!window.PLAN_TIPS_IA
+      })
+    })
+      .then(r => r.json())
+      .then(j => fin(j && j.ok ? { lista: j.consejos || [], fuente: j.fuente } : null))
+      .catch(() => fin(null));
+  }
+
   // ════ "Acerca de": cascada de tres niveles ════════════════════
   //  La librería legacy de Places NO tiene ningún campo de descripción
   //  (editorial_summary no existe en PlaceResult y no lo van a añadir),
@@ -4641,6 +4686,24 @@ class Component extends DCLogic {
       const dd = (this.PLAN_ID && det.gpid && this._detCache) ? this._detCache[det.gpid] : null;
       const esReal = !!this.PLAN_ID;
 
+      // ── "Saber antes de ir" ──
+      // Se pide al abrir la ficha, igual que el "Acerca de". Mientras no
+      // llega, la seccion entera no se dibuja: es mejor que aparezca de
+      // golpe ya escrita que ver cuatro huecos rellenarse.
+      if (esReal && dd && !dd.tips && !dd._tipsPidiendo) {
+        dd._tipsPidiendo = true;
+        this._tipsDe(dd, () => { dd._tipsPidiendo = false; this.setState({ _tipsTick: (this.state._tipsTick || 0) + 1 }); });
+      }
+      const tp = dd ? dd.tips : null;
+      V.hayTips = !!(tp && tp.lista && tp.lista.length);
+      V.tipsVM = (tp && tp.lista ? tp.lista : []).map(t => ({ t: t }));
+      // La procedencia se dice SIEMPRE que la escriba una IA, igual que
+      // ya se hace con el "Acerca de". El frame no lo contemplaba, pero
+      // el usuario tiene derecho a saber que esto no lo escribio nadie.
+      V.tipsNota = (tp && tp.fuente === 'ia')
+        ? 'Consejos generales del destino, redactados con IA. Confirma horarios y precios antes de ir.'
+        : 'Consejos generales; confirma horarios y precios antes de ir.';
+
       // ── "Acerca de" y de dónde salió ──
       // El demo trae su texto escrito a mano; los lugares reales lo resuelven
       // por la cascada. Mientras llega, se deja vacío en vez de poner un
@@ -4790,6 +4853,7 @@ class Component extends DCLogic {
       V.detFotoSeed = 'x';
       V.hasDetAddress = false; V.detAddress = ''; V.hasDetHours = false; V.detHoursToday = '';
       V.hasDetDwell = false; V.hasDetMentions = false; V.hasDetPhone = false; V.detPhone = '';
+      V.hayTips = false; V.tipsVM = []; V.tipsNota = '';
       V.hasDetWebsite = false; V.detWebsite = ''; V.detOpenWeb = V.noop; V.detOpenG = V.noop; V.detOpenGm = V.noop;
       V.hasDetTips = false; V.detRvwAvg = ''; V.detRvwLabel = ''; V.detRvwCount = ''; V.hasDetHisto = false;
       V.detFoto1 = ''; V.detFoto2 = ''; V.detFoto3 = ''; V.detFoto = '';
