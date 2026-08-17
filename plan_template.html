@@ -2051,14 +2051,28 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                hacia el propio campo que hay justo debajo.
 
                Su viewBox también va recortado a la tinta (64 64 512
-               512), que en éste sí es cuadrada y centrada. -->
+               512), que en éste sí es cuadrada y centrada.
+
+               EL INTERLINEADO SON 23 px, Y EL NÚMERO NO ES UN CAPRICHO.
+               El diseño lo pidió «como el 1,15 de Google Docs», y ahí hay
+               una trampa: el 1,15 de Docs NO es el 1,15 de CSS. Docs
+               multiplica el interlineado NATURAL de la fuente, y el de
+               Poppins es alto: medido a 13 px da 20, o sea 1,538 em.
+               Entonces Docs 1,15 = 20 x 1,15 = 23 px, que en CSS sería
+               1,769. Poner 1,15 a secas habría APRETADO el texto.
+
+               Antes había 18, que es menos que los 20 del sencillo: el
+               texto iba más junto que si no se hubiera tocado nada. Por
+               eso se veía apretado.
+
+               Si algún día se quiere el 1,20 de Docs son 24 px. -->
           <div style="display:flex;align-items:center;gap:7px;margin-top:12px">
             <span style="font-size:12.5px;font-weight:700;color:#212529;font-family:Poppins,sans-serif">Mensaje</span>
             <button onClick="{{ invMsgFoco }}" aria-label="Escribir el mensaje" tabindex="-1" style="width:20px;height:20px;border:none;border-radius:5px;background:none;color:#212529;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease" style-hover="background:#E9ECEF !important">
               <svg width="15" height="15" viewBox="64 64 512 512" fill="currentColor" style="display:block"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg>
             </button>
           </div>
-          <textarea data-inv-msg="1" value="{{ invMsg }}" onChange="{{ invMsgCambia }}" maxlength="{{ invMsgMax }}" aria-label="Mensaje de la invitación" rows="5" style="display:block;width:100%;box-sizing:border-box;margin-top:0;padding:0;border:none;outline:none;background:none;resize:none;font-family:inherit;font-size:13px;line-height:18px;color:#495057"></textarea>
+          <textarea data-inv-msg="1" value="{{ invMsg }}" onChange="{{ invMsgCambia }}" maxlength="{{ invMsgMax }}" aria-label="Mensaje de la invitación" rows="5" style="display:block;width:100%;box-sizing:border-box;margin-top:0;padding:0;border:none;outline:none;background:none;resize:none;font-family:inherit;font-size:13px;line-height:23px;color:#495057"></textarea>
 
           <!-- A LA DERECHA, no centrado, y SALIÉNDOSE DEL RELLENO DEL
                PANEL a propósito. El relleno es de 12 a los lados y 16

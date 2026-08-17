@@ -298,7 +298,7 @@ function planInviteCreate(int $planId, string $rol, ?string $email = null, ?int 
             if ($limpio !== '') {
                 $limpio = mb_substr($limpio, 0, PLAN_INV_MSG_MAX);
                 $altMsg = $limpio . "\n\n";
-                $bloque = '<p style="margin:0 0 18px;white-space:pre-wrap;">'
+                $bloque = '<p style="margin:0 0 18px;line-height:1.294;white-space:pre-wrap;">'
                         . nl2br(htmlspecialchars($limpio, ENT_QUOTES, 'UTF-8'))
                         . '</p>';
             }
