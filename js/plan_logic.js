@@ -2855,6 +2855,66 @@ class Component extends DCLogic {
     this._horaCerrar();
   }
 
+  // ════ LOS GASTOS DEL VIAJE, DE LAS DOS FUENTES ════════════════
+  //
+  // Hasta ahora el Presupuesto sumaba SOLO plan_gastos y no veia lo que
+  // se asignaba a los lugares del itinerario. Eran dos sistemas
+  // paralelos que no se hablaban: en un plan con 1.170 repartidos entre
+  // dos personas, la barra pintaba 0,00.
+  //
+  //   libro  → plan_gastos, gastos sueltos del viaje
+  //   sitio  → plan_items.precio, lo que cuesta un lugar del itinerario
+  //
+  // Los dos vuelven de aqui con la MISMA forma para que el total, el
+  // desglose y la lista no tengan que saber de donde salio cada uno.
+  //
+  // La clave `k` lleva prefijo porque los ids se repiten entre las dos
+  // tablas: el gasto 3 del libro y el item 3 del itinerario existen a la
+  // vez, y sin prefijo React reusaria el nodo de uno para el otro.
+  _gastosDelPlan() {
+    const s = this.state;
+    const out = [];
+    (s.gastos || []).forEach(g => {
+      const m = Number(g.m) || 0;
+      if (m <= 0) return;
+      out.push({
+        k: 'l' + g.id, origen: 'libro', id: g.id, c: g.c, m: m,
+        cat: g.cat || 'otro', moneda: g.moneda || 'MXN',
+        fecha: g.fecha || '', fiso: g.fiso || '', ts: g.ts || 0
+      });
+    });
+    (s.dayItems || []).forEach((arr, di) => (arr || []).forEach(it => {
+      const m = Number(it.costo) || 0;
+      if (m <= 0) return;
+      const d = (this.DAYS || [])[di];
+      out.push({
+        k: 's' + it.uid, origen: 'sitio', uid: it.uid, c: it.name, m: m,
+        cat: it.gastoCat || 'otro', moneda: it.moneda || 'MXN',
+        fecha: d && d.iso ? this._fmtDia(d.iso) : '', fiso: (d && d.iso) || '',
+        dia: di, ts: 0
+      });
+    }));
+    return out;
+  }
+
+  // ⚠ SUMAR MONEDAS DISTINTAS DA UN NUMERO SIN SIGNIFICADO.
+  // Cada gasto guarda su divisa y NADA convierte entre ellas: cien euros
+  // entrarian al total como cien pesos. Hoy no se nota porque todo esta
+  // en MXN, pero el fallo esta latente esperando a quien toque el
+  // selector de divisa de la ventana.
+  //
+  // Asi que en vez de sumar y callar, se avisa. Devuelve la lista de
+  // divisas distintas que hay; si trae mas de una, la pantalla lo dice.
+  // Devuelve el gasto del libro tal cual lo guarda el estado, para
+  // volver a abrirlo en la ventana con sus campos rellenos.
+  _gastoDelLibro(id) { return (this.state.gastos || []).find(g => g.id === id) || null; }
+
+  _monedasEnUso(lista) {
+    const set = {};
+    lista.forEach(g => { set[g.moneda || 'MXN'] = 1; });
+    return Object.keys(set);
+  }
+
   // ── Gasto ──
   _gastoAbrir(uid) {
     const ref = this._itemPorUid(uid);
@@ -2956,7 +3016,7 @@ class Component extends DCLogic {
       // usa el nombre de la categoria antes que rechazar el guardado:
       // el usuario ya puso importe y reparto, tirarle el trabajo por un
       // titulo seria peor que ponerle uno razonable.
-      const cat = this._gcats().find(c => c.k === s.gCat);
+      const cat = this._gcats().find(c => c.v === s.gCat);
       const concepto = (s.gConcepto || '').trim() || (cat ? cat.t : 'Gasto');
       if (total <= 0) { this._gastoCerrar(); return; }
       const g = {
@@ -4476,8 +4536,19 @@ class Component extends DCLogic {
     };
     const soloNum = (v, dec) => v.toLocaleString('es-MX', { minimumFractionDigits: dec === undefined ? 2 : dec, maximumFractionDigits: dec === undefined ? 2 : dec });
     const moneyMXN = (v, dec) => soloNum(v, dec) + ' MXN';
+    // AQUI SE CONECTAN LOS DOS SISTEMAS. Antes esta linea recorria solo
+    // s.gastos —el libro— y por eso los precios de los lugares del
+    // itinerario no aparecian en ninguna parte del Presupuesto.
+    const gastosTodos = this._gastosDelPlan();
     let total = 0; const catSum = {};
-    for (const g of s.gastos) { total += g.m; catSum[g.cat] = (catSum[g.cat] || 0) + g.m; }
+    for (const g of gastosTodos) { total += g.m; catSum[g.cat] = (catSum[g.cat] || 0) + g.m; }
+    // Si hay mas de una divisa, el total no significa nada: no se
+    // convierte en ningun sitio. Se avisa en vez de sumar y callar.
+    const divisas = this._monedasEnUso(gastosTodos);
+    V.budMezcla = divisas.length > 1;
+    V.budMezclaTxt = divisas.length > 1
+      ? ('Hay gastos en ' + divisas.join(', ') + '. El total los suma sin convertir, asi que no es fiable.')
+      : '';
     // LOS DIGITOS VAN APARTE DEL CODIGO DE MONEDA. Google Sans Code es
     // monoespaciada —se eligio justo por eso, para que una columna de
     // importes quede alineada por la coma— pero eso mismo hace que un
@@ -4573,10 +4644,15 @@ class Component extends DCLogic {
     V.desgDiaGo = () => this.setState({ desgTab: 'dia' });
     let desgData;
     if (isCat) {
-      desgData = ['Vuelos', 'Alquiler de coches', 'Transporte', 'Bebidas', 'Comestibles', 'Turismo', 'Gasolina', 'Compras', 'Actividades', 'Comida', 'Alojamiento', 'Otro'].map(c => ({ label: c, v: catSum[c] || 0 }));
+      // EL EJE SALE DE _gcats(), la lista que usa la ventana. Antes era
+      // una lista escrita a mano —Vuelos, Comestibles, Turismo, Alquiler
+      // de coches…— que NO casaba ni con la ventana ni con el enum de la
+      // base: eran TRES vocabularios y la mitad de las barras no podian
+      // valer nunca mas que cero. Ahora hay uno solo.
+      desgData = this._gcats().map(c => ({ label: c.t, v: catSum[c.v] || 0 }));
     } else {
       const byDay = {};
-      for (const g of s.gastos) { const f = g.fecha || ''; byDay[f] = (byDay[f] || 0) + g.m; }
+      for (const g of gastosTodos) { const f = g.fecha || ''; byDay[f] = (byDay[f] || 0) + g.m; }
       const dated = this.DAYS.filter(d => d.iso);
       if (dated.length) {
         desgData = dated.map(d => { const a = d.iso.split('-'); return { label: (+a[2]) + '/' + (+a[1]), v: byDay[this._fmtDia(d.iso)] || 0 }; });
@@ -4630,17 +4706,40 @@ class Component extends DCLogic {
         default: return b.ts - a.ts;
       }
     };
-    V.gastoRows = [...s.gastos].sort(gastoCmp).map(g => ({
-      // La categoria se guarda en minuscula -es el vocabulario unico que
-      // comparten plan_items y plan_gastos desde la migracion- y se
-      // capitaliza AQUI, al enseñarla. Guardar 'Comida' y 'comida' segun
-      // la tabla es lo que tenia la grafica con barras a cero.
-      c: g.c, sub: (g.fecha || '31 jul.') + ' • ' + (g.cat ? g.cat.charAt(0).toUpperCase() + g.cat.slice(1) : 'Otro'),
-      iconD: CATI[g.cat] || CATI.Otro,
-      amtNum: g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), amtMon: 'MXN',
-      amt: 'MXN ' + g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      remove: () => { this.setState({ gastos: this.state.gastos.filter(x => x.id !== g.id) }); if (typeof g.id === 'number') this._sync('plan_gastos.php', { action: 'del', id: g.id }); }
-    }));
+    // La lista enseña LAS DOS fuentes. Un gasto de sitio se distingue por
+    // el nombre del lugar bajo el concepto, y al pulsarlo se abre la
+    // ventana de ESE sitio, no la del libro: es donde se edita de verdad.
+    V.gastoRows = gastosTodos.slice().sort(gastoCmp).map(g => {
+      const esSitio = g.origen === 'sitio';
+      return {
+        k: g.k,
+        // La categoria se guarda en minuscula -es el vocabulario unico que
+        // comparten plan_items y plan_gastos desde la migracion- y se
+        // capitaliza AQUI, al enseñarla. Guardar 'Comida' y 'comida' segun
+        // la tabla es lo que tenia la grafica con barras a cero.
+        c: g.c,
+        sub: (g.fecha || '') + (g.fecha ? ' • ' : '') + (g.cat ? g.cat.charAt(0).toUpperCase() + g.cat.slice(1) : 'Otro')
+             + (esSitio ? ' • del itinerario' : ''),
+        iconD: CATI[g.cat] || CATI.Otro,
+        // El codigo de moneda es el DEL GASTO, no un 'MXN' escrito a mano:
+        // si alguien puso euros en un sitio, aqui se ve que son euros en
+        // vez de enseñarlos como pesos.
+        amtNum: g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        amtMon: g.moneda || 'MXN',
+        amt: (g.moneda || 'MXN') + ' ' + g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        abrir: esSitio ? () => this._gastoAbrir(g.uid) : () => this._gastoSueltoAbrir(this._gastoDelLibro(g.id)),
+        // Un gasto de sitio NO se borra desde aqui: se le quita el importe
+        // en su propia ventana. Borrarlo desde el Presupuesto daria a
+        // entender que desaparece el lugar del itinerario, que no es asi.
+        puedeBorrar: !esSitio,
+        borrarOpac: esSitio ? '0' : '1',
+        borrarEventos: esSitio ? 'none' : 'auto',
+        remove: esSitio ? V.noop : () => {
+          this.setState({ gastos: this.state.gastos.filter(x => x.id !== g.id) });
+          if (typeof g.id === 'number') this._sync('plan_gastos.php', { action: 'del', id: g.id });
+        }
+      };
+    });
 
     // ── Asistente ──
     V.chatSmall = s.chatMode === 'small' && !s.narrow;

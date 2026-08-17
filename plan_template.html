@@ -847,6 +847,12 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
           <p style="margin:0;font-size:34px;font-weight:700;color:#0D1F27;white-space:nowrap"><span class="rn-cifra" style="letter-spacing:-.02em">{{ budTotalNum }}</span> <span style="font-size:27px">{{ budMon }}</span></p>
           <p style="margin:4px 0 0;font-size:12.8px;color:#4a5b64">de <span class="rn-cifra">{{ budLimitNum }}</span> {{ budMon }} presupuestado</p>
           <span style="display:block;height:13px;border-radius:7px;background:#dbe3e9;margin-top:15px;overflow:hidden;max-width:330px"><span style="display:block;height:100%;width:{{ budPct }};background:{{ budBar }};border-radius:7px;transition:width .3s"></span></span>
+          <!-- ⚠ El total suma divisas distintas SIN CONVERTIR. Nada en
+               plan.php convierte, asi que cien euros entrarian como cien
+               pesos. En vez de sumar y callar, se dice. -->
+          <sc-if value="{{ budMezcla }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:10px 0 0;font-size:11.6px;line-height:1.45;color:#8a5b00;background:#FFF6E5;border-left:3px solid #F5B93F;border-radius:5px;padding:8px 11px;max-width:330px">{{ budMezclaTxt }}</p>
+          </sc-if>
           <sc-if value="{{ budEditOff }}" hint-placeholder-val="{{ true }}">
             <button onClick="{{ budEditStart }}" style="display:flex;align-items:center;gap:8px;border:1px solid #c9d5dd;background:#ffffff;border-radius:16px;padding:8px 14px;font-size:12.5px;font-weight:600;color:#0D1F27;cursor:pointer;margin-top:14px;transition:border-color .15s" style-hover="border-color:#0E2A33 !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">
               <svg width="13" height="13" viewBox="0 0 640 640"><path fill="#0D1F27" d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg>
@@ -923,15 +929,22 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
               <span style="width:36px;height:36px;border-radius:50%;background:#E9ECEF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <svg width="16" height="16" viewBox="0 0 640 640"><path fill="#495057" d="{{ g.iconD }}"></path></svg>
               </span>
-              <div style="flex:1;min-width:0">
+              <!-- La fila abre la ventana que le corresponde: la del
+                   propio sitio si el gasto viene del itinerario, y la
+                   del libro si es un gasto suelto. Es donde se edita
+                   de verdad cada uno. -->
+              <button onClick="{{ g.abrir }}" style="flex:1;min-width:0;border:none;background:none;padding:0;cursor:pointer;text-align:left;font-family:inherit" style-focus="outline:2px solid #0E2A33 !important;outline-offset:3px !important">
                 <p style="margin:0;font-size:14px;font-weight:700;color:#0D1F27;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ g.c }}">{{ g.c }}</p>
                 <p style="margin:2px 0 0;font-size:12px;color:#5b6b74">{{ g.sub }}</p>
-              </div>
+              </button>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
                 <span style="font-size:13.8px;font-weight:700;color:#0D1F27">{{ g.amtMon }} <span class="rn-cifra">{{ g.amtNum }}</span></span>
                 <span style="width:16px;height:16px;border-radius:50%;background:#F5B93F;color:#0E2A33;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;overflow:hidden"><sc-if value="{{ userHasFoto }}" hint-placeholder-val="{{ false }}"><img src="{{ userFoto }}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if><sc-if value="{{ userNoFoto }}" hint-placeholder-val="{{ true }}">{{ userInitial }}</sc-if></span>
               </div>
-              <button onClick="{{ g.remove }}" aria-label="Eliminar gasto" title="Eliminar gasto" class="rn-blocktrash" style="position:absolute;right:-34px;top:50%;margin-top:-15px;width:30px;height:30px;border:none;background:none;cursor:pointer;color:#6C757D;border-radius:7px;display:flex;align-items:center;justify-content:center">
+              <!-- Un gasto DEL ITINERARIO no se borra desde aqui: se le
+                   quita el importe en su propia ventana. La papelera aqui
+                   daria a entender que desaparece el lugar del viaje. -->
+              <button onClick="{{ g.remove }}" aria-label="Eliminar gasto" title="Eliminar gasto" class="rn-blocktrash" style="position:absolute;right:-34px;top:50%;margin-top:-15px;width:30px;height:30px;border:none;background:none;cursor:pointer;color:#6C757D;border-radius:7px;display:flex;align-items:center;justify-content:center;opacity:{{ g.borrarOpac }};pointer-events:{{ g.borrarEventos }}">
                 <svg width="15" height="15" viewBox="0 0 640 640"><path fill="currentColor" d="M232.7 69.9C237.1 56.8 249.3 48 263.1 48L377 48C390.8 48 403 56.8 407.4 69.9L416 96L512 96C529.7 96 544 110.3 544 128C544 145.7 529.7 160 512 160L128 160C110.3 160 96 145.7 96 128C96 110.3 110.3 96 128 96L224 96L232.7 69.9zM128 208L512 208L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 208zM216 272C202.7 272 192 282.7 192 296L192 488C192 501.3 202.7 512 216 512C229.3 512 240 501.3 240 488L240 296C240 282.7 229.3 272 216 272zM320 272C306.7 272 296 282.7 296 296L296 488C296 501.3 306.7 512 320 512C333.3 512 344 501.3 344 488L344 296C344 282.7 333.3 272 320 272zM424 272C410.7 272 400 282.7 400 296L400 488C400 501.3 410.7 512 424 512C437.3 512 448 501.3 448 488L448 296C448 282.7 437.3 272 424 272z"></path></svg>
               </button>
             </div>
