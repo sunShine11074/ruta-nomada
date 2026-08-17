@@ -10,6 +10,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/intentos.php';
 require_once __DIR__ . '/includes/email_dominio.php';
+require_once __DIR__ . '/includes/destino.php';
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
     header('Location: inicio.php');
@@ -108,14 +109,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
                             // Cookie de 30 días (simplificado — en producción usa token seguro)
                             setcookie('remember_email', $email, time() + 60 * 60 * 24 * 30, '/', '', true, true);
                         }
-                        // Retorno pendiente (p. ej. una invitación a un plan)
-                        $destino_login = $_SESSION['despues_de_login'] ?? 'inicio.php';
-                        unset($_SESSION['despues_de_login']);
-                        // Solo rutas internas simples (sin esquemas ni //)
-                        if (!preg_match('/^[a-z_]+\.php(\?[a-zA-Z0-9_=&]*)?$/', $destino_login)) {
-                            $destino_login = 'inicio.php';
-                        }
-                        header('Location: ' . $destino_login);
+                        // Retorno pendiente (p. ej. una invitación a un plan).
+                        // La validación vive en includes/destino.php, compartida
+                        // con register.php para que no se separen: la copia que
+                        // estaba aquí rechazaba en silencio los nombres con guion.
+                        header('Location: ' . destinoTrasEntrar());
                         exit;
                     } else {
                         $error_form = 'Correo o contraseña incorrectos. Intenta de nuevo.';

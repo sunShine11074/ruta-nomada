@@ -70,6 +70,29 @@ $contexto = aiPlanContexto($boot);
 // El historial vive en la sesión porque la API de Gemini no guarda
 // estado: hay que reenviar la conversación entera en cada petición.
 // Sólo los últimos turnos, para no pagar el hilo completo cada vez.
+//
+// Va separado por plan —$_SESSION['ai_hist'][$planId]— para que la
+// conversación de un viaje no se cuele en otro. Eso ya estaba bien.
+//
+// LO QUE FALTABA: el historial sobrevivía a que CAMBIARA EL DESTINO del
+// propio viaje. Si alguien creaba un plan a Ensenada, preguntaba por
+// Ensenada y luego cambiaba el destino a Cartagena, el contexto pasaba a
+// decir Cartagena pero la conversación seguía llena de Ensenada, y el
+// modelo hacía caso a la conversación. Reproducido el 14/08/2026: 2 de
+// 4 respuestas seguían recomendando Ensenada y La Bufadora con el
+// contexto ya puesto en Colombia; el modelo hasta se contradecía solo
+// —«tu viaje registrado es a Cartagena, pero preguntas por Ensenada»—.
+//
+// La huella es sólo nombre + destino, NO el itinerario entero: añadir un
+// lugar o mover un día tiene que dejar la conversación intacta, que es
+// justo para lo que sirve. Lo que la invalida es que el viaje pase a ser
+// otro viaje.
+$huella = md5(($boot['plan']['nombre'] ?? '') . '|' . ($boot['plan']['destino'] ?? ''));
+if (($_SESSION['ai_huella'][$planId] ?? null) !== $huella) {
+    unset($_SESSION['ai_hist'][$planId]);
+    $_SESSION['ai_huella'][$planId] = $huella;
+}
+
 $hist = $_SESSION['ai_hist'][$planId] ?? [];
 if (!is_array($hist)) $hist = [];
 $hist = array_slice($hist, -8);

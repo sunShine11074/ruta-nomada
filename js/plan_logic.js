@@ -1,3 +1,36 @@
+// ════ EL PORTAL DE LOS PINES ═══════════════════════════════════
+//
+// Los pines TIENEN que vivir dentro de un panel del mapa, no al lado
+// de el. Es toda la diferencia entre que se queden clavados al hacer
+// zoom y que peguen el tiron que se veia antes:
+//
+//   · Al ARRASTRAR, Maps aplica un transform al div que contiene los
+//     paneles. Lo que este dentro viaja con las teselas en el
+//     compositor, sin layout y sin JavaScript.
+//   · Al hacer ZOOM no hay transform, pero Maps llama a draw() UNA VEZ
+//     POR FOTOGRAMA y getProjection() devuelve una proyeccion
+//     INTERPOLADA, con zoom fraccionario. La sincronia la regala la API.
+//
+// Antes los pines eran HERMANOS de #rnGmap, o sea que estaban fuera de
+// .gm-style y ninguna de las dos cosas les alcanzaba. Se colocaban con
+// Mercator a mano leyendo getZoom(), que ya devuelve el zoom FINAL en
+// el primer fotograma: el pin llegaba a su destino en 30 ms y el suelo
+// bajo el tardaba 250 mas.
+//
+// El runtime dc no trae createPortal, pero monta React 18 de fabrica y
+// window.ReactDOM esta disponible, asi que se usa el de React.
+//
+// EL CONTENEDOR ES NUESTRO, hecho con createElement, y no un nodo que
+// pinte la plantilla. Importa: el sc-if de mapVisible desmonta el panel
+// del mapa, y si el nodo fuera de React intentaria borrarlo de un padre
+// que ya no es el suyo -NotFoundError- y el error boundary del runtime
+// cambiaria el subarbol por un hueco roto. Siendo nuestro, React solo
+// toca sus hijos.
+window.RNPinPortal = function (props) {
+  if (!props || !props.pane || !window.ReactDOM) return null;
+  return window.ReactDOM.createPortal(props.children, props.pane);
+};
+
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -149,9 +182,19 @@ class Component extends DCLogic {
       //             servidor; '' mientras se pide
       //   invCopiado  el boton dice "Copiado" SOLO si la copia salio
       //             bien de verdad (ver _invCopiar)
+      //   invEmail  lo que se esta TECLEANDO, que todavia no es un
+      //             destinatario: se vuelve ficha con Intro o con el
+      //             boton redondo
+      //   invDest   las fichas ya anadidas, o sea a quien se envia
+      //   invMsg    el CUERPO del correo. Ojo con el parecido: el aviso
+      //             de estado es invAviso, y se llamaba invMsg hasta
+      //             que esta pantalla tuvo un mensaje de verdad
+      //   invRes    que paso con cada direccion del ultimo envio
       invModal: false, invPant: 'invitar', invLink: '', invLinkErr: '',
-      invCopiado: false, invEmail: '', invMsg: '', invMsgMal: false,
-      invEnviando: false,
+      invCopiado: false, invEmail: '', invAviso: '', invAvisoMal: false,
+      invEnviando: false, invDest: [], invMsg: '', invRes: [],
+      // Concepto del gasto SUELTO (el que no cuelga de un sitio)
+      gConcepto: '',
       // El latido (fase 3 de PLAN_colaboracion.md).
       //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
       pulsoCaido: false, presentes: [],
@@ -232,14 +275,51 @@ class Component extends DCLogic {
     const DL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const ML = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const MA = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
-    const COLS = ['#41A24D', '#6F42C1', '#1E86D8', '#E8365D', '#E7AD00', '#12808C', '#8e44ad'];
+    // UN COLOR POR DIA, del 1 al 30, elegidos por el diseño. Antes eran
+    // SIETE en ciclo, asi que el dia 8 repetia el del 1 y el color dejaba
+    // de identificar el dia. Ahora hay tantos como dias permite la regla
+    // (1 a 30, ver planRangoError en includes/plan_auth.php), asi que no
+    // se repite ninguno.
+    //
+    // Pintan el pin del mapa Y la ruta de ese dia: las dos salen de
+    // DAYS[di].color. El numero del pin va en blanco, asi que TODOS pasan
+    // 3.1:1 contra #FFFFFF; el mas justo es 3.13:1 y el mas holgado 11.5:1.
+    //
+    // NO TOQUES UNO SUELTO SIN MEDIR. Los 30 estan tan separados como cabe:
+    // en 435 parejas la distancia perceptiva (dE2000) mas corta es 8.6, y
+    // solo baja de 11.7 en esa. El techo teorico para 30 colores vivos que
+    // pasen 3.1:1 es 15.8, o sea que aqui ya casi no queda sitio: cualquier
+    // color nuevo cae encima de alguno de los otros 29.
+    const COLS = [
+      '#F850AA', '#518FFC', '#2DA800', '#FF0033', '#A352FF',   // dias 1-5
+      '#214ECC', '#E47200', '#008647', '#FF4082', '#9F9400',   // dias 6-10
+      '#002A9E', '#EA6B4B', '#00674B', '#FF00FF', '#874A2B',   // dias 11-15
+      '#009CD5', '#A47300', '#00A489', '#7700FF', '#CC3000',   // dias 16-20
+      '#005F8F', '#CC216B', '#1F6800', '#69009E', '#00A1AD',   // dias 21-25
+      '#9E002A', '#008376', '#CC00CC', '#5269FF', '#9E198C'   // dias 26-30
+    ];
+
+    // Tope de dias del viaje. La regla de verdad NO esta aqui: vive en el
+    // servidor (planRangoError, includes/plan_auth.php) y en la base (la
+    // restriccion chk_planes_dias), asi que un plan de mas de 30 dias ya no
+    // puede ni guardarse. Esto queda de red de seguridad para los planes
+    // creados ANTES de la regla, que si podian pasarse.
+    //
+    // Antes este 30 era el UNICO limite que existia, y truncaba en silencio:
+    // un viaje de 40 dias se guardaba entero en la base y aqui se dibujaban
+    // 30. Los dias 31 a 40 existian para la base y no para la persona.
+    //
+    // Que sean 30 y no otro numero sale de COLS, la linea de arriba: hay
+    // exactamente 30, uno por dia. El % de mas abajo ya no da la vuelta
+    // nunca, pero se queda por si algun dia la lista se acorta.
+    const DIAS_MAX = 30;
     const parse = (x) => { if (!x || x === '0000-00-00') return null; const a = String(x).split('-'); return a.length === 3 && +a[0] ? new Date(+a[0], +a[1] - 1, +a[2]) : null; };
     const out = [];
     const d0 = parse(fi); let d1 = parse(ff);
     if (d0) {
       if (!d1 || d1 < d0) d1 = d0;
       const cur = new Date(d0);
-      while (cur <= d1 && out.length < 30) {
+      while (cur <= d1 && out.length < DIAS_MAX) {
         out.push({
           label: DS[cur.getDay()] + '. ' + cur.getDate() + '/' + (cur.getMonth() + 1),
           num: String(cur.getDate()), mes: MA[cur.getMonth()],
@@ -598,9 +678,9 @@ class Component extends DCLogic {
       if (!this.state.avisoRecarga) this.setState({ avisoTxt: '' });
     }, 4500);
 
-    // Los pines son un overlay propio calculado con MERC(), asi que
-    // recolocarlos es todo lo que hace falta para que el mapa quede al
-    // dia. Nada de Google Maps se toca.
+    // Los pines viven en un panel del mapa; aqui solo hay que pedir que
+    // se recoloquen, porque el CONJUNTO acaba de cambiar. Nada de Google
+    // Maps se toca.
     this._reproject();
   }
 
@@ -668,7 +748,13 @@ class Component extends DCLogic {
   }
   _mapearGastos(B) {
     return (B.gastos || []).map((g, i) => ({
-      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0, cat: g.categoria || 'Otro',
+      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0,
+      // 'otro' en MINUSCULA: es el vocabulario unico que comparten
+      // plan_items y plan_gastos desde la migracion. Aqui ponia 'Otro'
+      // capitalizado, del enum viejo, y ya no casaria con nada.
+      cat: g.categoria || 'otro',
+      moneda: g.moneda || 'MXN', desc: g.descripcion || '', modo: g.modo || 'no',
+      reparto: (g.reparto || []).map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })),
       fecha: this._fmtDia(g.fecha), fiso: g.fecha || '', ts: ((B.gastos || []).length - i)
     }));
   }
@@ -700,11 +786,33 @@ class Component extends DCLogic {
   //   screens_ref/Invita a companeros de viaje*.png
   //   medidas y decisiones en Reportes_md/PLAN_invitar.md
 
+  // El texto que sale ya escrito al abrir, el del frame. Con una
+  // correccion: el frame dice "nuestro proxima aventura" y aqui va
+  // "nuestra". Es una errata, y esto sale por correo a gente de fuera.
+  //
+  // Se repone ENTERO en cada apertura y NO se guarda en ningun sitio.
+  // Guardarlo pediria una columna nueva y abre preguntas que el frame
+  // no contesta: si es por plan o por persona, y que hacer si alguien
+  // lo deja vacio. Se puede anadir despues sin deshacer nada de esto.
+  static get INV_MSG_DEF() {
+    return '¡Consulta mi itinerario en Ruta Nómada! Podemos colaborar en tiempo '
+         + 'real y planificar los sitios que visitaremos en nuestros días de viaje, '
+         + 'así como planear nuestros gastos, definir nuestro presupuesto y tiempos '
+         + 'de estancia. ¡Planifiquemos nuestra próxima aventura!';
+  }
+  // Los mismos dos topes que el servidor: PLAN_INV_MSG_MAX en
+  // includes/plan_invite_lib.php e INVITAR_DESTINOS_MAX en
+  // api/plan_invitar.php. Aqui solo sirven para avisar ANTES de mandar;
+  // quien decide es el servidor, que es el unico que no se puede saltar.
+  static get INV_MSG_MAX() { return 1000; }
+  static get INV_DEST_MAX() { return 10; }
+
   _invAbrir() {
     this._invVolverA = document.activeElement;
     this.setState({
       invModal: true, invPant: 'invitar', invCopiado: false,
-      invEmail: '', invMsg: '', invMsgMal: false, invEnviando: false
+      invEmail: '', invAviso: '', invAvisoMal: false, invEnviando: false,
+      invDest: [], invRes: [], invMsg: Component.INV_MSG_DEF
     });
     this._invPedirEnlace();
     // Se espera al repintado del runtime antes de buscar el boton.
@@ -778,34 +886,128 @@ class Component extends DCLogic {
     } catch (e) { return false; }
   }
 
+  // Anade lo que se esta tecleando como ficha. Lo llaman Intro y el
+  // boton redondo, que hacen lo mismo a proposito: el boton es la
+  // pista visual para quien no adivina que Intro sirve.
+  //
+  // OJO, ESTO CAMBIA UNA COSTUMBRE: antes Intro ENVIABA, porque el
+  // campo no tenia boton. Ahora Intro anade y solo envia el boton
+  // azul. Ctrl+Intro se deja como atajo para quien tenga el dedo
+  // hecho al de antes.
+  //
+  // Valida aqui ademas de en el servidor porque una direccion mal
+  // escrita no puede esperar al envio: para entonces ya hay otras
+  // cuatro buenas en la lista y el aviso llega tarde.
+  _invAddDest() {
+    const e = (this.state.invEmail || '').trim();
+    if (!e) return;
+    const dest = this.state.invDest || [];
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) {
+      this.setState({ invAviso: 'Ese correo no parece válido.', invAvisoMal: true });
+      return;
+    }
+    // Sin distinguir mayusculas: para el servidor de correo Ana@ y
+    // ana@ son la misma persona y recibiria el mensaje dos veces.
+    if (dest.some(d => d.toLowerCase() === e.toLowerCase())) {
+      this.setState({ invEmail: '', invAviso: 'Esa dirección ya está en la lista.', invAvisoMal: true });
+      return;
+    }
+    if (dest.length >= Component.INV_DEST_MAX) {
+      this.setState({ invAviso: 'Como mucho ' + Component.INV_DEST_MAX + ' personas por envío.', invAvisoMal: true });
+      return;
+    }
+    this.setState({ invDest: dest.concat([e]), invEmail: '', invAviso: '', invAvisoMal: false, invRes: [] });
+  }
+
+  // Lo que hace el boton redondo: HABILITAR EL CAMPO para escribir la
+  // siguiente direccion. No es lo mismo que _invAddDest, y la
+  // diferencia importa.
+  //
+  // En el frame el campo aparece con su texto de ayuda y ya hay una
+  // ficha debajo, asi que el boton no significa "mete lo que hay
+  // escrito", significa "quiero anadir a otra persona": lleva el cursor
+  // al campo y a escribir.
+  //
+  // Aun asi, si quedaba algo tecleado sin convertir en ficha, primero
+  // se convierte. Si no, pulsar + con una direccion a medias la
+  // perderia de vista sin decir nada, y el cursor acabaria encima de un
+  // texto que el usuario cree que ya conto. Intro sigue siendo la otra
+  // forma de cerrar la ficha.
+  _invAddOtro() {
+    if ((this.state.invEmail || '').trim() !== '') this._invAddDest();
+    setTimeout(() => {
+      const c = document.querySelector('[role="dialog"][data-inv="1"]');
+      const i = c && c.querySelector('input[type="email"]');
+      if (i) i.focus();
+    }, 0);
+  }
+
+  _invQuitarDest(email) {
+    this.setState({
+      invDest: (this.state.invDest || []).filter(d => d !== email),
+      invAviso: '', invAvisoMal: false, invRes: []
+    });
+  }
+
+  // Manda la lista ENTERA en una peticion, no una por ficha, para que
+  // el tope por hora se compruebe una sola vez con el lote completo:
+  // de una en una, cinco direcciones podrian mandar tres y toparse a
+  // mitad, dejando el envio hecho a medias.
   _invEnviar() {
-    const email = (this.state.invEmail || '').trim();
-    if (!email || this.state.invEnviando || !this.PLAN_ID) return;
-    this.setState({ invEnviando: true, invMsg: '', invMsgMal: false });
+    // Lo que quedo escrito sin pulsar Intro tambien cuenta. Si no,
+    // teclear una direccion y darle a Enviar no manda nada, que es
+    // justo lo que haria cualquiera la primera vez.
+    const suelto = (this.state.invEmail || '').trim();
+    const dest = (this.state.invDest || []).slice();
+    if (suelto && !dest.some(d => d.toLowerCase() === suelto.toLowerCase())) dest.push(suelto);
+
+    if (!dest.length || this.state.invEnviando || !this.PLAN_ID) return;
+    this.setState({ invEnviando: true, invAviso: '', invAvisoMal: false, invRes: [] });
     fetch('api/plan_invitar.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
-      body: JSON.stringify({ plan_id: this.PLAN_ID, action: 'correo', email: email, rol: 'editor' })
+      body: JSON.stringify({
+        plan_id: this.PLAN_ID, action: 'correo', emails: dest,
+        mensaje: (this.state.invMsg || '').slice(0, Component.INV_MSG_MAX), rol: 'editor'
+      })
     })
       .then(r => r.json())
       .then(j => {
         if (!j || !j.ok) {
-          this.setState({ invEnviando: false, invMsg: (j && j.error) || 'No se pudo invitar.', invMsgMal: true });
+          this.setState({ invEnviando: false, invAviso: (j && j.error) || 'No se pudo invitar.', invAvisoMal: true });
           return;
         }
+        const res     = j.resultados || [];
+        const ok      = res.filter(r => r.estado === 'enviado');
+        const creadas = res.filter(r => r.estado === 'creado');
+        const malas   = res.filter(r => r.estado === 'error');
+
+        // Solo se van de la lista las que salieron. Las que fallaron SE
+        // QUEDAN como ficha, con su motivo al lado: borrarlas obligaria
+        // a teclearlas otra vez para reintentar.
+        const quedan = malas.map(r => r.email);
+
         // Se dice la verdad. includes/mail_config.php esta en
         // .gitignore, asi que en las maquinas de los companeros el
         // envio falla siempre: anunciar "enviada" seria mentir, y la
         // persona se quedaria esperando un correo que no existe.
+        let aviso = '';
+        if (ok.length) aviso = ok.length === 1
+          ? ('Invitación enviada a ' + ok[0].email)
+          : ('Invitaciones enviadas a ' + ok.length + ' personas.');
+        if (creadas.length) {
+          aviso += (aviso ? ' ' : '')
+            + (creadas.length === 1 ? 'Una invitación quedó creada' : creadas.length + ' invitaciones quedaron creadas')
+            + ', pero el correo no salió: pásales el enlace de arriba.';
+        }
+        if (!aviso && malas.length) aviso = 'No se pudo invitar a nadie.';
+
         this.setState({
-          invEnviando: false, invEmail: '',
-          invMsg: j.correo_enviado
-            ? ('Invitación enviada a ' + email)
-            : 'La invitación quedó creada, pero el correo no salió. Pásale el enlace de arriba.',
-          invMsgMal: !j.correo_enviado
+          invEnviando: false, invDest: quedan, invEmail: '', invRes: res,
+          invAviso: aviso, invAvisoMal: !ok.length
         });
       })
-      .catch(() => this.setState({ invEnviando: false, invMsg: 'No se pudo invitar. Inténtalo de nuevo.', invMsgMal: true }));
+      .catch(() => this.setState({ invEnviando: false, invAviso: 'No se pudo invitar. Inténtalo de nuevo.', invAvisoMal: true }));
   }
 
   // ── Gestionar companeros ────────────────────────────────
@@ -818,13 +1020,13 @@ class Component extends DCLogic {
     })
       .then(r => r.json())
       .then(j => {
-        if (!j || !j.ok) { this.setState({ invMsg: (j && j.error) || 'No se pudo quitar.', invMsgMal: true }); return; }
+        if (!j || !j.ok) { this.setState({ invAviso: (j && j.error) || 'No se pudo quitar.', invAvisoMal: true }); return; }
         this.MIEMBROS = this._mapMiembros(j.miembros);
         // MIEMBROS no es estado, asi que hace falta un setState para
         // que el runtime repinte la lista y los avatares de arriba.
-        this.setState({ invMsg: '', invMsgMal: false });
+        this.setState({ invAviso: '', invAvisoMal: false });
       })
-      .catch(() => this.setState({ invMsg: 'No se pudo quitar. Inténtalo de nuevo.', invMsgMal: true }));
+      .catch(() => this.setState({ invAviso: 'No se pudo quitar. Inténtalo de nuevo.', invAvisoMal: true }));
   }
 
   // ── Fotos propias: listar, subir y borrar ────────────────
@@ -1141,20 +1343,43 @@ class Component extends DCLogic {
     window.__plMap = this._map;                          // handle de depuración
     window.__plDiag = { init: Date.now(), reproj: 0, proj: null, pins: 0 };
     const comp = this;
-    // El OverlayView solo sirve de disparador extra de redibujo; la
-    // proyección se calcula con Mercator puro (no depende de que Maps
-    // complete su primer ciclo de pintado)
+    // El OverlayView ya NO es un disparador de redibujo: es quien aloja
+    // los pines y quien los coloca. Ver el comentario de RNPinPortal,
+    // arriba del todo, para el porqué.
     class Proyector extends google.maps.OverlayView {
-      onAdd() {} onRemove() {}
-      draw() { comp._reproject(); }
+      onAdd() {
+        // overlayMouseTarget es el único panel documentado que recibe
+        // eventos del DOM (panel 3). Los pines llevan onClick, onMouseEnter
+        // y onMouseLeave, así que tiene que ser ése y no markerLayer.
+        //
+        // El contenedor se reutiliza entre montajes: _ensureMap() rehace
+        // el mapa al volver a la pantalla y aquí sólo hay que recolgarlo.
+        if (!comp._pinPane) {
+          const d = document.createElement('div');
+          // Los paneles miden 0 de alto y 100% de ancho, así que todo lo
+          // que cuelgue de ellos ha de ir en posición absoluta.
+          d.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0';
+          comp._pinPane = d;
+        }
+        this.getPanes().overlayMouseTarget.appendChild(comp._pinPane);
+        // Sin esto, un clic en un pin dispara TAMBIÉN el clic del mapa.
+        google.maps.OverlayView.preventMapHitsFrom(comp._pinPane);
+        // Ahora que el destino existe, que React monte el portal.
+        comp.setState({ _pinTick: (comp.state._pinTick || 0) + 1 });
+      }
+      onRemove() {
+        const d = comp._pinPane;
+        if (d && d.parentNode) d.parentNode.removeChild(d);
+      }
+      // Maps llama aquí una vez por fotograma durante el zoom. La
+      // documentación avisa de no hacer trabajo caro en este método, así
+      // que _colocarPines() sólo lee la proyección y escribe transform:
+      // ni setState, ni reconstruir listas, ni tocar el layout.
+      draw() { comp._colocarPines(this.getProjection()); }
     }
     this._proy = new Proyector();
     this._proy.setMap(this._map);
-    this._map.addListener('bounds_changed', () => this._reproject());
-    this._map.addListener('center_changed', () => this._reproject());
-    this._map.addListener('zoom_changed', () => this._reproject());
-    this._map.addListener('drag', () => this._reproject());
-    setTimeout(() => this._reproject(), 400);
+    window.__plProy = this._proy;   // handle de depuracion, como window.__plMap
     if (!prev && !hasLL && B.plan && B.plan.destino) {
       new google.maps.Geocoder().geocode({ address: B.plan.destino }, (res, st) => {
         if (st === 'OK' && res[0]) {
@@ -1328,43 +1553,68 @@ class Component extends DCLogic {
     });
     return out;
   }
+  // Coloca cada pin leyendo la proyección VIVA del mapa. Corre una vez
+  // por fotograma mientras dura el zoom, así que no puede hacer nada
+  // caro: ni setState, ni recorrer listas de estado, ni leer geometría
+  // que fuerce al navegador a recalcular el layout.
+  //
+  // Escribe `transform` y no `left`/`top` a propósito: transform lo
+  // resuelve el compositor, mientras que left y top son propiedades de
+  // layout y obligarían a rehacerlo 60 veces por segundo.
+  //
+  // Las coordenadas salen de fromLatLngToDivPixel(), que las devuelve en
+  // el sistema del PANEL —no del contenedor del mapa—. Es justo lo que
+  // hace falta: mientras se arrastra, ese sistema se mueve con las
+  // teselas y el valor no cambia, así que no hay nada que recalcular.
+  _colocarPines(proj) {
+    const pane = this._pinPane;
+    if (!pane || !proj) return;
+    const nodos = pane.querySelectorAll('[data-pin]');
+    if (!nodos.length) return;
+    // Pines EXACTAMENTE en la misma coordenada: se abren en abanico para
+    // que no se tapen. Antes la comparación era por píxel redondeado, lo
+    // que a 60 fotogramas por segundo hacía que un pin saltara 8 px de
+    // lado en cuanto el zoom lo juntaba o lo separaba de otro. Con la
+    // coordenada como clave el abanico es estable a cualquier zoom.
+    const vistos = {};
+    for (let i = 0; i < nodos.length; i++) {
+      const n = nodos[i];
+      const lat = +n.getAttribute('data-lat');
+      const lng = +n.getAttribute('data-lng');
+      if (!isFinite(lat) || !isFinite(lng)) continue;
+      const p = proj.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+      if (!p) continue;
+      const k = lat + ',' + lng;
+      let dx = 0;
+      if (vistos[k]) { dx = 8 * vistos[k]; vistos[k]++; } else vistos[k] = 1;
+      // El translate(-50%,-100%) del final es el ancla del pin: la punta
+      // abajo y centrada. Antes estaba en el style de la plantilla; ahora
+      // va aquí porque esta línea escribe el transform entero.
+      n.style.transform = 'translate(' + (p.x + dx) + 'px,' + p.y + 'px) translate(-50%,-100%)';
+    }
+    if (window.__plDiag) { window.__plDiag.reproj++; window.__plDiag.pins = nodos.length; window.__plDiag.proj = true; }
+  }
+
+  // Recolocar a mano. Maps sólo llama a draw() cuando el mapa se mueve,
+  // así que un pin RECIÉN AÑADIDO —al meter un lugar, encender una capa
+  // o buscar en el mapa— nace sin transform y se quedaría en la esquina
+  // superior izquierda hasta que alguien arrastrara. De ahí que los
+  // nueve sitios que cambian el CONJUNTO de pines sigan llamando aquí.
+  //
+  // Conserva el nombre de antes a propósito: esos nueve puntos no tienen
+  // por qué enterarse de que la proyección cambió de manos. Lo que ya no
+  // hace es calcular posiciones ni tocar el estado.
+  //
+  // Va dentro de un requestAnimationFrame porque quien llama suele venir
+  // de un setState y los nodos nuevos todavía no están en el DOM.
   _reproject() {
     if (this._rafPend) return;
     this._rafPend = true;
-    const run = () => {
-      if (!this._rafPend) return;   // ya corrió (rAF o timeout, el primero gana)
+    requestAnimationFrame(() => {
       this._rafPend = false;
-      if (!this._map || !this._mapNode) return;
-      // Mercator puro: px = (mundo(punto) − mundo(centro)) · 2^zoom + centroDelDiv
-      const MERC = (lat, lng) => {
-        const siny = Math.min(Math.max(Math.sin(lat * Math.PI / 180), -0.9999), 0.9999);
-        return { x: 256 * (0.5 + lng / 360), y: 256 * (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) };
-      };
-      const c = this._map.getCenter();
-      if (!c) return;
-      const scale = Math.pow(2, this._map.getZoom());
-      const cw = this._mapNode.offsetWidth / 2, ch = this._mapNode.offsetHeight / 2;
-      if (!cw || !ch) return;
-      const wc = MERC(c.lat(), c.lng());
-      if (window.__plDiag) { window.__plDiag.reproj++; window.__plDiag.proj = true; window.__plDiag.pins = this._pinList().length; }
-      const px = {}; const seen = {};
-      for (const p of this._pinList()) {
-        const wp = MERC(p.lat, p.lng);
-        let x = Math.round((wp.x - wc.x) * scale + cw);
-        let y = Math.round((wp.y - wc.y) * scale + ch);
-        if (x < -60 || y < -60 || x > cw * 2 + 60 || y > ch * 2 + 60) continue;   // fuera de vista
-        const key = x + ',' + y;                          // pines en la misma coordenada
-        if (seen[key]) { x += 8 * seen[key]; seen[key]++; } else seen[key] = 1;
-        px[p.id] = { left: x, top: y };
-      }
-      const prev = this._pinPx || {};
-      const kn = Object.keys(px), kp = Object.keys(prev);
-      const same = kn.length === kp.length && kn.every(k => prev[k] && prev[k].left === px[k].left && prev[k].top === px[k].top);
-      this._pinPx = px;
-      if (!same) this.setState({ _pinTick: (this.state._pinTick || 0) + 1 });
-    };
-    requestAnimationFrame(run);
-    setTimeout(run, 120);   // respaldo: pestañas en 2º plano o paneles sin composición
+      if (!this._proy || !this._proy.getProjection) return;
+      this._colocarPines(this._proy.getProjection());
+    });
   }
   // ════ Rutas del itinerario ════════════════════════════════════
   //  Una polilínea por TRAMO (par de lugares consecutivos), no una por
@@ -1372,13 +1622,20 @@ class Component extends DCLogic {
   //  reordenar, los tramos que no cambiaron conserven su geometría en
   //  vez de recalcularse enteros.
   //
-  //  Se usa google.maps.Polyline y no un SVG propio a pesar de que los
-  //  pines van con proyección casera: la Polyline no depende de
-  //  getProjection() (que es lo que fallaba con los pines), y además
-  //  vive por debajo de ellos, así que nunca tapa un número.
-  //  ⚠ Esto se sostiene mientras el mapa siga siendo ráster. Si algún
-  //  día se le pone un mapId, pasa a vectorial con inclinación y giro,
-  //  y MERC() —que no conoce el ángulo de cámara— dejaría de cuadrar.
+  //  Se usa google.maps.Polyline y no un SVG propio. Desde que los pines
+  //  se mudaron a un panel del mapa, ambos cuelgan del MISMO contenedor
+  //  que Google transforma, asi que van sincronizados por construcción.
+  //  Antes no: las rutas iban pegadas a las teselas y los pines no, y al
+  //  hacer zoom los números se despegaban de sus propias líneas.
+  //
+  //  ⚠ AVISO CORREGIDO. Aqui ponia que anadir un mapId pasaria el mapa a
+  //  vectorial con inclinación y giro. Es falso, y se comprobó: mapId y
+  //  renderingType son ejes independientes, y con mapId y sin
+  //  renderingType el mapa sigue siendo ráster con tilt 0. El único
+  //  efecto real de un mapId es que se apaga la propiedad `styles`, que
+  //  este proyecto no usa. Lo que SÍ hay que saber: AdvancedMarkerElement
+  //  exige mapId, y google.maps.Marker (js/mis_planes.js) está deprecado
+  //  desde febrero de 2024. Esa migración es otra conversación.
 
   _rutaEstilo(color, firme) {
     // Firme = geometría real o recta conocida. No firme = provisional o
@@ -2054,6 +2311,90 @@ class Component extends DCLogic {
       cb(d);
     });
   }
+  // ════ "Saber antes de ir": cuatro consejos ════════════════════
+  //  Cascada de dos niveles, como la del "Acerca de" de aqui arriba:
+  //    1. Gemini, si PLAN_TIPS_IA esta encendido
+  //    2. Plantilla determinista en el servidor, que siempre responde
+  //
+  //  ⚠ NO SE MANDA NADA DE GOOGLE. Ni el nombre del negocio, ni las
+  //  resenas, ni la valoracion, ni los horarios. El porque esta escrito
+  //  entero en la cabecera de api/plan_tips.php, y en dos lineas es:
+  //  los terminos de Maps prohiben usar su contenido para entrenar
+  //  modelos, y la capa gratuita de Gemini entrena con los prompts.
+  //
+  //  De ahi que los consejos sean del TIPO de sitio y de la ciudad, no
+  //  del negocio. Se pierde punteria a cambio de no pisar los terminos.
+  //
+  //  El resultado se guarda en `d.tips`, o sea en memoria y por ficha
+  //  abierta. NO va a la base: un consejo derivado de datos del viaje
+  //  no tiene por que persistir, y asi tampoco hay que preguntarse
+  //  cuanto tiempo se puede guardar.
+  _tipsDe(d, cb) {
+    if (d.tips) { cb(d.tips); return; }
+    const fin = (r) => { d.tips = r; cb(r); };
+    if (!this.PLAN_ID) { fin(null); return; }
+    const TOPE = 4;
+
+    // ── Nivel 1: los atributos del propio negocio ──
+    // Estos SI hablan del sitio concreto, y son datos, no redaccion.
+    // Van primero porque un "solo aceptan efectivo" verdadero vale mas
+    // que cuatro consejos bien escritos sobre la ciudad.
+    this._placeNuevo(d.gpid || '', (q) => {
+      const propios = this._tipsAtributos(q).slice(0, TOPE);
+      if (propios.length >= TOPE) { fin({ lista: propios, fuente: 'atributos' }); return; }
+
+      // ── Niveles 2 y 3: se COMPLETA, no se sustituye ──
+      // Si Google solo sabe dos cosas del sitio, se enseñan esas dos y
+      // se rellena hasta cuatro con consejos del destino. Asi la seccion
+      // siempre tiene el mismo tamaño y lo especifico va arriba.
+      // this.META.destino y NO window.PLAN_BOOT: el destino se puede
+      // cambiar despues de cargar la pagina, y META es el que se pone al
+      // dia con el cambio (ver donde se rehace META al fusionar). Es el
+      // mismo motivo por el que el asistente tuvo que aprender a tirar su
+      // historial cuando cambia el destino.
+      //
+      // ⚠ AQUI PONIA this.BOOT.plan.destino, QUE NO EXISTE. La clase
+      // nunca guardo el boot en this.BOOT: lo lee de window.PLAN_BOOT y
+      // reparte en META, DAYS y compania. Asi que la ciudad viajaba
+      // SIEMPRE vacia, y sin ciudad el modelo se inventaba el pais: en
+      // planes de Atenas y de Madrid salia «lleva efectivo en pesos
+      // mexicanos». No dio error en ningun sitio, solo consejos malos.
+      const dest = String((this.META && this.META.destino) || '');
+      fetch('api/plan_tips.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+        body: JSON.stringify({
+          plan_id: this.PLAN_ID,
+          categoria: d.cat || 'custom',
+          ciudad: dest,
+          // El extracto de Wikipedia es CC BY-SA, asi que este SI se puede
+          // mandar sin reparos. Solo existe para monumentos; para un
+          // restaurante llega vacio y los consejos salen mas genericos.
+          wiki: (d.acerca && d.acerca.fuente === 'wiki') ? d.acerca.texto : '',
+          nota: d.nota || '',
+          ia: !!window.PLAN_TIPS_IA,
+          // Cuantos faltan. El servidor manda cuatro igual y aqui se
+          // recorta: pedirle "dame dos" a un modelo sale peor que pedirle
+          // cuatro y quedarse con las que hagan falta.
+          faltan: TOPE - propios.length
+        })
+      })
+        .then(r => r.json())
+        .then(j => {
+          const extra = (j && j.ok && j.consejos) ? j.consejos : [];
+          const lista = propios.concat(extra).slice(0, TOPE);
+          if (!lista.length) { fin(null); return; }
+          // La procedencia es la de lo MENOS fiable que se enseña: si hay
+          // una sola linea escrita por un modelo, el aviso tiene que
+          // decirlo aunque las otras tres sean datos de Google.
+          const fuente = !extra.length ? 'atributos'
+                       : (propios.length ? 'mixto' : (j.fuente || 'plantilla'));
+          fin({ lista: lista, fuente: fuente, propios: propios.length });
+        })
+        .catch(() => fin(propios.length ? { lista: propios, fuente: 'atributos', propios: propios.length } : null));
+    });
+  }
+
   // ════ "Acerca de": cascada de tres niveles ════════════════════
   //  La librería legacy de Places NO tiene ningún campo de descripción
   //  (editorial_summary no existe en PlaceResult y no lo van a añadir),
@@ -2076,34 +2417,156 @@ class Component extends DCLogic {
     });
   }
 
-  // ── Nivel 1: editorialSummary (Places API New) ──
-  _acercaGoogle(pid, cb) {
-    // Interruptor desde plan.php: el nivel 1 se cobra aparte y sólo trae
-    // 1,000 llamadas gratis al mes, así que conviene poder apagarlo.
+  // ── Una sola llamada a Places (New) para todo lo que sale de ahi ──
+  //
+  // De aqui salen DOS cosas: el editorialSummary del "Acerca de" y los
+  // atributos del negocio de "Saber antes de ir". Van juntos A
+  // PROPOSITO, y no es por ahorrarse una linea:
+  //
+  // Places (New) cobra POR PETICION, al escalon mas alto de los campos
+  // que pidas. editorialSummary ya esta en Enterprise + Atmosphere, que
+  // es el mas caro, asi que meter en la MISMA llamada los atributos
+  // -que son de ese mismo escalon- no abre ningun cobro nuevo. En dos
+  // llamadas separadas se pagaria dos veces por lo mismo.
+  //
+  // Por eso tambien comparten el interruptor PLAN_ACERCA_GOOGLE: si se
+  // apaga para no gastar, se apagan los dos.
+  static get PLACE_CAMPOS() {
+    return [
+      'editorialSummary', 'editorialSummaryLanguageCode',
+      // Los que de verdad cambian lo que haces antes de ir
+      'paymentOptions', 'parkingOptions', 'accessibilityOptions', 'isReservable',
+      // Comodidad y con quien vas
+      'hasOutdoorSeating', 'isGoodForChildren', 'hasMenuForChildren', 'isGoodForGroups',
+      'allowsDogs', 'hasRestroom', 'hasLiveMusic',
+      // Que se puede comer
+      'servesVegetarianFood', 'servesBreakfast', 'servesBrunch', 'servesDinner',
+      'hasTakeout', 'hasDelivery'
+    ];
+  }
+  _placeNuevo(pid, cb) {
+    if (!this._pnCache) { this._pnCache = {}; this._pnEspera = {}; }
+    if (Object.prototype.hasOwnProperty.call(this._pnCache, pid)) { cb(this._pnCache[pid]); return; }
+    // Dos peticiones a la vez para el mismo sitio pagarian dos veces. El
+    // "Acerca de" y los consejos se piden casi al mismo tiempo, asi que
+    // esto no es teorico: el segundo se engancha al primero.
+    if (this._pnEspera[pid]) { this._pnEspera[pid].push(cb); return; }
     if (!window.PLAN_ACERCA_GOOGLE) { cb(null); return; }
     if (!window.google || !google.maps || !google.maps.importLibrary) { cb(null); return; }
-    let listo = false;
-    const una = (v) => { if (!listo) { listo = true; cb(v); } };
+    this._pnEspera[pid] = [cb];
+    const fin = (q) => {
+      this._pnCache[pid] = q;
+      const cola = this._pnEspera[pid] || [];
+      delete this._pnEspera[pid];
+      cola.forEach(f => { try { f(q); } catch (e) { } });
+    };
     google.maps.importLibrary('places').then((lib) => {
       const Place = (lib && lib.Place) || (google.maps.places && google.maps.places.Place);
-      if (!Place) { una(null); return; }
-      // La clase nueva convive con PlacesService: no hay que migrar nada más.
+      if (!Place) { fin(null); return; }
+      // La clase nueva convive con PlacesService: no hay que migrar nada mas.
       const p = new Place({ id: pid, requestedLanguage: 'es', requestedRegion: 'MX' });
-      return p.fetchFields({ fields: ['editorialSummary', 'editorialSummaryLanguageCode'] })
-        .then((res) => {
-          const q = (res && res.place) || p;
-          const txt = q.editorialSummary ? String(q.editorialSummary).trim() : '';
-          const idi = String(q.editorialSummaryLanguageCode || '').slice(0, 2);
-          // Google prohíbe alterar este texto, así que tampoco se puede
-          // traducir: si no llega en español, se baja de nivel.
-          if (!txt || (idi && idi !== 'es')) { una(null); return; }
-          una({ texto: txt, fuente: 'google' });
+      return p.fetchFields({ fields: Component.PLACE_CAMPOS })
+        .then((res) => fin((res && res.place) || p))
+        .catch((e) => {
+          // Si UN nombre de campo no le gusta, fetchFields tira la
+          // llamada ENTERA y nos quedariamos tambien sin el "Acerca de",
+          // que llevaba meses funcionando. Asi que se reintenta con los
+          // dos campos de siempre y los consejos se caen al siguiente
+          // nivel, en vez de llevarse por delante una funcion que ya iba.
+          console.warn('[plan] atributos no disponibles, reintento sin ellos:', e && e.message);
+          return p.fetchFields({ fields: ['editorialSummary', 'editorialSummaryLanguageCode'] })
+            .then((res) => fin((res && res.place) || p))
+            .catch(() => fin(null));
         });
     }).catch((e) => {
-      // Lo más probable: falta habilitar "Places API (New)" en Cloud.
-      console.warn('[plan] editorialSummary no disponible:', e && e.message);
-      una(null);
+      // Lo mas probable: falta habilitar "Places API (New)" en Cloud.
+      console.warn('[plan] Places (New) no disponible:', e && e.message);
+      fin(null);
     });
+  }
+
+  // ── Nivel 1 del "Acerca de": editorialSummary ──
+  _acercaGoogle(pid, cb) {
+    this._placeNuevo(pid, (q) => {
+      if (!q) { cb(null); return; }
+      const txt = q.editorialSummary ? String(q.editorialSummary).trim() : '';
+      const idi = String(q.editorialSummaryLanguageCode || '').slice(0, 2);
+      // Google prohibe alterar este texto, asi que tampoco se puede
+      // traducir: si no llega en español, se baja de nivel.
+      if (!txt || (idi && idi !== 'es')) { cb(null); return; }
+      cb({ texto: txt, fuente: 'google' });
+    });
+  }
+
+  // ── Consejos sacados de los ATRIBUTOS del propio negocio ──
+  //
+  // Esto es lo unico de toda la seccion que habla del sitio CONCRETO, y
+  // ademas es lo mas fiable: son datos de Places convertidos a frases,
+  // sin IA por medio. Nada que inventar.
+  //
+  // Y esquiva el problema de los terminos por donde no duele: lo que
+  // prohiben es usar contenido de Maps para ENTRENAR modelos. Aqui no
+  // hay modelo ninguno. Enseñar datos de Places dentro de la aplicacion
+  // es exactamente para lo que sirve la licencia.
+  //
+  // ⚠ LOS NOMBRES NO SON LOS DE LA DOCUMENTACION REST. La clase Place
+  // de JavaScript les pone prefijo: donde la doc dice `reservable`,
+  // `outdoorSeating` o `freeParkingLot`, aqui hay que escribir
+  // `isReservable`, `hasOutdoorSeating` y `hasFreeParkingLot`. Con el
+  // nombre de la doc, fetchFields tira la llamada ENTERA con "Unknown
+  // fields requested"; y en los objetos anidados no falla, simplemente
+  // devuelve undefined y el consejo no sale nunca. Comprobado contra la
+  // API con los sitios reales del plan.
+  //
+  // Ojo tambien con Object.keys() sobre paymentOptions y compania: da
+  // los nombres MINIFICADOS (qh, sh, rh). Los documentados funcionan
+  // igual porque son getters del prototipo; solo no se ven al listar.
+  //
+  // ⚠ SIN DATO NO SE DICE NADA. Los booleanos de Places son opcionales:
+  // que no venga `reservable` NO significa que no acepte reservas,
+  // significa que Google no lo sabe. Por eso todo se compara con === true
+  // o === false y nunca con un simple if: escribir "no acepta reservas"
+  // porque el campo no vino seria mentir con cara de dato.
+  _tipsAtributos(q) {
+    if (!q) return [];
+    const L = [];
+    const si = (v) => v === true, no = (v) => v === false;
+    const pa = q.paymentOptions || {}, pk = q.parkingOptions || {}, ac = q.accessibilityOptions || {};
+
+    // 1) Lo que te obliga a hacer algo ANTES de salir de casa.
+    if (si(pa.acceptsCashOnly)) L.push('Sólo aceptan efectivo: pasa por un cajero antes de ir.');
+    else if (no(pa.acceptsCreditCards)) L.push('No aceptan tarjeta de crédito: lleva efectivo.');
+    else if (si(pa.acceptsCreditCards)) L.push('Aceptan tarjeta, así que no hace falta que lleves efectivo.');
+
+    if (si(q.isReservable)) L.push('Acepta reservas: si vais en grupo, reserva antes.');
+    else if (no(q.isReservable)) L.push('No acepta reservas: llega pronto si quieres sitio.');
+
+    if (si(pk.hasFreeParkingLot)) L.push('Tiene estacionamiento propio y gratuito.');
+    else if (si(pk.hasPaidParkingLot) || si(pk.hasPaidGarageParking)) L.push('El estacionamiento es de pago; calcula ese gasto aparte.');
+    else if (si(pk.hasValetParking)) L.push('Hay servicio de valet parking.');
+    else if (si(pk.hasFreeStreetParking)) L.push('Se puede estacionar gratis en la calle.');
+
+    // 2) Accesibilidad. Va arriba a propósito: para quien la necesita no
+    //    es un detalle simpático, es lo que decide si puede ir o no.
+    if (si(ac.hasWheelchairAccessibleEntrance)) L.push('La entrada es accesible en silla de ruedas.');
+    else if (no(ac.hasWheelchairAccessibleEntrance)) L.push('La entrada NO es accesible en silla de ruedas.');
+
+    // 3) Con quién vas.
+    if (si(q.isGoodForChildren) || si(q.hasMenuForChildren)) {
+      L.push(si(q.hasMenuForChildren) ? 'Buen sitio para ir con niños: tienen menú infantil.' : 'Es un sitio adecuado para ir con niños.');
+    }
+    if (si(q.isGoodForGroups)) L.push('Admite grupos grandes sin problema.');
+    if (si(q.allowsDogs)) L.push('Se puede entrar con perro.');
+
+    // 4) Cómo es el sitio.
+    if (si(q.hasOutdoorSeating)) L.push('Tiene mesas al aire libre, además del comedor de dentro.');
+    if (si(q.servesVegetarianFood)) L.push('Hay opciones vegetarianas en la carta.');
+    if (si(q.hasLiveMusic)) L.push('A veces hay música en vivo; puede haber más ruido de lo normal.');
+    if (si(q.servesBreakfast) || si(q.servesBrunch)) L.push('Sirven desayuno, así que también funciona para empezar el día.');
+    if (si(q.hasTakeout) || si(q.hasDelivery)) L.push('Se puede pedir para llevar si no te cuadra la hora.');
+    if (no(q.hasRestroom)) L.push('No tiene baños para clientes.');
+
+    return L;
   }
 
   // ── Nivel 2: Wikipedia, sólo para lugares que suelen tener artículo ──
@@ -2398,6 +2861,108 @@ class Component extends DCLogic {
     this._horaCerrar();
   }
 
+  // ════ LOS GASTOS DEL VIAJE, DE LAS DOS FUENTES ════════════════
+  //
+  // Hasta ahora el Presupuesto sumaba SOLO plan_gastos y no veia lo que
+  // se asignaba a los lugares del itinerario. Eran dos sistemas
+  // paralelos que no se hablaban: en un plan con 1.170 repartidos entre
+  // dos personas, la barra pintaba 0,00.
+  //
+  //   libro  → plan_gastos, gastos sueltos del viaje
+  //   sitio  → plan_items.precio, lo que cuesta un lugar del itinerario
+  //
+  // Los dos vuelven de aqui con la MISMA forma para que el total, el
+  // desglose y la lista no tengan que saber de donde salio cada uno.
+  //
+  // La clave `k` lleva prefijo porque los ids se repiten entre las dos
+  // tablas: el gasto 3 del libro y el item 3 del itinerario existen a la
+  // vez, y sin prefijo React reusaria el nodo de uno para el otro.
+  _gastosDelPlan() {
+    const s = this.state;
+    const out = [];
+    (s.gastos || []).forEach(g => {
+      const m = Number(g.m) || 0;
+      if (m <= 0) return;
+      out.push({
+        k: 'l' + g.id, origen: 'libro', id: g.id, c: g.c, m: m,
+        cat: g.cat || 'otro', moneda: g.moneda || 'MXN',
+        reparto: g.reparto || [],
+        fecha: g.fecha || '', fiso: g.fiso || '', ts: g.ts || 0
+      });
+    });
+    (s.dayItems || []).forEach((arr, di) => (arr || []).forEach(it => {
+      const m = Number(it.costo) || 0;
+      if (m <= 0) return;
+      const d = (this.DAYS || [])[di];
+      out.push({
+        k: 's' + it.uid, origen: 'sitio', uid: it.uid, c: it.name, m: m,
+        cat: it.gastoCat || 'otro', moneda: it.moneda || 'MXN',
+        reparto: it.reparto || [],
+        fecha: d && d.iso ? this._fmtDia(d.iso) : '', fiso: (d && d.iso) || '',
+        dia: di, ts: 0
+      });
+    }));
+    return out;
+  }
+
+  // ⚠ SUMAR MONEDAS DISTINTAS DA UN NUMERO SIN SIGNIFICADO.
+  // Cada gasto guarda su divisa y NADA convierte entre ellas: cien euros
+  // entrarian al total como cien pesos. Hoy no se nota porque todo esta
+  // en MXN, pero el fallo esta latente esperando a quien toque el
+  // selector de divisa de la ventana.
+  //
+  // Asi que en vez de sumar y callar, se avisa. Devuelve la lista de
+  // divisas distintas que hay; si trae mas de una, la pantalla lo dice.
+  // Devuelve el gasto del libro tal cual lo guarda el estado, para
+  // volver a abrirlo en la ventana con sus campos rellenos.
+  // ── Cuanto le toca a cada quien ─────────────────────────────
+  //
+  // La infraestructura del reparto estaba entera desde hace tiempo
+  // —plan_item_gasto para los lugares, plan_gasto_reparto para los
+  // sueltos— pero NADIE sumaba por persona. Se sabia repartir UN gasto y
+  // no habia forma de ver el total de cada uno.
+  //
+  // Un gasto SIN filas de reparto no es de nadie: va a «Sin repartir».
+  // Es lo que pasa con modo='no', que es el valor por defecto, y con los
+  // gastos de antes de que existiera la ventana. Meterlos a partes
+  // iguales entre todos seria inventarse un dato que nadie escribio.
+  //
+  // Se devuelven TODOS los miembros, tambien los que no deben nada: un
+  // cero explicito dice «no le toca» y una ausencia no dice nada.
+  _porPersona(lista) {
+    const suma = {};
+    (this.MIEMBROS || []).forEach(m => { suma[m.uid] = 0; });
+    let sinRepartir = 0;
+    lista.forEach(g => {
+      const rep = (g.reparto || []).filter(r => Number(r.monto) > 0);
+      if (!rep.length) { sinRepartir += g.m; return; }
+      let cubierto = 0;
+      rep.forEach(r => {
+        const u = Number(r.uid), v = Number(r.monto) || 0;
+        if (suma[u] === undefined) suma[u] = 0;   // repartido a alguien que ya no es miembro
+        suma[u] += v; cubierto += v;
+      });
+      // Si el reparto no cubre el importe entero —pasa si se edito el
+      // total y no las partes—, la diferencia no se reparte a la fuerza:
+      // se queda sin asignar y el usuario ve que algo no cuadra.
+      const resto = Math.round((g.m - cubierto) * 100) / 100;
+      if (resto > 0) sinRepartir += resto;
+    });
+    const filas = (this.MIEMBROS || []).map(m => ({
+      label: (m.nombre || 'Sin nombre').split(' ')[0], v: suma[m.uid] || 0
+    }));
+    if (sinRepartir > 0.004) filas.push({ label: 'Sin repartir', v: sinRepartir });
+    return filas;
+  }
+
+  _gastoDelLibro(id) { return (this.state.gastos || []).find(g => g.id === id) || null; }
+
+  _monedasEnUso(lista) {
+    const set = {};
+    lista.forEach(g => { set[g.moneda || 'MXN'] = 1; });
+    return Object.keys(set);
+  }
+
   // ── Gasto ──
   _gastoAbrir(uid) {
     const ref = this._itemPorUid(uid);
@@ -2414,6 +2979,35 @@ class Component extends DCLogic {
       gMonOpen: false, gCatOpen: false, gModoOpen: false, gDonaOpen: true, gColorUid: null
     });
   }
+  // ── Un gasto que NO cuelga de ningun sitio ──────────────────
+  //
+  // La misma ventana que se abre desde la tarjeta de un lugar, pero
+  // desde el boton «+ Añadir gasto» de Presupuesto. Antes ese boton
+  // desplegaba un formulario en linea aparte —concepto, monto y una
+  // categoria de siete— que no era el que queria el diseño.
+  //
+  // La diferencia esta en donde acaba el dato:
+  //    con sitio  -> plan_items + plan_item_gasto
+  //    suelto     -> plan_gastos + plan_gasto_reparto
+  //
+  // Y en que el suelto pide CONCEPTO. Con sitio, el nombre del gasto es
+  // el del lugar; sin sitio no hay nada que ponerle, y
+  // plan_gastos.concepto es NOT NULL. Por eso la ventana enseña un
+  // campo mas, y solo en este caso.
+  _gastoSueltoAbrir(g) {
+    const rep = {};
+    ((g && g.reparto) || []).forEach(r => { rep[r.uid] = { monto: r.monto, color: r.color || '' }; });
+    this.setState({
+      gastoMenu: { suelto: true, id: (g && g.id) || null },
+      gConcepto: (g && g.c) || '',
+      gMonto: (g && g.m > 0) ? String(g.m) : '',
+      gMoneda: (g && g.moneda) || 'MXN',
+      gCat: (g && g.cat) || '', gDesc: (g && g.desc) || '',
+      gModo: (g && g.modo) || 'no', gRep: rep,
+      gMonOpen: false, gCatOpen: false, gModoOpen: false, gDonaOpen: true, gColorUid: null
+    });
+  }
+
   _gastoCerrar() { this.setState({ gastoMenu: null, gMonOpen: false, gCatOpen: false, gModoOpen: false, gColorUid: null }); }
   _gastoNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; }
   // Reparte a partes iguales dejando el sobrante en el primero: 100
@@ -2461,9 +3055,48 @@ class Component extends DCLogic {
     const m = this.state.gastoMenu;
     if (!m) return;
     const s = this.state;
-    const ref = this._itemPorUid(m.uid);
     const total = this._gastoNum(s.gMonto);
     const reparto = Object.keys(s.gRep).map(u => ({ usuario_id: Number(u), monto: s.gRep[u].monto, color: s.gRep[u].color }));
+
+    // ── Gasto SUELTO: va al libro, no a un sitio ──────────────
+    if (m.suelto) {
+      // El concepto es obligatorio en la base. Si no lo escribieron, se
+      // usa el nombre de la categoria antes que rechazar el guardado:
+      // el usuario ya puso importe y reparto, tirarle el trabajo por un
+      // titulo seria peor que ponerle uno razonable.
+      const cat = this._gcats().find(c => c.v === s.gCat);
+      const concepto = (s.gConcepto || '').trim() || (cat ? cat.t : 'Gasto');
+      if (total <= 0) { this._gastoCerrar(); return; }
+      const g = {
+        id: m.id || ('tmp' + Date.now()), c: concepto, m: total, cat: s.gCat || 'otro',
+        moneda: s.gMoneda, desc: s.gDesc, modo: s.gModo,
+        reparto: reparto.map(r => ({ uid: r.usuario_id, monto: r.monto, color: r.color })),
+        fecha: (new Date()).toISOString().slice(0, 10)
+      };
+      const nuevo = m.id
+        ? (this.state.gastos || []).map(x => x.id === m.id ? { ...x, ...g } : x)
+        : [...(this.state.gastos || []), g];
+      this.setState({ gastos: nuevo });
+      // _sync lleva CALLBACK, no promesa. Es el mismo patron que usaba
+      // el formulario en linea al que esto reemplaza (ver el historial
+      // de plan_gastos.php): el id de verdad sustituye al provisional
+      // cuando contesta el servidor.
+      this._sync('plan_gastos.php', {
+        action: m.id ? 'update' : 'add', id: m.id || undefined,
+        concepto: concepto, monto: total, categoria: s.gCat || 'otro',
+        moneda: s.gMoneda, descripcion: s.gDesc, modo: s.gModo,
+        reparto: reparto, fecha: g.fecha
+      }, (j) => {
+        if (j && j.id && !m.id) {
+          this.setState({ gastos: this.state.gastos.map(x => x.id === g.id ? { ...x, id: Number(j.id) } : x) });
+        }
+      });
+      this._gastoCerrar();
+      return;
+    }
+
+    // ── Gasto de un SITIO: como siempre ───────────────────────
+    const ref = this._itemPorUid(m.uid);
     this._parcheaItem(m.uid, {
       costo: total, moneda: s.gMoneda, gastoCat: s.gCat, gastoDesc: s.gDesc, gastoModo: s.gModo,
       reparto: reparto.map(r => ({ uid: r.usuario_id, monto: r.monto, color: r.color }))
@@ -2653,7 +3286,7 @@ class Component extends DCLogic {
       // otra ventana: Escape retrocede a la de invitar antes de
       // cerrar, igual que hace el menu de gasto con sus desplegables.
       if (s.invModal) {
-        if (s.invPant === 'gestiona') { this.setState({ invPant: 'invitar', invMsg: '', invMsgMal: false }); return; }
+        if (s.invPant === 'gestiona') { this.setState({ invPant: 'invitar', invAviso: '', invAvisoMal: false }); return; }
         this._invCerrar(); return;
       }
       if (s.gastoMenu) {
@@ -2859,6 +3492,12 @@ class Component extends DCLogic {
 
     // ── Gasto del lugar ──
     V.gastoOn = !!s.gastoMenu;
+    // El gasto SUELTO enseña un campo mas -«Concepto»- porque sin sitio
+    // no hay de donde sacarle nombre, y plan_gastos.concepto es NOT NULL.
+    V.gastoEsSuelto = !!(s.gastoMenu && s.gastoMenu.suelto);
+    V.gastoConcepto = s.gConcepto || '';
+    V.gastoConceptoChange = (e) => this.setState({ gConcepto: e.target.value });
+    V.gastoSueltoAbrir = () => this._gastoSueltoAbrir(null);
     V.gastoClose = () => this._gastoCerrar();
     const mon = Component.MONEDAS.find(m => m.c === s.gMoneda) || Component.MONEDAS[0];
     V.gastoMonSim = mon.s;
@@ -2908,6 +3547,11 @@ class Component extends DCLogic {
       const on = !!s.gRep[m.uid];
       return {
         nombre: m.nombre, inicial: m.inicial,
+        // La foto de perfil. Los miembros SIEMPRE la han traido en
+        // MIEMBROS; esta fila era la unica que se quedaba con la
+        // inicial pudiendo enseñar la cara, que es lo que ayuda a
+        // repartir sin equivocarse de persona.
+        hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || '',
         editable: !soloYo, conImporte: !soloYo,
         on: on, boxBd: on ? '#E7AD00' : '#ADB5BD', boxBg: on ? '#E7AD00' : '#ffffff',
         col: (soloYo || on) ? '#212529' : '#8b969d',
@@ -3538,8 +4182,8 @@ class Component extends DCLogic {
     V.invEsInvitar  = s.invPant !== 'gestiona';
     V.invEsGestiona = s.invPant === 'gestiona';
     V.invTitulo = V.invEsGestiona ? 'Gestiona compañeros de viaje' : 'Invita a compañeros de viaje';
-    V.invGestiona = () => this.setState({ invPant: 'gestiona', invMsg: '', invMsgMal: false });
-    V.invVolver   = () => this.setState({ invPant: 'invitar', invMsg: '', invMsgMal: false });
+    V.invGestiona = () => this.setState({ invPant: 'gestiona', invAviso: '', invAvisoMal: false });
+    V.invVolver   = () => this.setState({ invPant: 'invitar', invAviso: '', invAvisoMal: false });
 
     // Tres estados para la ranura del enlace: pidiendolo, error, o la
     // URL. El texto se corta con puntos suspensivos por CSS, como en
@@ -3556,10 +4200,73 @@ class Component extends DCLogic {
 
     V.invEmail = s.invEmail || '';
     V.invEmailCambia = (e) => this.setState({ invEmail: e.target.value });
-    V.invEmailTecla = (e) => { if (e.key === 'Enter') { e.preventDefault(); this._invEnviar(); } };
-    V.invHayMsg = !!s.invMsg;
+    // Intro ANADE, no envia. Es un cambio respecto a como estaba, donde
+    // el campo no tenia boton y Intro era la unica forma de mandar. Se
+    // deja Ctrl+Intro enviando para quien ya tuviera el dedo hecho.
+    V.invEmailTecla = (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) this._invEnviar(); else this._invAddDest();
+    };
+    V.invHayAviso = !!s.invAviso;
+    V.invAviso = s.invAviso || '';
+    V.invAvisoColor = s.invAvisoMal ? '#C0392B' : '#2E7D32';
+
+    // ── Los destinatarios, en fichas ─────────────────────────
+    // El motivo del ultimo envio viaja PEGADO a la ficha y no en el
+    // aviso de abajo: con cinco direcciones, "una falló" no dice cual.
+    const fallos = {};
+    (s.invRes || []).forEach(r => { if (r.estado === 'error') fallos[r.email] = r.motivo || 'No se pudo.'; });
+    const dest = s.invDest || [];
+    V.invHayDest = dest.length > 0;
+    V.invDestVM = dest.map(email => ({
+      email: email,
+      mal: !!fallos[email],
+      // El borde rojo tiene que ser visible sin depender del color, asi
+      // que el motivo va tambien en el title y en el aria-label.
+      borde: fallos[email] ? '#C0392B' : '#E1E4E8',
+      tinta: fallos[email] ? '#C0392B' : '#6C757D',
+      motivo: fallos[email] || '',
+      titulo: fallos[email] ? (email + ' — ' + fallos[email]) : email,
+      quitar: () => this._invQuitarDest(email)
+    }));
+    V.invAddDest = () => this._invAddOtro();
+    // El boton redondo se apaga al llegar al tope, en vez de dejar
+    // pulsar y contestar con un error.
+    V.invAddPuede = dest.length < Component.INV_DEST_MAX;
+    V.invAddOpac  = dest.length < Component.INV_DEST_MAX ? '1' : '.4';
+    V.invAddCursor = dest.length < Component.INV_DEST_MAX ? 'pointer' : 'default';
+
+    // ── El mensaje del correo ────────────────────────────────
+    // Siempre editable: el lapiz es la pista visual, no un interruptor.
+    // Un interruptor anadiria un estado y una pulsacion mas sin dar
+    // nada a cambio, porque quien quiere cambiar el texto hace clic en
+    // el texto.
     V.invMsg = s.invMsg || '';
-    V.invMsgColor = s.invMsgMal ? '#C0392B' : '#2E7D32';
+    V.invMsgCambia = (e) => this.setState({ invMsg: e.target.value.slice(0, Component.INV_MSG_MAX) });
+    V.invMsgMax = Component.INV_MSG_MAX;
+    // El lapiz lleva el cursor al final del texto, que es donde se
+    // suele querer escribir.
+    V.invMsgFoco = () => {
+      const t = document.querySelector('[role="dialog"][data-inv="1"] textarea[data-inv-msg]');
+      if (!t) return;
+      t.focus();
+      t.setSelectionRange(t.value.length, t.value.length);
+    };
+
+    V.invEnviar = () => this._invEnviar();
+    V.invEnviarTxt = s.invEnviando ? 'Enviando…' : 'Enviar correo electrónico';
+    // Hay algo que mandar si hay fichas O si queda algo escrito sin
+    // convertir en ficha, que es el caso de quien teclea y pulsa
+    // Enviar directamente.
+    //
+    // El boton NO lleva `disabled`: se apaga de color y _invEnviar()
+    // vuelve solo si no hay nada. Asi sigue recibiendo el foco del
+    // teclado, que es lo que permite descubrir que existe; un boton
+    // deshabilitado se salta al tabular y desaparece del recorrido.
+    const puede = (dest.length > 0 || (s.invEmail || '').trim() !== '') && !s.invEnviando;
+    V.invEnviarBg = puede ? '#3F52E3' : '#AFB6E9';
+    V.invEnviarCursor = puede ? 'pointer' : 'default';
 
     // La lista de la segunda pantalla. El propietario NO lleva aspa:
     // quitarlo dejaria el viaje sin dueno, y planes.usuario_id y
@@ -3871,18 +4578,40 @@ class Component extends DCLogic {
 
     // ── Presupuesto ──
     const CATC = { Alojamiento: '#8e44ad', Comida: '#d97706', Actividades: '#41A24D', Gasolina: '#E7AD00', Transporte: '#1E86D8', Compras: '#e02424', Otro: '#6b7a83' };
-    const CATI = {
-      Alojamiento: 'M64 96C81.7 96 96 110.3 96 128L96 352L320 352L320 224C320 206.3 334.3 192 352 192L512 192C565 192 608 235 608 288L608 512C608 529.7 593.7 544 576 544C558.3 544 544 529.7 544 512L544 448L96 448L96 512C96 529.7 81.7 544 64 544C46.3 544 32 529.7 32 512L32 128C32 110.3 46.3 96 64 96zM144 256C144 220.7 172.7 192 208 192C243.3 192 272 220.7 272 256C272 291.3 243.3 320 208 320C172.7 320 144 291.3 144 256z',
-      Comida: 'M127.9 78.4C127.1 70.2 120.2 64 112 64C103.8 64 96.9 70.2 96 78.3L81.9 213.7C80.6 219.7 80 225.8 80 231.9C80 277.8 115.1 315.5 160 319.6L160 544C160 561.7 174.3 576 192 576C209.7 576 224 561.7 224 544L224 319.6C268.9 315.5 304 277.8 304 231.9C304 225.8 303.4 219.7 302.1 213.7L287.9 78.3C287.1 70.2 280.2 64 272 64C263.8 64 256.9 70.2 256.1 78.4L242.5 213.9C241.9 219.6 237.1 224 231.4 224C225.6 224 220.8 219.6 220.2 213.8L207.9 78.6C207.2 70.3 200.3 64 192 64C183.7 64 176.8 70.3 176.1 78.6L163.8 213.8C163.3 219.6 158.4 224 152.6 224C146.8 224 142 219.6 141.5 213.9L127.9 78.4zM512 64C496 64 384 96 384 240L384 352C384 387.3 412.7 416 448 416L480 416L480 544C480 561.7 494.3 576 512 576C529.7 576 544 561.7 544 544L544 96C544 78.3 529.7 64 512 64z',
-      Actividades: 'M335.9 84.2C326.1 78.6 314 78.6 304.1 84.2L80.1 212.2C67.5 219.4 61.3 234.2 65 248.2C68.7 262.2 81.5 272 96 272L128 272L128 480L128 480L76.8 518.4C68.7 524.4 64 533.9 64 544C64 561.7 78.3 576 96 576L544 576C561.7 576 576 561.7 576 544C576 533.9 571.3 524.4 563.2 518.4L512 480L512 272L544 272C558.5 272 571.2 262.2 574.9 248.2C578.6 234.2 572.4 219.4 559.8 212.2L335.8 84.2zM464 272L464 480L400 480L400 272L464 272zM352 272L352 480L288 480L288 272L352 272zM240 272L240 480L176 480L176 272L240 272zM320 160C337.7 160 352 174.3 352 192C352 209.7 337.7 224 320 224C302.3 224 288 209.7 288 192C288 174.3 302.3 160 320 160z',
-      Gasolina: 'M96 128C96 92.7 124.7 64 160 64L320 64C355.3 64 384 92.7 384 128L384 320L392 320C440.6 320 480 359.4 480 408L480 440C480 453.3 490.7 464 504 464C517.3 464 528 453.3 528 440L528 286C500.4 278.9 480 253.8 480 224L480 164.5L454.2 136.2C445.3 126.4 446 111.2 455.8 102.3C465.6 93.4 480.8 94.1 489.7 103.9L561.4 182.7C570.8 193 576 206.4 576 220.4L576 440C576 479.8 543.8 512 504 512C464.2 512 432 479.8 432 440L432 408C432 385.9 414.1 368 392 368L384 368L384 529.4C393.3 532.7 400 541.6 400 552C400 565.3 389.3 576 376 576L104 576C90.7 576 80 565.3 80 552C80 541.5 86.7 532.7 96 529.4L96 128zM160 144L160 240C160 248.8 167.2 256 176 256L304 256C312.8 256 320 248.8 320 240L320 144C320 135.2 312.8 128 304 128L176 128C167.2 128 160 135.2 160 144z',
-      Transporte: 'M96 128C96 92.7 124.7 64 160 64L320 64C355.3 64 384 92.7 384 128L384 352C428.2 352 464 387.8 464 432L464 444C464 455 473 464 484 464C495 464 504 455 504 444L504 316.3C471.5 306.1 448 275.8 448 240L448 208C448 199.2 455.2 192 464 192L480 192L480 144C480 135.2 487.2 128 496 128C504.8 128 512 135.2 512 144L512 192L544 192L544 144C544 135.2 551.2 128 560 128C568.8 128 576 135.2 576 144L576 192L592 192C600.8 192 608 199.2 608 208L608 240C608 275.8 584.5 306.1 552 316.3L552 444C552 481.6 521.6 512 484 512C446.4 512 416 481.6 416 444L416 432C416 414.3 401.7 400 384 400L384 529.4C393.3 532.7 400 541.6 400 552C400 565.3 389.3 576 376 576L104 576C90.7 576 80 565.3 80 552C80 541.5 86.7 532.7 96 529.4L96 128zM178.7 253.7L217.7 253.7L196.8 320.6C194.4 328.2 200.1 336 208.1 336C211 336 213.7 335 215.9 333.1L310.5 251.1C313.6 248.4 315.4 244.5 315.4 240.4C315.4 232.6 309.1 226.3 301.3 226.3L262.3 226.3L283.2 159.4C285.6 151.8 279.9 144 271.9 144C269 144 266.3 145 264.1 146.9L169.5 228.9C166.4 231.6 164.6 235.5 164.6 239.6C164.6 247.4 170.9 253.7 178.7 253.7z',
-      Compras: 'M256 144C256 108.7 284.7 80 320 80C355.3 80 384 108.7 384 144L384 192L256 192L256 144zM208 192L144 192C117.5 192 96 213.5 96 240L96 448C96 501 139 544 192 544L448 544C501 544 544 501 544 448L544 240C544 213.5 522.5 192 496 192L432 192L432 144C432 82.1 381.9 32 320 32C258.1 32 208 82.1 208 144L208 192zM232 240C245.3 240 256 250.7 256 264C256 277.3 245.3 288 232 288C218.7 288 208 277.3 208 264C208 250.7 218.7 240 232 240zM384 264C384 250.7 394.7 240 408 240C421.3 240 432 250.7 432 264C432 277.3 421.3 288 408 288C394.7 288 384 277.3 384 264z',
-      Otro: 'M296 88C296 74.7 306.7 64 320 64C333.3 64 344 74.7 344 88L344 128L400 128C417.7 128 432 142.3 432 160C432 177.7 417.7 192 400 192L285.1 192C260.2 192 240 212.2 240 237.1C240 259.6 256.5 278.6 278.7 281.8L370.3 294.9C424.1 302.6 464 348.6 464 402.9C464 463.2 415.1 512 354.9 512L344 512L344 552C344 565.3 333.3 576 320 576C306.7 576 296 565.3 296 552L296 512L224 512C206.3 512 192 497.7 192 480C192 462.3 206.3 448 224 448L354.9 448C379.8 448 400 427.8 400 402.9C400 380.4 383.5 361.4 361.3 358.2L269.7 345.1C215.9 337.5 176 291.4 176 237.1C176 176.9 224.9 128 285.1 128L296 128L296 88z'
-    };
-    const moneyMXN = (v, dec) => v.toLocaleString('es-MX', { minimumFractionDigits: dec === undefined ? 2 : dec, maximumFractionDigits: dec === undefined ? 2 : dec }) + ' MXN';
+    // ⚠ LOS ICONOS SALEN DE _gcats(), la misma lista que usa la
+    // ventana. Aqui habia un objeto CATI aparte con SIETE claves
+    // capitalizadas —Alojamiento, Comida, Actividades…— y desde que
+    // las categorias se guardan como slug en minuscula NINGUNA
+    // casaba: todos los gastos salian con el icono de «Otro».
+    // Ahora hay una sola lista para el icono, la etiqueta y el
+    // guardado, con las doce que puede elegir el usuario.
+    const CATS = this._gcats();
+    const catDe = (k) => CATS.find(c => c.v === k) || CATS[CATS.length - 1];
+    const etiCat = (k) => catDe(k).t;
+    const soloNum = (v, dec) => v.toLocaleString('es-MX', { minimumFractionDigits: dec === undefined ? 2 : dec, maximumFractionDigits: dec === undefined ? 2 : dec });
+    const moneyMXN = (v, dec) => soloNum(v, dec) + ' MXN';
+    // AQUI SE CONECTAN LOS DOS SISTEMAS. Antes esta linea recorria solo
+    // s.gastos —el libro— y por eso los precios de los lugares del
+    // itinerario no aparecian en ninguna parte del Presupuesto.
+    const gastosTodos = this._gastosDelPlan();
     let total = 0; const catSum = {};
-    for (const g of s.gastos) { total += g.m; catSum[g.cat] = (catSum[g.cat] || 0) + g.m; }
+    for (const g of gastosTodos) { total += g.m; catSum[g.cat] = (catSum[g.cat] || 0) + g.m; }
+    // Si hay mas de una divisa, el total no significa nada: no se
+    // convierte en ningun sitio. Se avisa en vez de sumar y callar.
+    const divisas = this._monedasEnUso(gastosTodos);
+    V.budMezcla = divisas.length > 1;
+    V.budMezclaTxt = divisas.length > 1
+      ? ('Hay gastos en ' + divisas.join(', ') + '. El total los suma sin convertir, asi que no es fiable.')
+      : '';
+    // LOS DIGITOS VAN APARTE DEL CODIGO DE MONEDA. Google Sans Code es
+    // monoespaciada —se eligio justo por eso, para que una columna de
+    // importes quede alineada por la coma— pero eso mismo hace que un
+    // «MXN» dentro de la fuente ocupe tres anchos de digito y se despegue
+    // del numero. La plantilla pone la clase rn-cifra solo en el numero.
+    V.budTotalNum = soloNum(total);
+    V.budLimitNum = soloNum(s.budget, 0);
+    V.budMon = 'MXN';
+    // Los de siempre se quedan: los usa el resumen para imprimir.
     V.budTotal = moneyMXN(total);
     V.budLimit = moneyMXN(s.budget, 0);
     V.budPct = Math.min(100, (total / s.budget) * 100).toFixed(1) + '%';
@@ -3959,20 +4688,35 @@ class Component extends DCLogic {
       }
       else this.setState(tplReset);
     };
-    const isCat = (s.desgTab || 'cat') === 'cat';
-    V.desgIsCat = isCat; V.desgIsDia = !isCat;
-    const tabSt = (on) => ({ bg: on ? '#ffffff' : 'transparent', bd: on ? '#DEE2E6' : 'transparent', w: on ? 700 : 500 });
-    const t1 = tabSt(isCat), t2 = tabSt(!isCat);
-    V.desgCatBg = t1.bg; V.desgCatBd = t1.bd; V.desgCatW = t1.w;
-    V.desgDiaBg = t2.bg; V.desgDiaBd = t2.bd; V.desgDiaW = t2.w;
+    // TRES pestañas, no dos. El codigo de antes tenia isCat/!isCat por
+    // todas partes; con una tercera eso ya no vale, asi que se compara
+    // contra el nombre de la pestaña activa.
+    const tab = s.desgTab || 'cat';
+    V.desgIsCat = tab === 'cat'; V.desgIsDia = tab === 'dia'; V.desgIsPer = tab === 'per';
+    // La pastilla activa es BLANCA CON SOMBRA sobre un carril gris, no
+    // una caja con borde. Medido sobre el frame: carril #F3F4F5 con 3 px
+    // de holgura, y la pastilla sin borde ninguno.
+    const tabSt = (on) => ({ bg: on ? '#ffffff' : 'transparent', sh: on ? '0 1px 3px rgba(13,31,39,.14)' : 'none', w: on ? 600 : 500 });
+    const t1 = tabSt(tab === 'cat'), t2 = tabSt(tab === 'dia'), t3 = tabSt(tab === 'per');
+    V.desgCatBg = t1.bg; V.desgCatSh = t1.sh; V.desgCatW = t1.w;
+    V.desgDiaBg = t2.bg; V.desgDiaSh = t2.sh; V.desgDiaW = t2.w;
+    V.desgPerBg = t3.bg; V.desgPerSh = t3.sh; V.desgPerW = t3.w;
     V.desgCatGo = () => this.setState({ desgTab: 'cat' });
     V.desgDiaGo = () => this.setState({ desgTab: 'dia' });
+    V.desgPerGo = () => this.setState({ desgTab: 'per' });
     let desgData;
-    if (isCat) {
-      desgData = ['Vuelos', 'Alquiler de coches', 'Transporte', 'Bebidas', 'Comestibles', 'Turismo', 'Gasolina', 'Compras', 'Actividades', 'Comida', 'Alojamiento', 'Otro'].map(c => ({ label: c, v: catSum[c] || 0 }));
+    if (tab === 'per') {
+      desgData = this._porPersona(gastosTodos);
+    } else if (tab === 'cat') {
+      // EL EJE SALE DE _gcats(), la lista que usa la ventana. Antes era
+      // una lista escrita a mano —Vuelos, Comestibles, Turismo, Alquiler
+      // de coches…— que NO casaba ni con la ventana ni con el enum de la
+      // base: eran TRES vocabularios y la mitad de las barras no podian
+      // valer nunca mas que cero. Ahora hay uno solo.
+      desgData = this._gcats().map(c => ({ label: c.t, v: catSum[c.v] || 0 }));
     } else {
       const byDay = {};
-      for (const g of s.gastos) { const f = g.fecha || ''; byDay[f] = (byDay[f] || 0) + g.m; }
+      for (const g of gastosTodos) { const f = g.fecha || ''; byDay[f] = (byDay[f] || 0) + g.m; }
       const dated = this.DAYS.filter(d => d.iso);
       if (dated.length) {
         desgData = dated.map(d => { const a = d.iso.split('-'); return { label: (+a[2]) + '/' + (+a[1]), v: byDay[this._fmtDia(d.iso)] || 0 }; });
@@ -3987,13 +4731,30 @@ class Component extends DCLogic {
       }
     }
     const desgMax = Math.max(2000, Math.ceil(Math.max(1, ...desgData.map(r => r.v)) / 2000) * 2000);
-    const fmtAx = (n) => 'MX$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // ⚠ LAS CIFRAS DEL EJE VAN DESNUDAS. Antes llevaban «MX$» pegado
+    // delante y ademas escrito a mano, asi que un plan en euros seguia
+    // diciendo MX$. En el frame el eje son numeros y punto; la moneda se
+    // dice UNA vez, en el globo de la barra.
+    const fmtAx = (n) => soloNum(n);
+    // Y la del globo es la del plan, no una escrita a mano. Si hay gastos
+    // en varias divisas se calla: sumar euros con pesos no da un numero
+    // que se pueda etiquetar.
+    const monDesg = divisas.length === 1 ? divisas[0] : '';
+    // 42 px de paso y 32 px de barra en LAS DOS pestañas. Antes «dia a
+    // dia» usaba 54/26 y «categoria» 34/22; en los dos frames la fila
+    // mide lo mismo, asi que la altura no depende de cuantas filas haya.
     V.desgRows2 = desgData.map(r => {
       const pctN = (r.v / desgMax) * 100;
-      return { label: r.label, name: r.label, amt: fmtAx(r.v), pct: pctN.toFixed(2) + '%', tipL: Math.min(62, Math.max(8, pctN * 0.6)).toFixed(1) + '%', h: isCat ? '34px' : '54px', barH: isCat ? '22px' : '26px' };
+      return { label: r.label, name: r.label, amt: soloNum(r.v) + (monDesg ? ' ' + monDesg : ''), pct: pctN.toFixed(2) + '%', tipL: Math.min(62, Math.max(8, pctN * 0.6)).toFixed(1) + '%', h: '42px', barH: '32px' };
     });
     V.desgAx0 = fmtAx(0); V.desgAxMid = fmtAx(desgMax / 2); V.desgAxMax = fmtAx(desgMax);
-    V.desgLabW = isCat ? '112px' : '46px'; V.desgAxOff = isCat ? '120px' : '54px'; V.desgAxOffC = isCat ? '121px' : '55px';
+    // La columna de etiquetas es ancha salvo en «Dia a dia», donde
+// solo pone «1/9» y sobraria sitio.
+const anchaLab = tab !== 'dia';
+    // Medido sobre el frame: la columna de etiquetas acaba a 8 px de la
+    // marca, la marca mide 6 y luego viene el eje. 92+8+6 = 106, que es
+    // exactamente donde cae el eje en el PNG.
+    V.desgLabW = anchaLab ? '92px' : '76px'; V.desgAxOff = anchaLab ? '106px' : '90px'; V.desgAxOffC = anchaLab ? '107px' : '91px';
     V.expFormOpen = s.expFormOpen;
     V.expFormToggle = () => this.setState({ expFormOpen: !s.expFormOpen });
     V.expC = s.expC; V.expCChange = (e) => this.setState({ expC: e.target.value });
@@ -4014,23 +4775,68 @@ class Component extends DCLogic {
     V.expCancel = () => this.setState({ expFormOpen: false, expC: '', expM: '' });
     V.gastosOpen = s.gastosOpen; V.gastosRot = s.gastosOpen ? '90deg' : '0deg';
     V.gastosToggle = () => this.setState({ gastosOpen: !s.gastosOpen });
-    V.gastosEmpty = s.gastos.length === 0;
+    // ⚠ EL VACIO SE MIRA SOBRE LAS DOS FUENTES. Aqui ponia s.gastos, o
+    // sea solo el libro, y por eso un plan con gastos en los sitios del
+    // itinerario seguia diciendo «Aun no hay gastos» con la lista llena.
+    V.gastosEmpty = gastosTodos.length === 0;
     V.expSort = s.expSort;
     V.expSortChange = (e) => this.setState({ expSort: e.target.value });
+    // ⚠ LA FECHA SE ORDENA POR LA FECHA, no por `ts`. `ts` es el orden de
+    // llegada del libro y en los gastos de sitio vale 0 para todos, asi
+    // que ordenar por el dejaba el itinerario entero empatado y sin
+    // ordenar. Se usa fiso —la fecha ISO, que compara bien como texto— y
+    // `ts` solo para desempatar dentro del mismo dia.
+    const clave = (g) => (g.fiso || '') + '|' + String(100000 - (g.ts || 0)).padStart(6, '0');
     const gastoCmp = (a, b) => {
       switch (s.expSort) {
-        case 'fechaAsc': return a.ts - b.ts;
-        case 'monto': return b.m - a.m;
-        case 'montoAsc': return a.m - b.m;
-        case 'cat': return a.cat.localeCompare(b.cat, 'es');
-        default: return b.ts - a.ts;
+        case 'fechaAsc': return clave(a).localeCompare(clave(b));
+        case 'monto': return b.m - a.m || clave(b).localeCompare(clave(a));
+        case 'montoAsc': return a.m - b.m || clave(a).localeCompare(clave(b));
+        // La categoria se compara por su ETIQUETA, no por el slug: asi
+        // «Árbol» y «Actividad» salen en orden de diccionario español y
+        // no en el del ASCII.
+        case 'cat': return (etiCat(a.cat)).localeCompare(etiCat(b.cat), 'es') || clave(b).localeCompare(clave(a));
+        default: return clave(b).localeCompare(clave(a));
       }
     };
-    V.gastoRows = [...s.gastos].sort(gastoCmp).map(g => ({
-      c: g.c, sub: (g.fecha || '31 jul.') + ' • ' + g.cat, iconD: CATI[g.cat] || CATI.Otro,
-      amt: 'MXN ' + g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      remove: () => { this.setState({ gastos: this.state.gastos.filter(x => x.id !== g.id) }); if (typeof g.id === 'number') this._sync('plan_gastos.php', { action: 'del', id: g.id }); }
-    }));
+    // La lista enseña LAS DOS fuentes. Un gasto de sitio se distingue por
+    // el nombre del lugar bajo el concepto, y al pulsarlo se abre la
+    // ventana de ESE sitio, no la del libro: es donde se edita de verdad.
+    V.gastoRows = gastosTodos.slice().sort(gastoCmp).map(g => {
+      const esSitio = g.origen === 'sitio';
+      return {
+        k: g.k,
+        // La categoria se guarda en minuscula -es el vocabulario unico que
+        // comparten plan_items y plan_gastos desde la migracion- y se
+        // capitaliza AQUI, al enseñarla. Guardar 'Comida' y 'comida' segun
+        // la tabla es lo que tenia la grafica con barras a cero.
+        c: g.c,
+        // La etiqueta sale de la misma lista que el icono, asi no hay
+        // que capitalizar el slug a mano —«supermercado» no es
+        // «Supermercado» por poner la primera en mayuscula si algun dia
+        // hay una de dos palabras—.
+        sub: (g.fecha || '') + (g.fecha ? ' • ' : '') + etiCat(g.cat)
+             + (esSitio ? ' • del itinerario' : ''),
+        iconD: catDe(g.cat).d, iconVB: catDe(g.cat).vb,
+        // El codigo de moneda es el DEL GASTO, no un 'MXN' escrito a mano:
+        // si alguien puso euros en un sitio, aqui se ve que son euros en
+        // vez de enseñarlos como pesos.
+        amtNum: g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        amtMon: g.moneda || 'MXN',
+        amt: (g.moneda || 'MXN') + ' ' + g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        abrir: esSitio ? () => this._gastoAbrir(g.uid) : () => this._gastoSueltoAbrir(this._gastoDelLibro(g.id)),
+        // Un gasto de sitio NO se borra desde aqui: se le quita el importe
+        // en su propia ventana. Borrarlo desde el Presupuesto daria a
+        // entender que desaparece el lugar del itinerario, que no es asi.
+        puedeBorrar: !esSitio,
+        borrarOpac: esSitio ? '0' : '1',
+        borrarEventos: esSitio ? 'none' : 'auto',
+        remove: esSitio ? V.noop : () => {
+          this.setState({ gastos: this.state.gastos.filter(x => x.id !== g.id) });
+          if (typeof g.id === 'number') this._sync('plan_gastos.php', { action: 'del', id: g.id });
+        }
+      };
+    });
 
     // ── Asistente ──
     V.chatSmall = s.chatMode === 'small' && !s.narrow;
@@ -4106,13 +4912,17 @@ class Component extends DCLogic {
     V.mapPois = [];
     const layerOn = (k) => s.layerChecks[k] !== false;
     // Pines del itinerario proyectados (lat/lng → px del contenedor)
-    const pinPx = this._pinPx || {};
+    // Los pines ya NO llevan pixeles: llevan su coordenada, y quien los
+    // coloca es _colocarPines() leyendo la proyeccion viva del mapa. Asi
+    // un zoom no obliga a repintar React ni una sola vez.
+    V.pinPane = this._pinPane || null;
     V.mapPins = [];
     (s.dayItems || []).forEach((arr, di) => {
       if (!layerOn('d' + di)) return;
       arr.forEach((it, i) => {
-        const p = pinPx[it.uid];
-        if (!p) return;
+        // Sin coordenada no hay pin: antes lo descartaba el filtro por
+        // pixeles, que ya no existe. Sin esto se quedaria en la esquina.
+        if (it.lat == null || it.lng == null) return;
         // También se resalta el pin del lugar que enseña la ficha, no
         // sólo el que está bajo el ratón: al pasar de un sitio a otro
         // con las flechas hay que ver a cuál corresponde la ficha.
@@ -4121,7 +4931,7 @@ class Component extends DCLogic {
           // el número sigue al orden del día en el Itinerario (se
           // recalcula solo al arrastrar y soltar una tarjeta)
           num: String(i + 1), name: it.name,
-          left: p.left + 'px', top: p.top + 'px',
+          lat: it.lat, lng: it.lng,
           fill: this.DAYS[di] ? this.DAYS[di].color : this.PIN.sav,
           hover: hot, z: hot ? 55 : 40,
           recent: false,
@@ -4141,19 +4951,16 @@ class Component extends DCLogic {
     // fuera un lugar, su pin también se va: de lo contrario quedarían dos
     // pines con el mismo número y ninguno correspondería a la lista.
     (this.PLACES || []).forEach(p => {
-      // También aquí, y no sólo en _pinList: componentDidUpdate no
-      // reproyecta, así que _pinPx conserva las posiciones viejas hasta el
-      // siguiente movimiento del mapa. Sin esta línea los pines seguirían
-      // a la vista después de cerrar Explorar, hasta que se moviera el mapa.
+      // También aquí, y no sólo en _pinList: sin esta línea los pines de
+      // Explorar seguirían dibujados después de cerrar la sección.
       if (!this._exPinVive(p)) return;
+      if (p.lat == null || p.lng == null) return;
       const n = exNum[p.id] || (exq ? 0 : (p.num || 0));
       if (!n) return;
-      const pp = pinPx[p.id];
-      if (!pp) return;
       const hot = s.hoverPlace === p.id || s.detail === p.id;
       V.mapPins.push({
         num: String(n), name: p.name,
-        left: pp.left + 'px', top: pp.top + 'px',
+        lat: p.lat, lng: p.lng,
         fill: this.PIN[p.cat],
         hover: hot, z: hot ? 55 : 40,
         recent: !!p.recent,
@@ -4165,12 +4972,11 @@ class Component extends DCLogic {
     // Pines teal de los resultados del buscador del mapa (M4)
     (this.SEARCH || []).forEach(p => {
       if ((this.PLACES || []).some(x => x.id === p.id)) return;
-      const pp = pinPx[p.id];
-      if (!pp) return;
+      if (p.lat == null || p.lng == null) return;
       const hot = s.hoverPlace === p.id || s.detail === p.id;
       V.mapPins.push({
         num: String(p.num), name: p.name,
-        left: pp.left + 'px', top: pp.top + 'px',
+        lat: p.lat, lng: p.lng,
         fill: this.PIN.sav,
         hover: hot, z: hot ? 55 : 42,
         recent: false,
@@ -4329,6 +5135,32 @@ class Component extends DCLogic {
       const dd = (this.PLAN_ID && det.gpid && this._detCache) ? this._detCache[det.gpid] : null;
       const esReal = !!this.PLAN_ID;
 
+      // ── "Saber antes de ir" ──
+      // Se pide al abrir la ficha, igual que el "Acerca de". Mientras no
+      // llega, la seccion entera no se dibuja: es mejor que aparezca de
+      // golpe ya escrita que ver cuatro huecos rellenarse.
+      if (esReal && dd && !dd.tips && !dd._tipsPidiendo) {
+        dd._tipsPidiendo = true;
+        this._tipsDe(dd, () => { dd._tipsPidiendo = false; this.setState({ _tipsTick: (this.state._tipsTick || 0) + 1 }); });
+      }
+      const tp = dd ? dd.tips : null;
+      V.hayTips = !!(tp && tp.lista && tp.lista.length);
+      V.tipsVM = (tp && tp.lista ? tp.lista : []).map(t => ({ t: t }));
+      // La procedencia se dice SIEMPRE que la escriba una IA, igual que
+      // ya se hace con el "Acerca de". El frame no lo contemplaba, pero
+      // el usuario tiene derecho a saber que esto no lo escribio nadie.
+      // El aviso dice la verdad sobre lo MENOS fiable que se enseña.
+      // 'atributos' son datos de Google sobre el propio sitio y no
+      // llevan aviso de IA; en cuanto una sola linea la escriba un
+      // modelo, hay que decirlo aunque las demas sean datos.
+      const NOTAS = {
+        atributos: 'Datos del sitio según Google. Confirma horarios y precios antes de ir.',
+        mixto:     'Los primeros son datos del sitio según Google; el resto, consejos del destino redactados con IA.',
+        ia:        'Consejos generales del destino, redactados con IA. Confirma horarios y precios antes de ir.',
+        plantilla: 'Consejos generales; confirma horarios y precios antes de ir.'
+      };
+      V.tipsNota = (tp && NOTAS[tp.fuente]) || NOTAS.plantilla;
+
       // ── "Acerca de" y de dónde salió ──
       // El demo trae su texto escrito a mano; los lugares reales lo resuelven
       // por la cascada. Mientras llega, se deja vacío en vez de poner un
@@ -4478,6 +5310,7 @@ class Component extends DCLogic {
       V.detFotoSeed = 'x';
       V.hasDetAddress = false; V.detAddress = ''; V.hasDetHours = false; V.detHoursToday = '';
       V.hasDetDwell = false; V.hasDetMentions = false; V.hasDetPhone = false; V.detPhone = '';
+      V.hayTips = false; V.tipsVM = []; V.tipsNota = '';
       V.hasDetWebsite = false; V.detWebsite = ''; V.detOpenWeb = V.noop; V.detOpenG = V.noop; V.detOpenGm = V.noop;
       V.hasDetTips = false; V.detRvwAvg = ''; V.detRvwLabel = ''; V.detRvwCount = ''; V.hasDetHisto = false;
       V.detFoto1 = ''; V.detFoto2 = ''; V.detFoto3 = ''; V.detFoto = '';

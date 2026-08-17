@@ -31,6 +31,11 @@ $lng = isset($in['lng']) && $in['lng'] !== '' ? (float)$in['lng'] : null;
 $fi = validDate($in['fecha_inicio'] ?? null);
 $ff = validDate($in['fecha_fin'] ?? null);
 if ($fi && $ff && $ff < $fi) { $t = $fi; $fi = $ff; $ff = $t; }
+// De 1 a 30 días. La regla y el texto viven en includes/plan_auth.php,
+// compartidos con api/plan_update.php. Se comprueba DESPUÉS de ordenar
+// las fechas: si llegan del revés se dan la vuelta solas, y sería absurdo
+// rechazar por un tecleo que el propio código acaba de corregir.
+if ($errRango = planRangoError($fi, $ff)) apiFail($errRango);
 
 $priv = in_array($in['privacidad'] ?? '', ['solo', 'amigos', 'publico'], true) ? $in['privacidad'] : 'solo';
 

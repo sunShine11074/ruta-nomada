@@ -97,11 +97,42 @@
   }
 
   /* ── Calendario ─────────────────────────────────────────── */
+
+  // Un viaje dura de 1 a 30 días. La regla de verdad vive en el servidor
+  // —planRangoError() en includes/plan_auth.php— y en la base, con la
+  // restricción chk_planes_dias. Esto de aquí sólo evita que alguien
+  // elija un rango que después le van a rechazar.
+  //
+  // Antes no había regla en ninguna parte y el cliente truncaba EN
+  // SILENCIO: js/plan_logic.js sólo generaba 30 días, así que un viaje de
+  // 40 se guardaba entero en la base y la pantalla dibujaba 30. Los días
+  // 31 a 40 existían para la base y no para la persona.
+  var DIAS_MAX = 30;
+
+  // Días entre dos 'YYYY-MM-DD' contando los dos extremos. A mediodía
+  // para que un cambio de horario no reste ni sume un día por el camino.
+  function diasEntre(a, b) {
+    var d1 = new Date(a + 'T12:00:00'), d2 = new Date(b + 'T12:00:00');
+    return Math.round((d2 - d1) / 86400000) + 1;
+  }
+
   function calClick(f) {
     if (f < HOY) return;
-    if (!S.start || S.end) { S.start = f; S.end = null; }
-    else if (f < S.start) { S.start = f; }
-    else { S.end = f; }
+    if (!S.start || S.end) { S.start = f; S.end = null; S.error = ''; }
+    else if (f < S.start) { S.start = f; S.error = ''; }
+    else {
+      var n = diasEntre(S.start, f);
+      if (n > DIAS_MAX) {
+        // No se fija el fin: se avisa y se deja seguir eligiendo. Cerrar
+        // el rango en el día 30 sería peor —parecería que la aplicación
+        // eligió por ti— y borrarlo entero obligaría a empezar de cero.
+        S.error = 'Un viaje no puede durar más de ' + DIAS_MAX + ' días, y ése duraría '
+                + n + '. Elige una fecha de fin más cercana o divídelo en varios planes.';
+        render();
+        return;
+      }
+      S.end = f; S.error = '';
+    }
     render();
   }
 

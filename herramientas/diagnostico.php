@@ -447,6 +447,66 @@ if (!$conRed) {
     } else {
         linea('aviso', 'Pexels — no se prueba: falta la clave');
     }
+
+    // 5d. Gemini — el asistente. SE LLAMA DE VERDAD, y aquí está el
+    // motivo: hasta el 14/08/2026 esto sólo miraba que ai_config.php
+    // existiera y tuviera una clave de algún tamaño. El diagnóstico
+    // decía «28 correctos · 0 fallos» mientras el asistente llevaba
+    // DÍAS muerto en todas las páginas, porque Google había revocado la
+    // clave por haberse publicado. Comprobar que un archivo existe no
+    // es comprobar que la clave sirve.
+    //
+    // Se pide un token de salida para que la llamada sea lo más barata
+    // posible: lo que se prueba es la CLAVE, no lo bien que escribe el
+    // modelo, así que con que Google conteste 200 basta.
+    $ai = is_file($raiz . '/includes/ai_config.php') ? @include $raiz . '/includes/ai_config.php' : null;
+    if (is_array($ai) && !empty($ai['gemini_key'])) {
+        $modelo = (string)($ai['modelo'] ?? 'gemini-2.0-flash');
+        $ver    = (string)($ai['api_version'] ?? 'v1beta');
+        [$http, $cuerpo, ] = tocar(
+            "https://generativelanguage.googleapis.com/{$ver}/models/{$modelo}:generateContent",
+            ['Content-Type: application/json', 'x-goog-api-key: ' . $ai['gemini_key']],
+            json_encode([
+                'contents'         => [['parts' => [['text' => 'ok']]]],
+                'generationConfig' => ['maxOutputTokens' => 1],
+            ])
+        );
+        $msg = '';
+        if ($j = json_decode((string)$cuerpo, true)) $msg = (string)($j['error']['message'] ?? '');
+
+        if ($http === 200) {
+            linea('ok', 'Gemini — el asistente responde (' . $modelo . ')');
+        } elseif ($http === 403 && stripos($msg, 'leaked') !== false) {
+            linea('falla', 'Gemini — LA CLAVE ESTÁ REVOCADA por haberse publicado',
+                'Google la desactivó al encontrarla en un sitio público, así que el' . "\n"
+                . 'asistente no contesta en NINGUNA página. No se arregla con código.' . "\n"
+                . 'Saca una nueva en aistudio.google.com, BORRA la vieja y ponla en' . "\n"
+                . 'includes/ai_config.php. Y no compartas el proyecto en .zip: el' . "\n"
+                . '.gitignore protege el archivo suelto, pero no mira dentro de un' . "\n"
+                . 'comprimido. Así se quemó ésta.');
+        } elseif ($http === 403) {
+            linea('falla', 'Gemini (HTTP 403)',
+                'Google acepta la clave pero no deja usarla aquí.' . "\n"
+                . ($msg ?: 'Suele ser que la API no está habilitada, o que la clave' . "\n"
+                        . 'tiene una restricción que no encaja con este uso.'));
+        } elseif ($http === 400) {
+            linea('falla', 'Gemini (HTTP 400)',
+                'Google rechazó la petición. Lo típico es la clave mal copiada' . "\n"
+                . '(sobra un espacio o un salto de línea al final).' . ($msg ? "\n" . $msg : ''));
+        } elseif ($http === 404) {
+            linea('falla', 'Gemini — el modelo «' . $modelo . '» no existe',
+                'La clave puede estar bien; el nombre del modelo no. Google los' . "\n"
+                . 'retira cada pocos meses. Cambia «modelo» en includes/ai_config.php.');
+        } elseif ($http === 429) {
+            linea('aviso', 'Gemini (HTTP 429) — cuota agotada por ahora',
+                'La clave sirve, pero se pasó del límite gratuito. Espera y reintenta.');
+        } else {
+            linea('falla', 'Gemini (HTTP ' . $http . ')',
+                'El asistente no va a contestar en ninguna página.' . ($msg ? "\n" . $msg : ''));
+        }
+    } else {
+        linea('aviso', 'Gemini — no se prueba: falta la clave');
+    }
 }
 
 // ── 5bis. La carpeta donde se guardan las fotos subidas ──────

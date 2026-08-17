@@ -6,6 +6,7 @@ session_start();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/email_dominio.php';
+require_once __DIR__ . '/includes/destino.php';
 
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
@@ -85,8 +86,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
                     'email'  => $email,
                 ];
 
-                // Redirigir directamente al panel principal tras el éxito
-                header('Location: inicio.php');
+                // Al panel principal... salvo que hubiera un destino pendiente.
+                //
+                // Quien llega por un enlace de invitación SIN tener cuenta pasa
+                // por aquí, no por login.php: plan_invitacion.php ya le guardó
+                // el destino y este archivo lo tiraba a la basura, así que
+                // aterrizaba en inicio.php sin rastro del viaje al que lo
+                // habían invitado. Parecía que la invitación fallaba y no era
+                // verdad: el token seguía sin gastar.
+                header('Location: ' . destinoTrasEntrar());
                 exit;
             } catch (PDOException $e) {
                 if (strpos($e->getMessage(), 'EMAIL_DUPLICADO') !== false) {

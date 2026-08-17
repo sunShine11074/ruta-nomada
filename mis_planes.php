@@ -247,9 +247,15 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
       <div class="mp-vista mp-oculto" data-vista="mapa">
         <div class="mp-mapa">
           <div class="mp-mapa__lienzo" id="mpMapa"></div>
+          <!-- Iconos, no los caracteres «+» y «−»: la fuente los dibuja con
+               terminaciones rectas y se veían cuadrados. Éstos son de Font
+               Awesome 7, la misma familia que el resto del proyecto, con las
+               puntas redondeadas. Los dos con ico() al MISMO tamaño porque su
+               tinta mide 448 de ancho en ambos casos: así el signo de menos
+               sale exactamente igual de largo que el brazo del más. -->
           <div class="mp-zoom">
-            <button type="button" id="mpZoomIn"  aria-label="Acercar">+</button>
-            <button type="button" id="mpZoomOut" aria-label="Alejar">−</button>
+            <button type="button" id="mpZoomIn"  aria-label="Acercar"><?= ico('mas', 18, '#212529') ?></button>
+            <button type="button" id="mpZoomOut" aria-label="Alejar"><?= ico('menos', 18, '#212529') ?></button>
           </div>
         </div>
       </div>

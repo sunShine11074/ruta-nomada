@@ -218,7 +218,24 @@ CREATE TABLE `planes` (
   `dia_subtitulos` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `usuario_id` (`usuario_id`),
-  CONSTRAINT `planes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+  CONSTRAINT `planes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE,
+  -- Un viaje dura de 1 a 30 dias. DATEDIFF entre 0 y 29 son 1 a 30
+  -- contando los dos extremos.
+  --
+  -- Admite NULL a proposito: un plan sin fechas es legitimo, se crean asi
+  -- y se rellenan despues. Y de paso rechaza los rangos al reves, porque
+  -- un DATEDIFF negativo no cae dentro del intervalo.
+  --
+  -- Esta AQUI y no solo en el PHP porque es la unica capa que no se puede
+  -- saltar: cubre las dos rutas de escritura (api/plan_create.php y
+  -- api/plan_update.php), phpMyAdmin y cualquier consulta a mano. El tope
+  -- de 30 tiene motivo: los pines del mapa se colorean con SIETE colores
+  -- en ciclo (js/plan_logic.js:235), asi que pasado el mes el color deja
+  -- de identificar el dia y la barra de dias se vuelve impracticable.
+  CONSTRAINT `chk_planes_dias` CHECK (
+    `fecha_inicio` IS NULL OR `fecha_fin` IS NULL
+    OR (DATEDIFF(`fecha_fin`, `fecha_inicio`) BETWEEN 0 AND 29)
+  )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `viajes_usuario` (

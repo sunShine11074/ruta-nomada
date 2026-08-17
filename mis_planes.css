@@ -311,27 +311,129 @@ body.dashboard-page { background: #FAFDFF; }
   background: #e8eef2; box-shadow: 0 2px 16px rgba(13, 31, 39, .16);
 }
 .mp-mapa__lienzo { position: absolute; inset: 0; }
-/* El control de zoom es una píldora de 35x79 con las puntas redondas del
-   todo, a 15 px del borde interior del mapa. */
+/* ── El control de zoom, en «liquid glass» ────────────────────
+   Píldora de 35x70 con las puntas redondas del todo, a 15 px del borde
+   interior del mapa. Antes eran 35x79 (39+40); los 70 salen de medir el
+   frame, que resultó ser 1:1 con píxeles CSS.
+
+   SOBRE EL 70 %: el frame exportado, medido, daba blanco al 87 %
+   —interior rgb(239,250,252) sobre mar rgb(126,213,233), alfa 0,876 /
+   0,881 / 0,864 en los tres canales—. Pero ese 87 % es el PÍXEL YA
+   COMPUESTO, no el relleno: en Figma el relleno era blanco al 60 % y el
+   efecto Glass le suma luz encima (Light intensity 90 %), que es de donde
+   salen los 27 puntos de diferencia. Se fija en 70 % por decisión del
+   diseño, a medio camino entre el relleno de Figma y lo que se veía, y
+   para igualar al zoom del mapa de plan.php. No lo bajes más: sobre un
+   tile blanco del mapa el botón ya casi se pierde.
+
+   ⚠ LO QUE LEE COMO CRISTAL AQUÍ ES EL ANILLO, NO EL DESENFOQUE. A 87 %
+   el fondo aporta sólo el 13 % del píxel, y blur() no cambia el brillo
+   medio de una zona: sólo redistribuye píxeles vecinos. Sobre mar liso la
+   diferencia entre con y sin desenfoque es CERO exacto —por eso el frame
+   no permite saber si en Figma lo había—, y en el peor caso imaginable el
+   techo teórico son ~33 niveles repartidos en 35 px. Se deja porque no
+   cuesta nada, pero el día que estorbe se puede borrar el bloque
+   @supports entero sin que nadie note la diferencia. */
 .mp-zoom {
   position: absolute; right: 15px; bottom: 15px; z-index: 5;
   display: flex; flex-direction: column; width: 35px;
-  border-radius: 999px; overflow: hidden; background: #fff;
-  box-shadow: 0 3px 12px rgba(13, 31, 39, .28);
+  border-radius: 999px; overflow: hidden;
+  background: rgba(255, 255, 255, .70);
+  /* El frame NO trae sombra, y aun así se conserva a propósito. El
+     interior compuesto contra el mar da 1,57:1 de contraste, y sobre un
+     tile BLANCO del mapa tiende a 1:1: el botón se desvanece. No incumple
+     WCAG —1.4.11 no exige borde visible si el contenido se distingue, y
+     los glifos van holgados sobre blanco al 87 %—, pero un botón sin
+     perímetro es peor de encontrar. Copiar el frame al pie de la letra
+     aquí sale caro. */
+  box-shadow: 0 2px 8px rgba(13, 31, 39, .22);
+}
+/* El canto de vidrio. Va en ::after para quedar por encima del hover.
+   Tres capas:
+   · el anillo de 1 px que se midió en el frame (245,253,254 en los
+     laterales frente a 239,250,252 del interior; que salga MÁS CLARO que
+     el relleno no puede ser suavizado del contorno, porque el fondo es más
+     oscuro y el antialias lo habría oscurecido);
+   · y el «Depth: 12» de Figma, que NO es un borde: la documentación lo
+     define como «hasta dónde se extiende el canto curvo hacia adentro
+     desde el borde del objeto». Una línea de 1 px no modela una banda de
+     12 con degradado; hacen falta dos inset con blur 12.
+   La dirección sale del «Light angle: -40». Con el eje Y de CSS hacia
+   abajo: dx = -0,766·d, dy = -0,643·d. Con d = 2 px queda el realce
+   abajo-derecha y su sombra complementaria arriba-izquierda. */
+.mp-zoom::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45),
+              inset -1.5px -1.3px 12px rgba(255, 255, 255, .9),
+              inset 1.5px 1.3px 12px rgba(13, 31, 39, .10);
 }
 .mp-zoom button {
-  width: 35px; height: 39px; border: none; background: #fff; cursor: pointer;
-  color: #212529; font-size: 22px; line-height: 1;
+  /* background TRANSPARENTE, no #fff. Un hijo opaco tapa por completo el
+     cristal del padre, y entonces parece que el backdrop-filter no
+     funciona cuando lo que pasa es que no se ve nada de él: es el fallo
+     más frecuente de esta técnica. Y NO poner backdrop-filter también
+     aquí: la píldora ya es «backdrop root», así que los botones verían su
+     fondo en vez del mapa, y se pagarían dos lecturas de textura. */
+  /* Sin font-size: los signos ya no son texto, son <svg> de
+     includes/iconos_planes.php («mas» y «menos»), con el color escrito en
+     el propio icono. */
+  width: 35px; height: 35px; border: none; background: transparent;
+  cursor: pointer; color: #212529; line-height: 1;
   display: flex; align-items: center; justify-content: center;
 }
 /* La raya que separa los dos botones no llega a los bordes: queda metida
-   4 px por cada lado, así que no puede ser un border del botón. */
-.mp-zoom button + button { height: 40px; position: relative; }
+   4 px por cada lado, así que no puede ser un border del botón. Va
+   translúcida: en sólido (#C2CBCE) era la única parte que no dejaba pasar
+   nada y delataba que la píldora no es cristal. */
+.mp-zoom button + button { height: 35px; position: relative; }
 .mp-zoom button + button::before {
   content: ''; position: absolute; top: 0; left: 4px; right: 4px;
-  height: 1px; background: #C2CBCE;
+  height: 1px; background: rgba(0, 0, 0, .14);
 }
-.mp-zoom button:hover { background: #F3F6F8; }
+.mp-zoom button:hover { background: rgba(255, 255, 255, .35); }
+
+/* El desenfoque, aparte y condicionado. El prefijo va PRIMERO y sigue
+   haciendo falta: Safari sólo lo quitó en la 18; de la 9 a la 17 entiende
+   únicamente -webkit-. Los paréntesis extra alrededor del «or» son
+   obligatorios al mezclar condiciones en @supports. Sin soporte se queda
+   el blanco al 87 %, que es casi idéntico. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mp-zoom {
+    /* 1px y no 8px. El «Frost» del efecto Glass de Figma NO es un
+       porcentaje: la documentación lo define como «the amount of
+       background blur present on the glass», y en la Plugin API el campo
+       se llama «radius» y es el ÚNICO junto a depth que no está acotado
+       a 0-1 —lightIntensity, refraction y dispersion sí lo están—. En el
+       foro oficial se manejan valores de 4 y 24, incoherentes con 0-100.
+       O sea que es un radio, y el diseño pedía «Frost: 1»: un píxel.
+       Con 8px se estaba aplicando ocho veces más de lo diseñado.
+       ⚠ La unidad (píxeles) es inferencia bien fundada, no está escrita
+       en ninguna página de Figma. Si algún día se documenta, revísalo. */
+    -webkit-backdrop-filter: blur(1px) saturate(140%);
+    backdrop-filter: blur(1px) saturate(140%);
+  }
+}
+
+/* Contraste alto: fuera el cristal y borde negro. Se usa prefers-contrast
+   y no sólo prefers-reduced-transparency porque la primera está en todos
+   los navegadores desde 2022 y la segunda NO llega a Safari, que es justo
+   donde vive quien activa «Reducir transparencia». Se ponen las dos: la
+   segunda es gratis. */
+@media (prefers-contrast: more) {
+  .mp-zoom {
+    background: #fff;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .mp-zoom::after { box-shadow: inset 0 0 0 1px #000; }
+  .mp-zoom button { color: #000; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mp-zoom {
+    background: #fff;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
 
 /* ── Panel derecho ───────────────────────────────────────── */
 /* Paginador: 82x27, círculos de 23 a 2 px de los bordes. El

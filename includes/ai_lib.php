@@ -326,8 +326,34 @@ if (!function_exists('aiGenerar')) {
             'systemInstruction' => ['parts' => [['text' => $system]]],
             'contents'          => $contents,
             'generationConfig'  => [
-                'temperature'      => 0.7,
-                'topP'             => 0.95,
+                // Aquí había 'temperature' => 0.7 y 'topP' => 0.95. Google los
+                // marcó como DEPRECADOS para los modelos Gemini recientes en el
+                // registro de cambios del 21/07/2026. Hoy no rompen nada, pero
+                // dejarlos escritos da la falsa impresión de que se está
+                // controlando algo que el modelo ya ignora.
+                //
+                // El «nivel de pensamiento». Importa: esto es un panel de chat
+                // que debe contestar rápido, y los tokens de razonamiento
+                // gastan cuota aunque no se vean en la respuesta.
+                //
+                // ⚠ EL NOMBRE DEL CAMPO NO SE COPIÓ DE LA DOCUMENTACIÓN, SE
+                // MIDIÓ, y menos mal. La página del pensamiento enseña
+                //     "generation_config": { "thinking_level": "minimal" }
+                // pero avisa de que eso es de la Interactions API. Este archivo
+                // usa generateContent, y ahí ese nombre NO existe. Probado
+                // contra la API el 14/08/2026:
+                //     thinkingConfig.thinkingLevel = minimal  -> HTTP 200
+                //     thinking_level               = minimal  -> HTTP 400
+                //         Invalid JSON payload... Unknown name "thinking_level"
+                // O sea que seguir el ejemplo del doc habría roto el asistente
+                // entero. Si algún día hay que tocar esto, MÍDELO otra vez.
+                //
+                // Va explícito aunque gemini-3.5-flash-lite ya venga en
+                // 'minimal' de fábrica: los demás Flash arrancan en 'medium',
+                // así que esto evita heredar un razonamiento largo el día que
+                // se cambie de modelo en ai_config.php. Ojo: gemini-3.7-flash
+                // NO acepta 'minimal', sólo low/medium/high.
+                'thinkingConfig'   => ['thinkingLevel' => 'minimal'],
                 'maxOutputTokens'  => $maxTokens,
                 'candidateCount'   => 1,
                 'responseMimeType' => 'text/plain',
@@ -383,8 +409,41 @@ if (!function_exists('aiGenerar')) {
             // Completo en el log para nosotros; quien llama sólo verá algo
             // genérico. El código real de Google delata si la clave es
             // inválida o si se acabó la cuota: eso es reconocimiento gratis.
-            error_log(sprintf('[ai] HTTP %d body=%s', $http, mb_substr((string)$res, 0, 1000)));
-            return ['ok' => false, 'razon' => 'http', 'http' => $http];
+            //
+            // Y ADEMÁS SE TRADUCE, porque el registro lo leemos nosotras y un
+            // «HTTP 404» a secas manda a buscar donde no es. El 12/08/2026 el
+            // asistente llevaba días muerto por una clave revocada y el log
+            // sólo decía el número: se buscó en el PHP durante horas. Cada
+            // código tiene una causa distinta y un arreglo distinto.
+            $cuerpo = mb_substr((string)$res, 0, 1000);
+            $modelo = aiModelo();
+            switch (true) {
+                case $http === 404:
+                    // Google retira modelos cada pocos meses y NO redirige al
+                    // sucesor. La clave puede estar perfectamente bien.
+                    $pista = "el modelo «{$modelo}» no existe (retirado o mal escrito). "
+                           . 'NO es la clave: cámbialo en includes/ai_config.php';
+                    break;
+                case $http === 403 && stripos($cuerpo, 'leaked') !== false:
+                    $pista = 'clave REVOCADA por haberse publicado. Saca otra en '
+                           . 'aistudio.google.com y borra la vieja';
+                    break;
+                case $http === 403:
+                    $pista = 'la clave existe pero no puede usarse aquí: API sin '
+                           . 'habilitar, o restricción que no encaja';
+                    break;
+                case $http === 400:
+                    $pista = 'petición rechazada. Suele ser la clave mal copiada '
+                           . '(un salto de línea al final) o un campo que no existe';
+                    break;
+                case $http === 429:
+                    $pista = 'cuota agotada. La clave sirve; es el límite por minuto o por día';
+                    break;
+                default:
+                    $pista = 'fallo del lado de Google';
+            }
+            error_log(sprintf('[ai] HTTP %d — %s | modelo=%s body=%s', $http, $pista, $modelo, $cuerpo));
+            return ['ok' => false, 'razon' => 'http', 'http' => $http, 'pista' => $pista];
         }
 
         $data = json_decode((string)$res, true);

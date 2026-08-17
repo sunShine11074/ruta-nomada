@@ -6,6 +6,10 @@ session_start();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/includes/csrf.php';
+// Por planInviteBase(): el único sitio del proyecto que arma una URL
+// absoluta. Antes este archivo se la montaba por su cuenta y le faltaba
+// el valor de reserva (ver abajo).
+require_once __DIR__ . '/includes/plan_invite_lib.php';
 
 // Si ya hay sesión activa, redirigir al dashboard
 if (!empty($_SESSION['user'])) {
@@ -54,9 +58,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error_db) {
                 );
                 $ins->execute([$user['id'], $token_hash]);
 
-                // Construir el enlace y enviar el correo
-                $cfg       = mailConfig();
-                $resetLink = rtrim($cfg['base_url'], '/')
+                // Construir el enlace y enviar el correo.
+                //
+                // Antes esto era rtrim($cfg['base_url'], '/') a pelo, SIN
+                // valor de reserva. Como mail_config.sample.php recomienda
+                // dejar 'base_url' vacío, cualquiera que siguiera el ejemplo
+                // mandaba correos con «/reset-password.php?token=...»: una
+                // ruta relativa, que dentro de un correo es texto muerto.
+                // Y no se notaba, porque la pantalla dice «te lo enviamos»
+                // pase lo que pase, para no delatar qué correos existen.
+                $resetLink = planInviteBase()
                     . '/reset-password.php?token=' . $token
                     . '&email=' . urlencode($email);
 

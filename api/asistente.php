@@ -71,9 +71,22 @@ $st = $db->prepare(
 $st->execute([$userId]);
 $planes = $st->fetchAll();
 
+// El total, aparte de la lista. La consulta de arriba lleva LIMIT 8, así
+// que sin esto el asistente le contestaba «tienes 8 viajes» a quien
+// tuviera veinte: contaba lo que veía. Ahora sabe cuántos hay Y cuántos
+// está viendo, que no es lo mismo.
+$stTot = $db->prepare('SELECT COUNT(*) FROM plan_miembros WHERE usuario_id = ?');
+$stTot->execute([$userId]);
+$total = (int)$stTot->fetchColumn();
+
 if (!$planes) {
     $ctx[] = 'Todavía no ha creado ningún plan de viaje.';
 } else {
+    $ctx[] = 'Tiene ' . $total . ($total === 1 ? ' plan de viaje' : ' planes de viaje') . ' en total.';
+    if ($total > count($planes)) {
+        $ctx[] = 'Abajo van sólo los ' . count($planes) . ' más recientes. Si pregunta por otro, '
+               . 'dile que lo busque en la sección «Mis planes».';
+    }
     $ctx[] = 'Sus planes de viaje (del más reciente al más antiguo):';
     foreach ($planes as $p) {
         $l = '  - ' . aiTexto($p['nombre'] ?? '', 80);
