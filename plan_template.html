@@ -2065,14 +2065,36 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                por abajo -medido: el subrayado del campo va de 12 a 12
                exactos-, pero el botón cae a 9 del borde derecho y 10
                del inferior, así que lleva margen negativo: 12-9 = 3 y
-               16-10 = 6.
+               16-10 = 6. Comprobado en plan.php: 9,0 y 10,0.
 
-               Rasterizando el frame salen 6,8 y 7,5 en vez de 9 y 10
-               porque el borde de la pastilla va con antialias y los
-               píxeles del filo no cuentan como azul. Mandan los 9 y 10
-               de Figma, que son la caja de verdad. -->
+               EL PADDING ES 22 A CADA LADO, como pide el diseño. Con eso
+               y la etiqueta en Poppins 600 a 13,5 el botón sale de 214,8,
+               NO de los 183,8 que mide en el frame. Los dos datos no
+               pueden ser ciertos a la vez: 184 menos 44 de relleno deja
+               140 para el texto, y ese texto necesita 170,8.
+
+               Se deja el padding, que es lo pedido, y queda pendiente
+               decidir el tamaño de letra. Medido sobre el frame, la
+               tinta de la etiqueta ocupa 150 de ancho y 9 de alto, que
+               corresponde a unos 12,3 px; a ese tamaño el botón seguiría
+               saliendo de ~200. Para que salgan 184 la letra tendría que
+               bajar a ~11, y entonces la tinta mediría 134 y no los 150
+               medidos. Algo del frame no es un auto-layout con relleno
+               22 y ya está: o el texto lleva ancho fijo, o interletraje
+               negativo.
+
+               min-width 184 NO es decoración: la etiqueta cambia a
+               "Enviando…" mientras manda, que es mucho más corta, y sin
+               un suelo el botón se encogería a media pulsación. Es el
+               mismo motivo por el que el de copiar lleva ancho fijo (ver
+               más arriba: «Copiado» es más corto que «Copiar enlace»).
+
+               El azul es #3F52E3, EL MISMO que el de copiar. Antes puse
+               #5767E6 leyendo un solo píxel, que cayó en el antialias;
+               contando el frame entero salen 9192 píxeles de #3F52E3
+               frente a 94 del otro. -->
           <div style="display:flex;justify-content:flex-end;margin:24px -3px -6px 0">
-            <button onClick="{{ invEnviar }}" style="width:184px;height:37.5px;border:none;border-radius:18.75px;background:{{ invEnviarBg }};color:#ffffff;font-family:Poppins,sans-serif;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:{{ invEnviarCursor }};transition:background .15s ease" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">{{ invEnviarTxt }}</button>
+            <button onClick="{{ invEnviar }}" style="padding:0 22px;min-width:184px;height:37.5px;border:none;border-radius:18.75px;background:{{ invEnviarBg }};color:#ffffff;font-family:Poppins,sans-serif;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:{{ invEnviarCursor }};transition:background .15s ease" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">{{ invEnviarTxt }}</button>
           </div>
         </div>
 

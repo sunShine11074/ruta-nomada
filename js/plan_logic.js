@@ -3782,7 +3782,7 @@ class Component extends DCLogic {
     // teclado, que es lo que permite descubrir que existe; un boton
     // deshabilitado se salta al tabular y desaparece del recorrido.
     const puede = (dest.length > 0 || (s.invEmail || '').trim() !== '') && !s.invEnviando;
-    V.invEnviarBg = puede ? '#5767E6' : '#BCC3F2';
+    V.invEnviarBg = puede ? '#3F52E3' : '#AFB6E9';
     V.invEnviarCursor = puede ? 'pointer' : 'default';
 
     // La lista de la segunda pantalla. El propietario NO lleva aspa:
