@@ -83,7 +83,7 @@ require_once __DIR__ . '/includes/user_topbar.php';
 <!-- ════════════════════════════════════════════════════════════
      TOPBAR
 ════════════════════════════════════════════════════════════ -->
-<?php $topbar_active = 'inicio'; $topbar_search = false; include __DIR__ . '/includes/topbar.php'; ?>
+<?php $topbar_active = 'inicio'; $topbar_search = true; include __DIR__ . '/includes/topbar.php'; ?>
 
 <!-- ════════════════════════════════════════════════════════════
      LAYOUT PRINCIPAL
