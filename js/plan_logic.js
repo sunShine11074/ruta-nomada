@@ -2957,6 +2957,99 @@ class Component extends DCLogic {
 
   _gastoDelLibro(id) { return (this.state.gastos || []).find(g => g.id === id) || null; }
 
+  // ── Exportar como CSV ───────────────────────────────────────
+  //
+  // El formato es el del archivo de referencia, que sale de Wanderlog:
+  //   ID,Date,Expense,Amount,Currency,Category,Paid by,<un nombre por
+  //   miembro>
+  // y luego una fila por gasto.
+  //
+  // ⚠ «Paid by» VA VACIO, Y NO ES UN OLVIDO. En el archivo de Wanderlog
+  // las columnas de cada persona no son partes: son SALDOS. Quien pago
+  // sale en positivo por lo que le deben —4000 repartidos entre tres dan
+  // +2666.67 al pagador y -1333.33 a los otros dos—. Aqui eso no se
+  // puede calcular porque NINGUNA tabla guarda quien paga: ni
+  // plan_gastos, ni plan_items, ni plan_gasto_reparto, ni
+  // plan_item_gasto. Solo se sabe entre quienes se reparte.
+  //
+  // Asi que se exporta lo unico que es verdad —la parte de cada uno, en
+  // positivo— y la columna del pagador se deja vacia en vez de
+  // inventarse un nombre y publicar unos saldos que podrian estar del
+  // reves. Cuando exista el campo pagador esto son dos cambios:
+  // rellenar «Paid by» y restarle su parte al pagador.
+  _csvCampo(v) {
+    const t = String(v === null || v === undefined ? '' : v);
+    // RFC 4180: solo se entrecomilla lo que lo necesita, como en el
+    // archivo de referencia, donde «Casamarte Oyster Bar & Grill» va sin
+    // comillas.
+    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+
+  _exportarCsv() {
+    const miembros = this.MIEMBROS || [];
+    const cab = ['ID', 'Date', 'Expense', 'Amount', 'Currency', 'Category', 'Paid by']
+      .concat(miembros.map(m => m.nombre || 'Sin nombre'));
+
+    // Por fecha ascendente, NO por lo que diga el desplegable «Orden».
+    // Un archivo tiene que salir igual cada vez que se pide; que dependa
+    // de como este la pantalla en ese momento seria una sorpresa.
+    const gastos = this._gastosDelPlan().slice().sort((a, b) =>
+      (a.fiso || '').localeCompare(b.fiso || '')
+      || String(a.c || '').localeCompare(String(b.c || ''), 'es'));
+
+    // Los importes van crudos, sin separador de miles y con punto, que es
+    // lo que espera una hoja de calculo. 350.00 se escribe «350», igual
+    // que en el archivo de referencia.
+    const num = (n) => String(Math.round((Number(n) || 0) * 100) / 100);
+
+    const filas = gastos.map(g => {
+      const parte = {};
+      (g.reparto || []).forEach(r => { parte[Number(r.uid)] = Number(r.monto) || 0; });
+      const repartido = (g.reparto || []).length > 0;
+      return [
+        // El ID lleva letra de procedencia porque son DOS tablas: el
+        // gasto 12 del libro y el sitio 12 del itinerario existen a la
+        // vez, y una columna «ID» con el numero pelado los confundiria.
+        g.origen === 'libro' ? ('g' + g.id) : String(g.uid),
+        g.fiso || '',
+        g.c || '',
+        num(g.m),
+        g.moneda || 'MXN',
+        // La categoria va con NUESTRO vocabulario, no traducida al de
+        // Wanderlog: son taxonomias distintas —aqui hay bebidas,
+        // supermercado, coche, tren y cultura— y mapearlas perderia
+        // informacion por el camino.
+        g.cat || 'otro',
+        ''  // Paid by: ver el comentario de arriba
+      ].concat(miembros.map(m =>
+        repartido && parte[m.uid] !== undefined ? num(parte[m.uid]) : ''));
+    });
+
+    const texto = [cab].concat(filas)
+      .map(f => f.map(v => this._csvCampo(v)).join(','))
+      .join('\n') + '\n';
+
+    // Sin BOM y con LF, byte a byte como el archivo de referencia.
+    // ⚠ Sin BOM, Excel en Windows lee «López» como «LÃ³pez». El archivo
+    // de Wanderlog tiene exactamente el mismo problema; se copia tal cual
+    // porque es el formato que se pidio, pero si algun dia se abre en
+    // Excel, la solucion es anteponer "﻿" a `texto`.
+    const nombre = 'Gastos - ' + String(this.META.titulo || 'viaje').replace(/[\\/:*?"<>|]/g, '-') + '.csv';
+    this._descargarArchivo(texto, 'text/csv;charset=utf-8', nombre);
+  }
+
+  _descargarArchivo(texto, mime, nombre) {
+    const url = URL.createObjectURL(new Blob([texto], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Si no se libera, el Blob se queda en memoria hasta que se recargue
+    // la pagina. Con un segundo basta: la descarga ya arranco.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   _monedasEnUso(lista) {
     const set = {};
     lista.forEach(g => { set[g.moneda || 'MXN'] = 1; });
@@ -3067,11 +3160,31 @@ class Component extends DCLogic {
       const cat = this._gcats().find(c => c.v === s.gCat);
       const concepto = (s.gConcepto || '').trim() || (cat ? cat.t : 'Gasto');
       if (total <= 0) { this._gastoCerrar(); return; }
+      // ⚠ LA FECHA DE UN GASTO QUE YA EXISTE NO SE TOCA. Aqui se ponia
+      // la de hoy SIEMPRE, tambien al editar, y como este mismo objeto
+      // se manda al servidor unas lineas mas abajo, abrir un gasto de la
+      // semana pasada y pulsar «Guardar» sin cambiar nada le cambiaba la
+      // fecha a hoy. En la base, no solo en pantalla. Reproducido: un
+      // gasto del 2026-08-01 quedo con fecha 2026-08-17 sin que nadie
+      // tocara ningun campo.
+      const anterior = m.id ? this._gastoDelLibro(m.id) : null;
+      const iso = (anterior && anterior.fiso) || (new Date()).toISOString().slice(0, 10);
       const g = {
         id: m.id || ('tmp' + Date.now()), c: concepto, m: total, cat: s.gCat || 'otro',
         moneda: s.gMoneda, desc: s.gDesc, modo: s.gModo,
         reparto: reparto.map(r => ({ uid: r.usuario_id, monto: r.monto, color: r.color })),
-        fecha: (new Date()).toISOString().slice(0, 10)
+        // Y LAS DOS FORMAS DE LA FECHA, igual que las deja _mapearGastos:
+        // `fecha` es la bonita, para pintar, y `fiso` la ISO, para
+        // ordenar y exportar. Aqui se metia la ISO en `fecha` y no habia
+        // `fiso` ninguna, asi que hasta la siguiente recarga el gasto
+        // recien creado salia con «2026-08-17» de subtitulo en vez de
+        // «17 ago.», desordenado en la lista y SIN FECHA en el CSV.
+        fecha: this._fmtDia(iso), fiso: iso,
+        // ts es el orden de llegada dentro del mismo dia, y en
+        // _mapearGastos es un entero pequeño (la posicion en la lista).
+        // Un Date.now() aqui romperia la clave de ordenacion, que resta
+        // ts a 100000.
+        ts: Math.max(0, ...(this.state.gastos || []).map(x => Number(x.ts) || 0)) + 1
       };
       const nuevo = m.id
         ? (this.state.gastos || []).map(x => x.id === m.id ? { ...x, ...g } : x)
@@ -3085,7 +3198,7 @@ class Component extends DCLogic {
         action: m.id ? 'update' : 'add', id: m.id || undefined,
         concepto: concepto, monto: total, categoria: s.gCat || 'otro',
         moneda: s.gMoneda, descripcion: s.gDesc, modo: s.gModo,
-        reparto: reparto, fecha: g.fecha
+        reparto: reparto, fecha: iso
       }, (j) => {
         if (j && j.id && !m.id) {
           this.setState({ gastos: this.state.gastos.map(x => x.id === g.id ? { ...x, id: Number(j.id) } : x) });
@@ -4773,6 +4886,7 @@ const anchaLab = tab !== 'dia';
       });
     };
     V.expCancel = () => this.setState({ expFormOpen: false, expC: '', expM: '' });
+    V.csvExport = () => this._exportarCsv();
     V.gastosOpen = s.gastosOpen; V.gastosRot = s.gastosOpen ? '90deg' : '0deg';
     V.gastosToggle = () => this.setState({ gastosOpen: !s.gastosOpen });
     // ⚠ EL VACIO SE MIRA SOBRE LAS DOS FUENTES. Aqui ponia s.gastos, o
@@ -4802,10 +4916,47 @@ const anchaLab = tab !== 'dia';
     // La lista enseña LAS DOS fuentes. Un gasto de sitio se distingue por
     // el nombre del lugar bajo el concepto, y al pulsarlo se abre la
     // ventana de ESE sitio, no la del libro: es donde se edita de verdad.
+    // ⚠ QUIEN PAGA EL GASTO, no quien mira la pantalla. La fila tenia el
+    // avatar clavado a {{ userFoto }}, asi que un gasto repartido entre
+    // dos personas seguia enseñando UNA sola cara -la tuya- y ademas la
+    // enseñaba igual en los gastos que no son tuyos.
+    //
+    // La verdad de quien participa esta en `reparto`, que es lo mismo que
+    // mira _porPersona(). No se filtra por monto > 0 como alli: un
+    // miembro marcado con cero SIGUE estando marcado en la ventana, y
+    // borrarle la cara aqui contradiria la casilla que el usuario ve
+    // encendida. En «Por persona» un cero no suma; aqui una cara si sale.
+    const porUid = {};
+    (this.MIEMBROS || []).forEach(m => { porUid[m.uid] = m; });
+    const CARAS_MAX = 3;
+    const quienesDe = (g) => {
+      const vistos = {};
+      return (g.reparto || [])
+        .map(r => Number(r.uid))
+        .filter(u => { if (vistos[u] || !porUid[u]) return false; vistos[u] = 1; return true; })
+        .map(u => porUid[u]);
+    };
     V.gastoRows = gastosTodos.slice().sort(gastoCmp).map(g => {
       const esSitio = g.origen === 'sitio';
+      const quienes = quienesDe(g);
+      const caras = quienes.slice(0, CARAS_MAX);
+      const sobran = quienes.length - caras.length;
       return {
         k: g.k,
+        // Las caras se solapan 5 px, que es lo que las deja legibles sin
+        // comerse el importe cuando son tres.
+        quien: caras.map((m, i) => ({
+          uid: m.uid, inicial: m.inicial, nombre: m.nombre,
+          hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || '',
+          ml: i === 0 ? '0' : '-5px'
+        })),
+        hayQuien: quienes.length > 0,
+        hayMas: sobran > 0, masN: sobran > 0 ? ('+' + sobran) : '',
+        // El title dice los nombres ENTEROS, incluidos los que no caben:
+        // es la unica forma de saber quien es el «+2» sin abrir la ventana.
+        quienTxt: quienes.length
+          ? ('Se reparte entre ' + quienes.map(m => m.nombre).join(', '))
+          : '',
         // La categoria se guarda en minuscula -es el vocabulario unico que
         // comparten plan_items y plan_gastos desde la migracion- y se
         // capitaliza AQUI, al enseñarla. Guardar 'Comida' y 'comida' segun
