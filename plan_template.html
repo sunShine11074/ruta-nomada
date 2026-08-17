@@ -927,7 +927,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
           <sc-for list="{{ gastoRows }}" as="g" hint-placeholder-count="3">
             <div class="rn-block rn-gastorow" style="display:flex;align-items:center;gap:14px;padding:14px 0;position:relative">
               <span style="width:36px;height:36px;border-radius:50%;background:#E9ECEF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <svg width="16" height="16" viewBox="0 0 640 640"><path fill="#495057" d="{{ g.iconD }}"></path></svg>
+                <svg width="16" height="16" viewBox="{{ g.iconVB }}"><path fill="#495057" d="{{ g.iconD }}"></path></svg>
               </span>
               <!-- La fila abre la ventana que le corresponde: la del
                    propio sitio si el gasto viene del itinerario, y la
@@ -1613,7 +1613,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
             </div>
           </sc-if>
         </div>
-        <input value="{{ gastoMonto }}" onChange="{{ gastoMontoChange }}" inputmode="decimal" placeholder="0.00" aria-label="Importe" style="flex:1;min-width:0;border:none;outline:none;background:none;font-size:21px;font-weight:500;color:#212529;font-family:inherit">
+        <input value="{{ gastoMonto }}" onChange="{{ gastoMontoChange }}" inputmode="decimal" placeholder="0.00" aria-label="Importe" class="rn-cifra" style="flex:1;min-width:0;border:none;outline:none;background:none;font-size:21px;font-weight:500;color:#212529">
       </div>
 
       <!-- Categoría -->
@@ -1666,12 +1666,12 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                 <sc-if value="{{ gf.on }}" hint-placeholder-val="{{ true }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></sc-if>
               </button>
             </sc-if>
-            <span style="width:30px;height:30px;border-radius:50%;background:#F5B93F;color:#0E2A33;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;flex-shrink:0">{{ gf.inicial }}</span>
+            <span style="width:30px;height:30px;border-radius:50%;background:#F5B93F;color:#0E2A33;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;flex-shrink:0;overflow:hidden"><sc-if value="{{ gf.hasFoto }}" hint-placeholder-val="{{ false }}"><img src="{{ gf.foto }}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if><sc-if value="{{ gf.sinFoto }}" hint-placeholder-val="{{ true }}">{{ gf.inicial }}</sc-if></span>
             <span style="flex:1;min-width:0;font-size:13.4px;color:{{ gf.col }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ gf.nombre }}</span>
             <sc-if value="{{ gf.conImporte }}" hint-placeholder-val="{{ true }}">
               <span style="display:flex;align-items:center;gap:6px;border:1.5px solid {{ gf.inBd }};border-radius:8px;padding:3px 4px 3px 8px;flex-shrink:0">
                 <span style="font-size:11px;font-weight:600;color:#6C757D">{{ gastoMonCod }}</span>
-                <input value="{{ gf.monto }}" onChange="{{ gf.montoChange }}" type="number" min="0" step="1" aria-label="Importe de {{ gf.nombre }}" style="width:58px;border:none;outline:none;background:none;font-size:13px;color:#212529;font-family:inherit;text-align:right">
+                <input value="{{ gf.monto }}" onChange="{{ gf.montoChange }}" type="number" min="0" step="1" aria-label="Importe de {{ gf.nombre }}" class="rn-cifra" style="width:58px;border:none;outline:none;background:none;font-size:13px;color:#212529;text-align:right">
                 <button onClick="{{ gf.ok }}" style="border:none;border-radius:5px;background:#212529;color:#ffffff;font-size:10.4px;font-weight:700;padding:4px 7px;cursor:pointer;font-family:inherit" style-hover="background:#0D1F27 !important">OK</button>
               </span>
             </sc-if>
@@ -1710,7 +1710,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
               <sc-for list="{{ gastoDona }}" as="dn" hint-placeholder-count="4">
                 <div style="display:flex;align-items:center;gap:8px">
                   <button onClick="{{ dn.pickColor }}" aria-label="Cambiar el color de {{ dn.nombre }}" style="width:13px;height:13px;border-radius:4px;background:{{ dn.color }};border:1.5px solid {{ dn.borde }};cursor:pointer;flex-shrink:0;padding:0"></button>
-                  <span style="font-size:12.4px;color:#212529;font-weight:600;flex-shrink:0">{{ dn.pct }}</span>
+                  <span class="rn-cifra" style="font-size:12.4px;color:#212529;font-weight:600;flex-shrink:0">{{ dn.pct }}</span>
                   <span style="font-size:12.4px;color:#495057;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">• {{ dn.nombre }}</span>
                 </div>
               </sc-for>

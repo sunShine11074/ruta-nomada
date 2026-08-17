@@ -3547,6 +3547,11 @@ class Component extends DCLogic {
       const on = !!s.gRep[m.uid];
       return {
         nombre: m.nombre, inicial: m.inicial,
+        // La foto de perfil. Los miembros SIEMPRE la han traido en
+        // MIEMBROS; esta fila era la unica que se quedaba con la
+        // inicial pudiendo enseñar la cara, que es lo que ayuda a
+        // repartir sin equivocarse de persona.
+        hasFoto: !!m.foto, sinFoto: !m.foto, foto: m.foto || '',
         editable: !soloYo, conImporte: !soloYo,
         on: on, boxBd: on ? '#E7AD00' : '#ADB5BD', boxBg: on ? '#E7AD00' : '#ffffff',
         col: (soloYo || on) ? '#212529' : '#8b969d',
@@ -4573,15 +4578,16 @@ class Component extends DCLogic {
 
     // ── Presupuesto ──
     const CATC = { Alojamiento: '#8e44ad', Comida: '#d97706', Actividades: '#41A24D', Gasolina: '#E7AD00', Transporte: '#1E86D8', Compras: '#e02424', Otro: '#6b7a83' };
-    const CATI = {
-      Alojamiento: 'M64 96C81.7 96 96 110.3 96 128L96 352L320 352L320 224C320 206.3 334.3 192 352 192L512 192C565 192 608 235 608 288L608 512C608 529.7 593.7 544 576 544C558.3 544 544 529.7 544 512L544 448L96 448L96 512C96 529.7 81.7 544 64 544C46.3 544 32 529.7 32 512L32 128C32 110.3 46.3 96 64 96zM144 256C144 220.7 172.7 192 208 192C243.3 192 272 220.7 272 256C272 291.3 243.3 320 208 320C172.7 320 144 291.3 144 256z',
-      Comida: 'M127.9 78.4C127.1 70.2 120.2 64 112 64C103.8 64 96.9 70.2 96 78.3L81.9 213.7C80.6 219.7 80 225.8 80 231.9C80 277.8 115.1 315.5 160 319.6L160 544C160 561.7 174.3 576 192 576C209.7 576 224 561.7 224 544L224 319.6C268.9 315.5 304 277.8 304 231.9C304 225.8 303.4 219.7 302.1 213.7L287.9 78.3C287.1 70.2 280.2 64 272 64C263.8 64 256.9 70.2 256.1 78.4L242.5 213.9C241.9 219.6 237.1 224 231.4 224C225.6 224 220.8 219.6 220.2 213.8L207.9 78.6C207.2 70.3 200.3 64 192 64C183.7 64 176.8 70.3 176.1 78.6L163.8 213.8C163.3 219.6 158.4 224 152.6 224C146.8 224 142 219.6 141.5 213.9L127.9 78.4zM512 64C496 64 384 96 384 240L384 352C384 387.3 412.7 416 448 416L480 416L480 544C480 561.7 494.3 576 512 576C529.7 576 544 561.7 544 544L544 96C544 78.3 529.7 64 512 64z',
-      Actividades: 'M335.9 84.2C326.1 78.6 314 78.6 304.1 84.2L80.1 212.2C67.5 219.4 61.3 234.2 65 248.2C68.7 262.2 81.5 272 96 272L128 272L128 480L128 480L76.8 518.4C68.7 524.4 64 533.9 64 544C64 561.7 78.3 576 96 576L544 576C561.7 576 576 561.7 576 544C576 533.9 571.3 524.4 563.2 518.4L512 480L512 272L544 272C558.5 272 571.2 262.2 574.9 248.2C578.6 234.2 572.4 219.4 559.8 212.2L335.8 84.2zM464 272L464 480L400 480L400 272L464 272zM352 272L352 480L288 480L288 272L352 272zM240 272L240 480L176 480L176 272L240 272zM320 160C337.7 160 352 174.3 352 192C352 209.7 337.7 224 320 224C302.3 224 288 209.7 288 192C288 174.3 302.3 160 320 160z',
-      Gasolina: 'M96 128C96 92.7 124.7 64 160 64L320 64C355.3 64 384 92.7 384 128L384 320L392 320C440.6 320 480 359.4 480 408L480 440C480 453.3 490.7 464 504 464C517.3 464 528 453.3 528 440L528 286C500.4 278.9 480 253.8 480 224L480 164.5L454.2 136.2C445.3 126.4 446 111.2 455.8 102.3C465.6 93.4 480.8 94.1 489.7 103.9L561.4 182.7C570.8 193 576 206.4 576 220.4L576 440C576 479.8 543.8 512 504 512C464.2 512 432 479.8 432 440L432 408C432 385.9 414.1 368 392 368L384 368L384 529.4C393.3 532.7 400 541.6 400 552C400 565.3 389.3 576 376 576L104 576C90.7 576 80 565.3 80 552C80 541.5 86.7 532.7 96 529.4L96 128zM160 144L160 240C160 248.8 167.2 256 176 256L304 256C312.8 256 320 248.8 320 240L320 144C320 135.2 312.8 128 304 128L176 128C167.2 128 160 135.2 160 144z',
-      Transporte: 'M96 128C96 92.7 124.7 64 160 64L320 64C355.3 64 384 92.7 384 128L384 352C428.2 352 464 387.8 464 432L464 444C464 455 473 464 484 464C495 464 504 455 504 444L504 316.3C471.5 306.1 448 275.8 448 240L448 208C448 199.2 455.2 192 464 192L480 192L480 144C480 135.2 487.2 128 496 128C504.8 128 512 135.2 512 144L512 192L544 192L544 144C544 135.2 551.2 128 560 128C568.8 128 576 135.2 576 144L576 192L592 192C600.8 192 608 199.2 608 208L608 240C608 275.8 584.5 306.1 552 316.3L552 444C552 481.6 521.6 512 484 512C446.4 512 416 481.6 416 444L416 432C416 414.3 401.7 400 384 400L384 529.4C393.3 532.7 400 541.6 400 552C400 565.3 389.3 576 376 576L104 576C90.7 576 80 565.3 80 552C80 541.5 86.7 532.7 96 529.4L96 128zM178.7 253.7L217.7 253.7L196.8 320.6C194.4 328.2 200.1 336 208.1 336C211 336 213.7 335 215.9 333.1L310.5 251.1C313.6 248.4 315.4 244.5 315.4 240.4C315.4 232.6 309.1 226.3 301.3 226.3L262.3 226.3L283.2 159.4C285.6 151.8 279.9 144 271.9 144C269 144 266.3 145 264.1 146.9L169.5 228.9C166.4 231.6 164.6 235.5 164.6 239.6C164.6 247.4 170.9 253.7 178.7 253.7z',
-      Compras: 'M256 144C256 108.7 284.7 80 320 80C355.3 80 384 108.7 384 144L384 192L256 192L256 144zM208 192L144 192C117.5 192 96 213.5 96 240L96 448C96 501 139 544 192 544L448 544C501 544 544 501 544 448L544 240C544 213.5 522.5 192 496 192L432 192L432 144C432 82.1 381.9 32 320 32C258.1 32 208 82.1 208 144L208 192zM232 240C245.3 240 256 250.7 256 264C256 277.3 245.3 288 232 288C218.7 288 208 277.3 208 264C208 250.7 218.7 240 232 240zM384 264C384 250.7 394.7 240 408 240C421.3 240 432 250.7 432 264C432 277.3 421.3 288 408 288C394.7 288 384 277.3 384 264z',
-      Otro: 'M296 88C296 74.7 306.7 64 320 64C333.3 64 344 74.7 344 88L344 128L400 128C417.7 128 432 142.3 432 160C432 177.7 417.7 192 400 192L285.1 192C260.2 192 240 212.2 240 237.1C240 259.6 256.5 278.6 278.7 281.8L370.3 294.9C424.1 302.6 464 348.6 464 402.9C464 463.2 415.1 512 354.9 512L344 512L344 552C344 565.3 333.3 576 320 576C306.7 576 296 565.3 296 552L296 512L224 512C206.3 512 192 497.7 192 480C192 462.3 206.3 448 224 448L354.9 448C379.8 448 400 427.8 400 402.9C400 380.4 383.5 361.4 361.3 358.2L269.7 345.1C215.9 337.5 176 291.4 176 237.1C176 176.9 224.9 128 285.1 128L296 128L296 88z'
-    };
+    // ⚠ LOS ICONOS SALEN DE _gcats(), la misma lista que usa la
+    // ventana. Aqui habia un objeto CATI aparte con SIETE claves
+    // capitalizadas —Alojamiento, Comida, Actividades…— y desde que
+    // las categorias se guardan como slug en minuscula NINGUNA
+    // casaba: todos los gastos salian con el icono de «Otro».
+    // Ahora hay una sola lista para el icono, la etiqueta y el
+    // guardado, con las doce que puede elegir el usuario.
+    const CATS = this._gcats();
+    const catDe = (k) => CATS.find(c => c.v === k) || CATS[CATS.length - 1];
+    const etiCat = (k) => catDe(k).t;
     const soloNum = (v, dec) => v.toLocaleString('es-MX', { minimumFractionDigits: dec === undefined ? 2 : dec, maximumFractionDigits: dec === undefined ? 2 : dec });
     const moneyMXN = (v, dec) => soloNum(v, dec) + ' MXN';
     // AQUI SE CONECTAN LOS DOS SISTEMAS. Antes esta linea recorria solo
@@ -4752,16 +4758,28 @@ const anchaLab = tab !== 'dia';
     V.expCancel = () => this.setState({ expFormOpen: false, expC: '', expM: '' });
     V.gastosOpen = s.gastosOpen; V.gastosRot = s.gastosOpen ? '90deg' : '0deg';
     V.gastosToggle = () => this.setState({ gastosOpen: !s.gastosOpen });
-    V.gastosEmpty = s.gastos.length === 0;
+    // ⚠ EL VACIO SE MIRA SOBRE LAS DOS FUENTES. Aqui ponia s.gastos, o
+    // sea solo el libro, y por eso un plan con gastos en los sitios del
+    // itinerario seguia diciendo «Aun no hay gastos» con la lista llena.
+    V.gastosEmpty = gastosTodos.length === 0;
     V.expSort = s.expSort;
     V.expSortChange = (e) => this.setState({ expSort: e.target.value });
+    // ⚠ LA FECHA SE ORDENA POR LA FECHA, no por `ts`. `ts` es el orden de
+    // llegada del libro y en los gastos de sitio vale 0 para todos, asi
+    // que ordenar por el dejaba el itinerario entero empatado y sin
+    // ordenar. Se usa fiso —la fecha ISO, que compara bien como texto— y
+    // `ts` solo para desempatar dentro del mismo dia.
+    const clave = (g) => (g.fiso || '') + '|' + String(100000 - (g.ts || 0)).padStart(6, '0');
     const gastoCmp = (a, b) => {
       switch (s.expSort) {
-        case 'fechaAsc': return a.ts - b.ts;
-        case 'monto': return b.m - a.m;
-        case 'montoAsc': return a.m - b.m;
-        case 'cat': return a.cat.localeCompare(b.cat, 'es');
-        default: return b.ts - a.ts;
+        case 'fechaAsc': return clave(a).localeCompare(clave(b));
+        case 'monto': return b.m - a.m || clave(b).localeCompare(clave(a));
+        case 'montoAsc': return a.m - b.m || clave(a).localeCompare(clave(b));
+        // La categoria se compara por su ETIQUETA, no por el slug: asi
+        // «Árbol» y «Actividad» salen en orden de diccionario español y
+        // no en el del ASCII.
+        case 'cat': return (etiCat(a.cat)).localeCompare(etiCat(b.cat), 'es') || clave(b).localeCompare(clave(a));
+        default: return clave(b).localeCompare(clave(a));
       }
     };
     // La lista enseña LAS DOS fuentes. Un gasto de sitio se distingue por
@@ -4776,9 +4794,13 @@ const anchaLab = tab !== 'dia';
         // capitaliza AQUI, al enseñarla. Guardar 'Comida' y 'comida' segun
         // la tabla es lo que tenia la grafica con barras a cero.
         c: g.c,
-        sub: (g.fecha || '') + (g.fecha ? ' • ' : '') + (g.cat ? g.cat.charAt(0).toUpperCase() + g.cat.slice(1) : 'Otro')
+        // La etiqueta sale de la misma lista que el icono, asi no hay
+        // que capitalizar el slug a mano —«supermercado» no es
+        // «Supermercado» por poner la primera en mayuscula si algun dia
+        // hay una de dos palabras—.
+        sub: (g.fecha || '') + (g.fecha ? ' • ' : '') + etiCat(g.cat)
              + (esSitio ? ' • del itinerario' : ''),
-        iconD: CATI[g.cat] || CATI.Otro,
+        iconD: catDe(g.cat).d, iconVB: catDe(g.cat).vb,
         // El codigo de moneda es el DEL GASTO, no un 'MXN' escrito a mano:
         // si alguien puso euros en un sitio, aqui se ve que son euros en
         // vez de enseñarlos como pesos.
