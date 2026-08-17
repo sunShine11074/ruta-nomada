@@ -235,7 +235,7 @@ $q_attr = htmlspecialchars($q, ENT_QUOTES, 'UTF-8');
   <div class="rz-mapcol" id="mapWrap">
     <div class="rz-mappanel" id="mapPanel">
       <div id="map"></div>
-      <button class="rz-map-close" id="mapClose" hidden>✕ Cerrar mapa</button>
+      <button class="rz-map-close" id="mapClose" hidden><svg width="13" height="13" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg> Cerrar mapa</button>
       <button class="rz-map-expand" id="expandBtn" aria-label="Expandir mapa">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a4a52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path id="expandIcon" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
       </button>

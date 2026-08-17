@@ -4693,11 +4693,14 @@ class Component extends DCLogic {
     // contra el nombre de la pestaña activa.
     const tab = s.desgTab || 'cat';
     V.desgIsCat = tab === 'cat'; V.desgIsDia = tab === 'dia'; V.desgIsPer = tab === 'per';
-    const tabSt = (on) => ({ bg: on ? '#ffffff' : 'transparent', bd: on ? '#DEE2E6' : 'transparent', w: on ? 700 : 500 });
+    // La pastilla activa es BLANCA CON SOMBRA sobre un carril gris, no
+    // una caja con borde. Medido sobre el frame: carril #F3F4F5 con 3 px
+    // de holgura, y la pastilla sin borde ninguno.
+    const tabSt = (on) => ({ bg: on ? '#ffffff' : 'transparent', sh: on ? '0 1px 3px rgba(13,31,39,.14)' : 'none', w: on ? 600 : 500 });
     const t1 = tabSt(tab === 'cat'), t2 = tabSt(tab === 'dia'), t3 = tabSt(tab === 'per');
-    V.desgCatBg = t1.bg; V.desgCatBd = t1.bd; V.desgCatW = t1.w;
-    V.desgDiaBg = t2.bg; V.desgDiaBd = t2.bd; V.desgDiaW = t2.w;
-    V.desgPerBg = t3.bg; V.desgPerBd = t3.bd; V.desgPerW = t3.w;
+    V.desgCatBg = t1.bg; V.desgCatSh = t1.sh; V.desgCatW = t1.w;
+    V.desgDiaBg = t2.bg; V.desgDiaSh = t2.sh; V.desgDiaW = t2.w;
+    V.desgPerBg = t3.bg; V.desgPerSh = t3.sh; V.desgPerW = t3.w;
     V.desgCatGo = () => this.setState({ desgTab: 'cat' });
     V.desgDiaGo = () => this.setState({ desgTab: 'dia' });
     V.desgPerGo = () => this.setState({ desgTab: 'per' });
@@ -4728,16 +4731,30 @@ class Component extends DCLogic {
       }
     }
     const desgMax = Math.max(2000, Math.ceil(Math.max(1, ...desgData.map(r => r.v)) / 2000) * 2000);
-    const fmtAx = (n) => 'MX$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // ⚠ LAS CIFRAS DEL EJE VAN DESNUDAS. Antes llevaban «MX$» pegado
+    // delante y ademas escrito a mano, asi que un plan en euros seguia
+    // diciendo MX$. En el frame el eje son numeros y punto; la moneda se
+    // dice UNA vez, en el globo de la barra.
+    const fmtAx = (n) => soloNum(n);
+    // Y la del globo es la del plan, no una escrita a mano. Si hay gastos
+    // en varias divisas se calla: sumar euros con pesos no da un numero
+    // que se pueda etiquetar.
+    const monDesg = divisas.length === 1 ? divisas[0] : '';
+    // 42 px de paso y 32 px de barra en LAS DOS pestañas. Antes «dia a
+    // dia» usaba 54/26 y «categoria» 34/22; en los dos frames la fila
+    // mide lo mismo, asi que la altura no depende de cuantas filas haya.
     V.desgRows2 = desgData.map(r => {
       const pctN = (r.v / desgMax) * 100;
-      return { label: r.label, name: r.label, amt: fmtAx(r.v), pct: pctN.toFixed(2) + '%', tipL: Math.min(62, Math.max(8, pctN * 0.6)).toFixed(1) + '%', h: tab === 'dia' ? '54px' : '34px', barH: tab === 'dia' ? '26px' : '22px' };
+      return { label: r.label, name: r.label, amt: soloNum(r.v) + (monDesg ? ' ' + monDesg : ''), pct: pctN.toFixed(2) + '%', tipL: Math.min(62, Math.max(8, pctN * 0.6)).toFixed(1) + '%', h: '42px', barH: '32px' };
     });
     V.desgAx0 = fmtAx(0); V.desgAxMid = fmtAx(desgMax / 2); V.desgAxMax = fmtAx(desgMax);
     // La columna de etiquetas es ancha salvo en «Dia a dia», donde
 // solo pone «1/9» y sobraria sitio.
 const anchaLab = tab !== 'dia';
-    V.desgLabW = anchaLab ? '112px' : '46px'; V.desgAxOff = anchaLab ? '120px' : '54px'; V.desgAxOffC = anchaLab ? '121px' : '55px';
+    // Medido sobre el frame: la columna de etiquetas acaba a 8 px de la
+    // marca, la marca mide 6 y luego viene el eje. 92+8+6 = 106, que es
+    // exactamente donde cae el eje en el PNG.
+    V.desgLabW = anchaLab ? '92px' : '76px'; V.desgAxOff = anchaLab ? '106px' : '90px'; V.desgAxOffC = anchaLab ? '107px' : '91px';
     V.expFormOpen = s.expFormOpen;
     V.expFormToggle = () => this.setState({ expFormOpen: !s.expFormOpen });
     V.expC = s.expC; V.expCChange = (e) => this.setState({ expC: e.target.value });

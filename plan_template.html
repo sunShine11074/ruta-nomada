@@ -1131,7 +1131,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         <div style="display:flex;align-items:center;gap:9px;background:#ffffff;border:2px solid #1E86D8;border-radius:22px;padding:8px 14px;box-shadow:0 3px 10px rgba(13,31,39,.2)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5b6b74" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
           <input value="{{ mapSearchQ }}" onChange="{{ mapSearchQChange }}" onKeyDown="{{ mapSearchKey }}" autoFocus="true" placeholder="Buscar en esta zona" aria-label="Buscar en el mapa" style="flex:1;min-width:0;border:none;outline:none;background:none;font-size:12.6px;color:#16262e">
-          <button onClick="{{ mapSearchToggle }}" aria-label="Cerrar búsqueda" style="border:none;background:none;cursor:pointer;color:#93a2ab;font-size:13px;line-height:1;padding:0">✕</button>
+          <button onClick="{{ mapSearchToggle }}" aria-label="Cerrar búsqueda" style="border:none;background:none;cursor:pointer;color:#93a2ab;line-height:1;padding:0;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg></button>
         </div>
         <div style="background:#ffffff;border-radius:12px;box-shadow:0 8px 26px rgba(13,31,39,.25);margin-top:8px;padding:0;height:196px;overflow-y:auto;animation:rnMenu .18s ease both" class="rn-scroll">
           <sc-for list="{{ mapSearchCats }}" as="c" hint-placeholder-count="5">
@@ -1152,7 +1152,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
         <div style="position:absolute;top:0;right:calc(100% + 10px);z-index:80;width:296px;background:#ffffff;border-radius:10px;box-shadow:0 10px 32px rgba(13,31,39,.3);padding:13px 15px;animation:rnMenu .18s ease both">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <p style="margin:0;font-size:13.5px;font-weight:700;color:#212529">Capas de mapa</p>
-            <button onClick="{{ layersToggle }}" aria-label="Cerrar" style="width:24px;height:24px;border:none;background:none;cursor:pointer;color:#6B7A83;font-size:13px;line-height:1;border-radius:6px" style-hover="background:#f1f5f8 !important;color:#16262e !important">✕</button>
+            <button onClick="{{ layersToggle }}" aria-label="Cerrar" style="width:24px;height:24px;border:none;background:none;cursor:pointer;color:#6B7A83;line-height:1;border-radius:6px;display:flex;align-items:center;justify-content:center" style-hover="background:#f1f5f8 !important;color:#16262e !important"><svg width="13" height="13" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg></button>
           </div>
           <div style="display:flex;gap:12px;margin-top:6px">
             <a href="#" onClick="{{ layersAll }}" style="font-size:11.6px;font-weight:600">Selecciona todo</a>
@@ -1198,7 +1198,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
   <!-- Zoom + cerrar modal -->
   <div style="position:absolute;right:14px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px">
     <sc-if value="{{ mapModalOn }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ mapModalClose }}" aria-label="Cerrar mapa" style="width:38px;height:38px;border-radius:10px;border:none;background:#0E2A33;color:#ffffff;cursor:pointer;font-size:14px;box-shadow:0 2px 8px rgba(13,31,39,.3)">✕</button>
+      <button onClick="{{ mapModalClose }}" aria-label="Cerrar mapa" style="width:38px;height:38px;border-radius:10px;border:none;background:#0E2A33;color:#ffffff;cursor:pointer;box-shadow:0 2px 8px rgba(13,31,39,.3);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg></button>
     </sc-if>
     <span style="display:flex;flex-direction:column;width:38px;border-radius:19px;overflow:hidden;border:1px solid rgba(255,255,255,.8);background:rgba(255,255,255,.70);backdrop-filter:blur(1px) saturate(1.4);-webkit-backdrop-filter:blur(1px) saturate(1.4);box-shadow:0 2px 10px rgba(13,31,39,.2),inset -1.5px -1.3px 12px rgba(255,255,255,.9),inset 1.5px 1.3px 12px rgba(13,31,39,.10)">
       <button onClick="{{ zoomIn }}" aria-label="Acercar" style="width:100%;height:37px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1" style-hover="background:rgba(255,255,255,.35) !important"><svg width="18" height="18" viewBox="0 0 640 640" fill="#212529" aria-hidden="true" focusable="false"><path d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"></path></svg></button>
@@ -1586,7 +1586,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
   <div data-screen-label="Añadir gasto" style="position:fixed;inset:0;z-index:940;display:flex;align-items:center;justify-content:center;padding:22px">
     <div onClick="{{ gastoClose }}" style="position:absolute;inset:0;background:rgba(255,255,255,.5)"></div>
     <div class="rn-scroll" style="position:relative;width:540px;max-width:100%;max-height:100%;overflow-y:auto;background:#ffffff;border-radius:20px;box-shadow:0 24px 70px rgba(13,31,39,.3);padding:24px 26px 26px;animation:rnSheet .22s ease both">
-      <button onClick="{{ gastoClose }}" aria-label="Cerrar" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#495057;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#DEE2E6 !important">✕</button>
+      <button onClick="{{ gastoClose }}" aria-label="Cerrar" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#6C757D;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#DEE2E6 !important"><svg width="14" height="14" viewBox="0 0 640 640" aria-hidden="true" style="display:block"><path fill="currentColor" d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg></button>
       <h3 style="margin:2px 0 18px;text-align:center;font-size:21px;font-weight:700;color:#0D1F27">Añadir gasto</h3>
 
       <!-- CONCEPTO — sólo en el gasto que no cuelga de un sitio.
@@ -1739,7 +1739,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
   <div data-screen-label="Añadir desde una plantilla" style="position:fixed;inset:0;z-index:670;display:flex;align-items:center;justify-content:center;padding:22px">
     <div onClick="{{ tplClose }}" style="position:absolute;inset:0;background:rgba(255,255,255,.5)"></div>
     <div style="position:relative;width:470px;max-width:100%;max-height:min(760px,100%);background:#ffffff;border-radius:24px;box-shadow:0 24px 70px rgba(13,31,39,.3);display:flex;flex-direction:column;overflow:hidden;padding:24px 0 16px">
-      <button onClick="{{ tplClose }}" aria-label="Cerrar" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#495057;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#DEE2E6 !important">✕</button>
+      <button onClick="{{ tplClose }}" aria-label="Cerrar" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#6C757D;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#DEE2E6 !important"><svg width="14" height="14" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg></button>
       <h3 style="margin:6px 0 0;text-align:center;font-size:20px;font-weight:700;color:#0D1F27">Añadir desde una plantilla</h3>
       <p style="margin:6px 0 0;text-align:center;font-size:12.6px;color:#6C757D">Selecciona artículos para tu lista de verificación</p>
       <div style="display:flex;background:#F1F3F5;border-radius:19px;margin:14px 22px 0;flex-shrink:0">
@@ -1785,52 +1785,81 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
 <sc-if value="{{ desglose }}" hint-placeholder-val="{{ false }}">
   <div data-screen-label="Desglose de gastos" style="position:fixed;inset:0;z-index:660;display:flex;align-items:center;justify-content:center;padding:22px">
     <div onClick="{{ desgClose }}" style="position:absolute;inset:0;background:rgba(255,255,255,.5)"></div>
-    <div class="rn-scroll" style="position:relative;width:580px;max-width:100%;max-height:100%;overflow-y:auto;background:#ffffff;border-radius:20px;box-shadow:0 24px 70px rgba(13,31,39,.3);padding:24px 30px 26px;animation:rnSheet .22s ease both">
-      <button onClick="{{ desgClose }}" aria-label="Cerrar desglose" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#495057;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#dde2e6 !important;color:#212529 !important"><svg width="14" height="14" viewBox="0 0 640 640" style="display:block"><path fill="currentColor" d="M504.6 148.5C515.9 134.9 514.1 114.7 500.5 103.4C486.9 92.1 466.7 93.9 455.4 107.5L320 270L184.6 107.5C173.3 93.9 153.1 92.1 139.5 103.4C125.9 114.7 124.1 134.9 135.4 148.5L278.3 320L135.4 491.5C124.1 505.1 125.9 525.3 139.5 536.6C153.1 547.9 173.3 546.1 184.6 532.5L320 370L455.4 532.5C466.7 546.1 486.9 547.9 500.5 536.6C514.1 525.3 515.9 505.1 504.6 491.5L361.7 320L504.6 148.5z"></path></svg></button>
-      <h3 style="margin:4px 0 0;text-align:center;font-size:19.5px;font-weight:700;color:#0D1F27">Desglose de tus gastos</h3>
-      <div style="display:flex;background:#F1F3F5;border-radius:12px;margin-top:18px">
-        <button onClick="{{ desgCatGo }}" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid {{ desgCatBd }};background:{{ desgCatBg }};font-size:14.5px;font-weight:{{ desgCatW }};color:#212529;cursor:pointer">Categoría</button>
-        <button onClick="{{ desgDiaGo }}" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid {{ desgDiaBd }};background:{{ desgDiaBg }};font-size:14.5px;font-weight:{{ desgDiaW }};color:#212529;cursor:pointer">Día a día</button>
+    <div class="rn-scroll" style="position:relative;width:600px;max-width:100%;max-height:100%;overflow-y:auto;background:#ffffff;border-radius:20px;box-shadow:0 24px 70px rgba(13,31,39,.3);padding:28px 43px 30px;animation:rnSheet .22s ease both">
+      <button onClick="{{ desgClose }}" aria-label="Cerrar desglose" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#6C757D;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#dde2e6 !important;color:#212529 !important"><svg width="14" height="14" viewBox="0 0 640 640" aria-hidden="true" style="display:block"><path fill="currentColor" d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg></button>
+      <h3 style="margin:4px 0 0;text-align:center;font-size:24px;font-weight:700;color:#212529">Desglose de tus gastos</h3>
+      <!-- UN CARRIL, no tres cajas con borde. En el frame el fondo es
+           #F3F4F5 con 3 px de holgura y la pastilla activa es blanca con
+           una sombra corta; ninguna de las tres lleva borde. Y la primera
+           se llama «Por categoría», no «Categoría». -->
+      <div style="display:flex;background:#F3F4F5;border-radius:12px;padding:3px;margin-top:20px">
+        <button onClick="{{ desgCatGo }}" style="flex:1;padding:7px 8px;border-radius:9px;border:none;background:{{ desgCatBg }};box-shadow:{{ desgCatSh }};font-size:14px;font-weight:{{ desgCatW }};color:#212529;cursor:pointer;font-family:inherit">Por categoría</button>
+        <button onClick="{{ desgDiaGo }}" style="flex:1;padding:7px 8px;border-radius:9px;border:none;background:{{ desgDiaBg }};box-shadow:{{ desgDiaSh }};font-size:14px;font-weight:{{ desgDiaW }};color:#212529;cursor:pointer;font-family:inherit">Día a día</button>
         <!-- Por persona. La infraestructura del reparto llevaba tiempo
              entera —plan_item_gasto para los lugares y
              plan_gasto_reparto para los sueltos— pero nadie sumaba
              por cabeza: se sabía repartir UN gasto y no había forma
              de ver el total de cada quien. Esto es lo que faltaba. -->
-        <button onClick="{{ desgPerGo }}" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid {{ desgPerBd }};background:{{ desgPerBg }};font-size:14.5px;font-weight:{{ desgPerW }};color:#212529;cursor:pointer">Por persona</button>
+        <button onClick="{{ desgPerGo }}" style="flex:1;padding:7px 8px;border-radius:9px;border:none;background:{{ desgPerBg }};box-shadow:{{ desgPerSh }};font-size:14px;font-weight:{{ desgPerW }};color:#212529;cursor:pointer;font-family:inherit">Por persona</button>
       </div>
-      <div style="position:relative;margin:30px 14px 0 0">
-        <div style="position:absolute;left:{{ desgAxOff }};top:-14px;height:14px;width:2px;background:#495057"></div><svg width="10" height="10" viewBox="0 0 10 10" style="position:absolute;left:{{ desgAxOffC }};top:-22px;transform:translateX(-50%)"><path d="M5 0L9.5 9.2 5 7.2 0.5 9.2z" fill="#495057"></path></svg>
+      <!-- ══ EL GRÁFICO ═══════════════════════════════════════════
+           LOS EJES SON FLECHAS DE TRAZO, no barras que acaban en un
+           triángulo relleno. Medido sobre el frame: línea de 2 px en
+           #666666, y el galón de la punta con ese mismo grosor, punta
+           redonda, 14x7 arriba y 7x14 a la derecha.
+
+           El eje horizontal SOBRESALE 28 px de la última marca antes
+           de la punta: por eso la línea se dibuja aparte, con
+           right:-28px, en vez de ser el borde del contenedor. Si
+           fuese el borde, la flecha saldría pegada al 100 % y la
+           última cifra quedaría debajo de la punta.
+           ══════════════════════════════════════════════════════════ -->
+      <div style="position:relative;margin:26px 39px 0 0">
+        <svg width="14" height="8" viewBox="0 0 14 8" aria-hidden="true" style="position:absolute;left:{{ desgAxOffC }};top:-10px;transform:translateX(-50%);display:block"><path d="M1 7L7 1L13 7" fill="none" stroke="#666666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
         <sc-for list="{{ desgRows2 }}" as="b" hint-placeholder-count="0">
           <div class="rn-bar" style="display:flex;align-items:center;min-height:{{ b.h }}">
-            <span style="width:{{ desgLabW }};flex-shrink:0;text-align:right;font-size:12.6px;color:#495057;line-height:1.25;text-wrap:balance">{{ b.label }}</span>
-            <span style="width:6px;height:2px;background:#495057;flex-shrink:0;margin-left:2px"></span>
-            <div style="flex:1;align-self:stretch;border-left:2px solid #495057;display:flex;align-items:center;position:relative">
+            <span style="width:{{ desgLabW }};flex-shrink:0;text-align:right;font-size:13px;color:#666666;line-height:1.3;text-wrap:balance">{{ b.label }}</span>
+            <span style="width:6px;height:2px;background:#666666;flex-shrink:0;margin-left:8px"></span>
+            <div style="flex:1;align-self:stretch;border-left:2px solid #666666;display:flex;align-items:center;position:relative">
               <span style="height:{{ b.barH }};width:{{ b.pct }};background:#B4E88F;display:block"></span>
               <div class="rn-tip" style="position:absolute;left:{{ b.tipL }};top:50%;transform:translateY(-50%);z-index:8;flex-direction:column;gap:1px;background:#3E444A;border-radius:8px;padding:7px 12px;box-shadow:0 6px 18px rgba(13,31,39,.3);pointer-events:none;white-space:nowrap">
                 <span style="font-size:12.6px;font-weight:700;color:#ffffff">{{ b.name }}</span>
-                <span style="font-size:12.3px;color:#E9ECEF">{{ b.amt }}</span>
+                <span class="rn-cifra" style="font-size:12.3px;color:#E9ECEF">{{ b.amt }}</span>
               </div>
             </div>
           </div>
         </sc-for>
         <div style="display:flex">
           <span style="width:{{ desgAxOff }};flex-shrink:0"></span>
-          <div style="flex:1;height:2px;background:#495057;position:relative">
-            <svg width="10" height="10" viewBox="0 0 10 10" style="position:absolute;right:-14px;top:-4px"><path d="M0 0.5L9.2 5 0 9.5 2 5z" fill="#495057"></path></svg>
+          <div style="flex:1;position:relative;height:2px">
+            <span style="position:absolute;left:0;right:-28px;top:0;height:2px;background:#666666"></span>
+            <svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true" style="position:absolute;right:-37px;top:-6px;display:block"><path d="M1 1L7 7L1 13" fill="none" stroke="#666666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span style="position:absolute;left:0;top:2px;width:2px;height:5px;background:#666666"></span>
+            <span style="position:absolute;left:50%;margin-left:-1px;top:2px;width:2px;height:5px;background:#666666"></span>
+            <span style="position:absolute;left:100%;margin-left:-2px;top:2px;width:2px;height:5px;background:#666666"></span>
           </div>
         </div>
-        <div style="display:flex;margin-top:8px">
+        <!-- Las cifras van CENTRADAS en su marca, no repartidas de
+             extremo a extremo. En el frame las tres caen exactamente
+             sobre su tick (desviación medida: 0.0 px en las tres), y
+             la del cero se mete un poco en la columna de etiquetas. -->
+        <div style="display:flex;margin-top:5px">
           <span style="width:{{ desgAxOff }};flex-shrink:0"></span>
-          <div style="flex:1;display:flex;justify-content:space-between">
-            <span style="font-size:12.3px;color:#495057;white-space:nowrap">{{ desgAx0 }}</span>
-            <span style="font-size:12.3px;color:#495057;white-space:nowrap">{{ desgAxMid }}</span>
-            <span style="font-size:12.3px;color:#495057;white-space:nowrap">{{ desgAxMax }}</span>
+          <div style="flex:1;position:relative;height:17px">
+            <span class="rn-cifra" style="position:absolute;left:0;transform:translateX(-50%);font-size:12.5px;color:#666666;white-space:nowrap">{{ desgAx0 }}</span>
+            <span class="rn-cifra" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12.5px;color:#666666;white-space:nowrap">{{ desgAxMid }}</span>
+            <span class="rn-cifra" style="position:absolute;left:100%;transform:translateX(-50%);font-size:12.5px;color:#666666;white-space:nowrap">{{ desgAxMax }}</span>
           </div>
         </div>
       </div>
       <div style="display:flex;justify-content:center;margin-top:24px">
-        <button onClick="{{ noop }}" style="display:flex;align-items:center;gap:8px;border:1px solid #DEE2E6;border-radius:20px;background:#ffffff;padding:9px 17px;font-size:12.8px;font-weight:600;color:#495057;cursor:pointer;white-space:nowrap" style-hover="background:#f7f8f9 !important">
-          <span style="width:18px;height:18px;border-radius:50%;border:1.5px solid #495057;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#495057;flex-shrink:0">$</span>
+        <button onClick="{{ noop }}" style="display:flex;align-items:center;gap:10px;border:1px solid #CFD1D3;border-radius:19px;background:#ffffff;padding:8px 13px;font-size:13.5px;font-weight:500;color:#495057;cursor:pointer;white-space:nowrap" style-hover="background:#f7f8f9 !important">
+          <!-- El icono es el GLIFO del dólar (Font Awesome, el mismo
+               juego que las categorías), no el carácter «$» metido
+               dentro de un círculo dibujado con un border-radius. En el
+               frame no hay círculo: es la letra sola, y bastante más
+               alta que el texto de al lado. -->
+          <svg width="11" height="18" viewBox="176 64 288 512" aria-hidden="true" style="display:block;flex-shrink:0"><path fill="currentColor" d="M296 88C296 74.7 306.7 64 320 64C333.3 64 344 74.7 344 88L344 128L400 128C417.7 128 432 142.3 432 160C432 177.7 417.7 192 400 192L285.1 192C260.2 192 240 212.2 240 237.1C240 259.6 256.5 278.6 278.7 281.8L370.3 294.9C424.1 302.6 464 348.6 464 402.9C464 463.2 415.1 512 354.9 512L344 512L344 552C344 565.3 333.3 576 320 576C306.7 576 296 565.3 296 552L296 512L224 512C206.3 512 192 497.7 192 480C192 462.3 206.3 448 224 448L354.9 448C379.8 448 400 427.8 400 402.9C400 380.4 383.5 361.4 361.3 358.2L269.7 345.1C215.9 337.5 176 291.4 176 237.1C176 176.9 224.9 128 285.1 128L296 128L296 88z"></path></svg>
           Cambiar moneda
         </button>
       </div>
