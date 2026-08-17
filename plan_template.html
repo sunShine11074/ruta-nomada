@@ -1791,6 +1791,12 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
       <div style="display:flex;background:#F1F3F5;border-radius:12px;margin-top:18px">
         <button onClick="{{ desgCatGo }}" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid {{ desgCatBd }};background:{{ desgCatBg }};font-size:14.5px;font-weight:{{ desgCatW }};color:#212529;cursor:pointer">Categoría</button>
         <button onClick="{{ desgDiaGo }}" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid {{ desgDiaBd }};background:{{ desgDiaBg }};font-size:14.5px;font-weight:{{ desgDiaW }};color:#212529;cursor:pointer">Día a día</button>
+        <!-- Por persona. La infraestructura del reparto llevaba tiempo
+             entera —plan_item_gasto para los lugares y
+             plan_gasto_reparto para los sueltos— pero nadie sumaba
+             por cabeza: se sabía repartir UN gasto y no había forma
+             de ver el total de cada quien. Esto es lo que faltaba. -->
+        <button onClick="{{ desgPerGo }}" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid {{ desgPerBd }};background:{{ desgPerBg }};font-size:14.5px;font-weight:{{ desgPerW }};color:#212529;cursor:pointer">Por persona</button>
       </div>
       <div style="position:relative;margin:30px 14px 0 0">
         <div style="position:absolute;left:{{ desgAxOff }};top:-14px;height:14px;width:2px;background:#495057"></div><svg width="10" height="10" viewBox="0 0 10 10" style="position:absolute;left:{{ desgAxOffC }};top:-22px;transform:translateX(-50%)"><path d="M5 0L9.5 9.2 5 7.2 0.5 9.2z" fill="#495057"></path></svg>

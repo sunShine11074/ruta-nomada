@@ -748,7 +748,13 @@ class Component extends DCLogic {
   }
   _mapearGastos(B) {
     return (B.gastos || []).map((g, i) => ({
-      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0, cat: g.categoria || 'Otro',
+      id: Number(g.id), c: g.concepto, m: Number(g.monto) || 0,
+      // 'otro' en MINUSCULA: es el vocabulario unico que comparten
+      // plan_items y plan_gastos desde la migracion. Aqui ponia 'Otro'
+      // capitalizado, del enum viejo, y ya no casaria con nada.
+      cat: g.categoria || 'otro',
+      moneda: g.moneda || 'MXN', desc: g.descripcion || '', modo: g.modo || 'no',
+      reparto: (g.reparto || []).map(r => ({ uid: Number(r.uid), monto: Number(r.monto) || 0, color: r.color || '' })),
       fecha: this._fmtDia(g.fecha), fiso: g.fecha || '', ts: ((B.gastos || []).length - i)
     }));
   }
@@ -2880,6 +2886,7 @@ class Component extends DCLogic {
       out.push({
         k: 'l' + g.id, origen: 'libro', id: g.id, c: g.c, m: m,
         cat: g.cat || 'otro', moneda: g.moneda || 'MXN',
+        reparto: g.reparto || [],
         fecha: g.fecha || '', fiso: g.fiso || '', ts: g.ts || 0
       });
     });
@@ -2890,6 +2897,7 @@ class Component extends DCLogic {
       out.push({
         k: 's' + it.uid, origen: 'sitio', uid: it.uid, c: it.name, m: m,
         cat: it.gastoCat || 'otro', moneda: it.moneda || 'MXN',
+        reparto: it.reparto || [],
         fecha: d && d.iso ? this._fmtDia(d.iso) : '', fiso: (d && d.iso) || '',
         dia: di, ts: 0
       });
@@ -2907,6 +2915,46 @@ class Component extends DCLogic {
   // divisas distintas que hay; si trae mas de una, la pantalla lo dice.
   // Devuelve el gasto del libro tal cual lo guarda el estado, para
   // volver a abrirlo en la ventana con sus campos rellenos.
+  // ── Cuanto le toca a cada quien ─────────────────────────────
+  //
+  // La infraestructura del reparto estaba entera desde hace tiempo
+  // —plan_item_gasto para los lugares, plan_gasto_reparto para los
+  // sueltos— pero NADIE sumaba por persona. Se sabia repartir UN gasto y
+  // no habia forma de ver el total de cada uno.
+  //
+  // Un gasto SIN filas de reparto no es de nadie: va a «Sin repartir».
+  // Es lo que pasa con modo='no', que es el valor por defecto, y con los
+  // gastos de antes de que existiera la ventana. Meterlos a partes
+  // iguales entre todos seria inventarse un dato que nadie escribio.
+  //
+  // Se devuelven TODOS los miembros, tambien los que no deben nada: un
+  // cero explicito dice «no le toca» y una ausencia no dice nada.
+  _porPersona(lista) {
+    const suma = {};
+    (this.MIEMBROS || []).forEach(m => { suma[m.uid] = 0; });
+    let sinRepartir = 0;
+    lista.forEach(g => {
+      const rep = (g.reparto || []).filter(r => Number(r.monto) > 0);
+      if (!rep.length) { sinRepartir += g.m; return; }
+      let cubierto = 0;
+      rep.forEach(r => {
+        const u = Number(r.uid), v = Number(r.monto) || 0;
+        if (suma[u] === undefined) suma[u] = 0;   // repartido a alguien que ya no es miembro
+        suma[u] += v; cubierto += v;
+      });
+      // Si el reparto no cubre el importe entero —pasa si se edito el
+      // total y no las partes—, la diferencia no se reparte a la fuerza:
+      // se queda sin asignar y el usuario ve que algo no cuadra.
+      const resto = Math.round((g.m - cubierto) * 100) / 100;
+      if (resto > 0) sinRepartir += resto;
+    });
+    const filas = (this.MIEMBROS || []).map(m => ({
+      label: (m.nombre || 'Sin nombre').split(' ')[0], v: suma[m.uid] || 0
+    }));
+    if (sinRepartir > 0.004) filas.push({ label: 'Sin repartir', v: sinRepartir });
+    return filas;
+  }
+
   _gastoDelLibro(id) { return (this.state.gastos || []).find(g => g.id === id) || null; }
 
   _monedasEnUso(lista) {
@@ -4634,16 +4682,23 @@ class Component extends DCLogic {
       }
       else this.setState(tplReset);
     };
-    const isCat = (s.desgTab || 'cat') === 'cat';
-    V.desgIsCat = isCat; V.desgIsDia = !isCat;
+    // TRES pestañas, no dos. El codigo de antes tenia isCat/!isCat por
+    // todas partes; con una tercera eso ya no vale, asi que se compara
+    // contra el nombre de la pestaña activa.
+    const tab = s.desgTab || 'cat';
+    V.desgIsCat = tab === 'cat'; V.desgIsDia = tab === 'dia'; V.desgIsPer = tab === 'per';
     const tabSt = (on) => ({ bg: on ? '#ffffff' : 'transparent', bd: on ? '#DEE2E6' : 'transparent', w: on ? 700 : 500 });
-    const t1 = tabSt(isCat), t2 = tabSt(!isCat);
+    const t1 = tabSt(tab === 'cat'), t2 = tabSt(tab === 'dia'), t3 = tabSt(tab === 'per');
     V.desgCatBg = t1.bg; V.desgCatBd = t1.bd; V.desgCatW = t1.w;
     V.desgDiaBg = t2.bg; V.desgDiaBd = t2.bd; V.desgDiaW = t2.w;
+    V.desgPerBg = t3.bg; V.desgPerBd = t3.bd; V.desgPerW = t3.w;
     V.desgCatGo = () => this.setState({ desgTab: 'cat' });
     V.desgDiaGo = () => this.setState({ desgTab: 'dia' });
+    V.desgPerGo = () => this.setState({ desgTab: 'per' });
     let desgData;
-    if (isCat) {
+    if (tab === 'per') {
+      desgData = this._porPersona(gastosTodos);
+    } else if (tab === 'cat') {
       // EL EJE SALE DE _gcats(), la lista que usa la ventana. Antes era
       // una lista escrita a mano —Vuelos, Comestibles, Turismo, Alquiler
       // de coches…— que NO casaba ni con la ventana ni con el enum de la
@@ -4670,10 +4725,13 @@ class Component extends DCLogic {
     const fmtAx = (n) => 'MX$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     V.desgRows2 = desgData.map(r => {
       const pctN = (r.v / desgMax) * 100;
-      return { label: r.label, name: r.label, amt: fmtAx(r.v), pct: pctN.toFixed(2) + '%', tipL: Math.min(62, Math.max(8, pctN * 0.6)).toFixed(1) + '%', h: isCat ? '34px' : '54px', barH: isCat ? '22px' : '26px' };
+      return { label: r.label, name: r.label, amt: fmtAx(r.v), pct: pctN.toFixed(2) + '%', tipL: Math.min(62, Math.max(8, pctN * 0.6)).toFixed(1) + '%', h: tab === 'dia' ? '54px' : '34px', barH: tab === 'dia' ? '26px' : '22px' };
     });
     V.desgAx0 = fmtAx(0); V.desgAxMid = fmtAx(desgMax / 2); V.desgAxMax = fmtAx(desgMax);
-    V.desgLabW = isCat ? '112px' : '46px'; V.desgAxOff = isCat ? '120px' : '54px'; V.desgAxOffC = isCat ? '121px' : '55px';
+    // La columna de etiquetas es ancha salvo en «Dia a dia», donde
+// solo pone «1/9» y sobraria sitio.
+const anchaLab = tab !== 'dia';
+    V.desgLabW = anchaLab ? '112px' : '46px'; V.desgAxOff = anchaLab ? '120px' : '54px'; V.desgAxOffC = anchaLab ? '121px' : '55px';
     V.expFormOpen = s.expFormOpen;
     V.expFormToggle = () => this.setState({ expFormOpen: !s.expFormOpen });
     V.expC = s.expC; V.expCChange = (e) => this.setState({ expC: e.target.value });

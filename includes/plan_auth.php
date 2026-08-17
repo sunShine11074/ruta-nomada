@@ -254,13 +254,33 @@ function planFullJson(int $planId, array $acc): array
     }
     unset($it);
 
-    // Gastos
+    // Gastos del libro, con lo que la ventana «Añadir gasto» les añadió:
+    // moneda, descripción, modo de reparto — y el reparto en sí.
     $stmt = $db->prepare(
-        'SELECT id, concepto, monto, categoria, dia, fecha, created_at
+        'SELECT id, concepto, monto, moneda, categoria, descripcion, modo, dia, fecha, created_at
            FROM plan_gastos WHERE plan_id = ? ORDER BY created_at DESC, id DESC'
     );
     $stmt->execute([$planId]);
     $gastos = $stmt->fetchAll();
+
+    // El reparto de esos gastos, en su propia tabla. Se pega a cada uno
+    // igual que arriba se hace con el de los lugares: una sola consulta
+    // para todo el plan y luego se agrupa en PHP, en vez de una por
+    // gasto. Con quince gastos serían quince viajes a la base.
+    $stmt = $db->prepare(
+        'SELECT r.gasto_id, r.usuario_id, r.monto, r.color
+           FROM plan_gasto_reparto r JOIN plan_gastos g ON g.id = r.gasto_id
+          WHERE g.plan_id = ? ORDER BY r.id'
+    );
+    $stmt->execute([$planId]);
+    $repG = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $repG[(int)$r['gasto_id']][] = [
+            'uid' => (int)$r['usuario_id'], 'monto' => (float)$r['monto'], 'color' => $r['color'],
+        ];
+    }
+    foreach ($gastos as &$gg) { $gg['reparto'] = $repG[(int)$gg['id']] ?? []; }
+    unset($gg);
 
     // Listas + items
     $stmt = $db->prepare('SELECT id, titulo, tipo, texto, orden FROM plan_listas WHERE plan_id = ? ORDER BY orden, id');
