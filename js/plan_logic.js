@@ -2325,27 +2325,54 @@ class Component extends DCLogic {
     if (d.tips) { cb(d.tips); return; }
     const fin = (r) => { d.tips = r; cb(r); };
     if (!this.PLAN_ID) { fin(null); return; }
-    // La ciudad sale del destino del viaje, recortando lo que va tras
-    // la primera coma: "Ensenada, Baja California, Mexico" -> "Ensenada".
-    const dest = String((this.BOOT && this.BOOT.plan && this.BOOT.plan.destino) || '');
-    fetch('api/plan_tips.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
-      body: JSON.stringify({
-        plan_id: this.PLAN_ID,
-        categoria: d.cat || 'custom',
-        ciudad: dest,
-        // El extracto de Wikipedia es CC BY-SA, asi que este SI se puede
-        // mandar sin reparos. Solo existe para monumentos; para un
-        // restaurante llega vacio y los consejos salen mas genericos.
-        wiki: (d.acerca && d.acerca.fuente === 'wiki') ? d.acerca.texto : '',
-        nota: d.nota || '',
-        ia: !!window.PLAN_TIPS_IA
+    const TOPE = 4;
+
+    // ── Nivel 1: los atributos del propio negocio ──
+    // Estos SI hablan del sitio concreto, y son datos, no redaccion.
+    // Van primero porque un "solo aceptan efectivo" verdadero vale mas
+    // que cuatro consejos bien escritos sobre la ciudad.
+    this._placeNuevo(d.gpid || '', (q) => {
+      const propios = this._tipsAtributos(q).slice(0, TOPE);
+      if (propios.length >= TOPE) { fin({ lista: propios, fuente: 'atributos' }); return; }
+
+      // ── Niveles 2 y 3: se COMPLETA, no se sustituye ──
+      // Si Google solo sabe dos cosas del sitio, se enseñan esas dos y
+      // se rellena hasta cuatro con consejos del destino. Asi la seccion
+      // siempre tiene el mismo tamaño y lo especifico va arriba.
+      const dest = String((this.BOOT && this.BOOT.plan && this.BOOT.plan.destino) || '');
+      fetch('api/plan_tips.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
+        body: JSON.stringify({
+          plan_id: this.PLAN_ID,
+          categoria: d.cat || 'custom',
+          ciudad: dest,
+          // El extracto de Wikipedia es CC BY-SA, asi que este SI se puede
+          // mandar sin reparos. Solo existe para monumentos; para un
+          // restaurante llega vacio y los consejos salen mas genericos.
+          wiki: (d.acerca && d.acerca.fuente === 'wiki') ? d.acerca.texto : '',
+          nota: d.nota || '',
+          ia: !!window.PLAN_TIPS_IA,
+          // Cuantos faltan. El servidor manda cuatro igual y aqui se
+          // recorta: pedirle "dame dos" a un modelo sale peor que pedirle
+          // cuatro y quedarse con las que hagan falta.
+          faltan: TOPE - propios.length
+        })
       })
-    })
-      .then(r => r.json())
-      .then(j => fin(j && j.ok ? { lista: j.consejos || [], fuente: j.fuente } : null))
-      .catch(() => fin(null));
+        .then(r => r.json())
+        .then(j => {
+          const extra = (j && j.ok && j.consejos) ? j.consejos : [];
+          const lista = propios.concat(extra).slice(0, TOPE);
+          if (!lista.length) { fin(null); return; }
+          // La procedencia es la de lo MENOS fiable que se enseña: si hay
+          // una sola linea escrita por un modelo, el aviso tiene que
+          // decirlo aunque las otras tres sean datos de Google.
+          const fuente = !extra.length ? 'atributos'
+                       : (propios.length ? 'mixto' : (j.fuente || 'plantilla'));
+          fin({ lista: lista, fuente: fuente, propios: propios.length });
+        })
+        .catch(() => fin(propios.length ? { lista: propios, fuente: 'atributos', propios: propios.length } : null));
+    });
   }
 
   // ════ "Acerca de": cascada de tres niveles ════════════════════
@@ -2370,34 +2397,156 @@ class Component extends DCLogic {
     });
   }
 
-  // ── Nivel 1: editorialSummary (Places API New) ──
-  _acercaGoogle(pid, cb) {
-    // Interruptor desde plan.php: el nivel 1 se cobra aparte y sólo trae
-    // 1,000 llamadas gratis al mes, así que conviene poder apagarlo.
+  // ── Una sola llamada a Places (New) para todo lo que sale de ahi ──
+  //
+  // De aqui salen DOS cosas: el editorialSummary del "Acerca de" y los
+  // atributos del negocio de "Saber antes de ir". Van juntos A
+  // PROPOSITO, y no es por ahorrarse una linea:
+  //
+  // Places (New) cobra POR PETICION, al escalon mas alto de los campos
+  // que pidas. editorialSummary ya esta en Enterprise + Atmosphere, que
+  // es el mas caro, asi que meter en la MISMA llamada los atributos
+  // -que son de ese mismo escalon- no abre ningun cobro nuevo. En dos
+  // llamadas separadas se pagaria dos veces por lo mismo.
+  //
+  // Por eso tambien comparten el interruptor PLAN_ACERCA_GOOGLE: si se
+  // apaga para no gastar, se apagan los dos.
+  static get PLACE_CAMPOS() {
+    return [
+      'editorialSummary', 'editorialSummaryLanguageCode',
+      // Los que de verdad cambian lo que haces antes de ir
+      'paymentOptions', 'parkingOptions', 'accessibilityOptions', 'isReservable',
+      // Comodidad y con quien vas
+      'hasOutdoorSeating', 'isGoodForChildren', 'hasMenuForChildren', 'isGoodForGroups',
+      'allowsDogs', 'hasRestroom', 'hasLiveMusic',
+      // Que se puede comer
+      'servesVegetarianFood', 'servesBreakfast', 'servesBrunch', 'servesDinner',
+      'hasTakeout', 'hasDelivery'
+    ];
+  }
+  _placeNuevo(pid, cb) {
+    if (!this._pnCache) { this._pnCache = {}; this._pnEspera = {}; }
+    if (Object.prototype.hasOwnProperty.call(this._pnCache, pid)) { cb(this._pnCache[pid]); return; }
+    // Dos peticiones a la vez para el mismo sitio pagarian dos veces. El
+    // "Acerca de" y los consejos se piden casi al mismo tiempo, asi que
+    // esto no es teorico: el segundo se engancha al primero.
+    if (this._pnEspera[pid]) { this._pnEspera[pid].push(cb); return; }
     if (!window.PLAN_ACERCA_GOOGLE) { cb(null); return; }
     if (!window.google || !google.maps || !google.maps.importLibrary) { cb(null); return; }
-    let listo = false;
-    const una = (v) => { if (!listo) { listo = true; cb(v); } };
+    this._pnEspera[pid] = [cb];
+    const fin = (q) => {
+      this._pnCache[pid] = q;
+      const cola = this._pnEspera[pid] || [];
+      delete this._pnEspera[pid];
+      cola.forEach(f => { try { f(q); } catch (e) { } });
+    };
     google.maps.importLibrary('places').then((lib) => {
       const Place = (lib && lib.Place) || (google.maps.places && google.maps.places.Place);
-      if (!Place) { una(null); return; }
-      // La clase nueva convive con PlacesService: no hay que migrar nada más.
+      if (!Place) { fin(null); return; }
+      // La clase nueva convive con PlacesService: no hay que migrar nada mas.
       const p = new Place({ id: pid, requestedLanguage: 'es', requestedRegion: 'MX' });
-      return p.fetchFields({ fields: ['editorialSummary', 'editorialSummaryLanguageCode'] })
-        .then((res) => {
-          const q = (res && res.place) || p;
-          const txt = q.editorialSummary ? String(q.editorialSummary).trim() : '';
-          const idi = String(q.editorialSummaryLanguageCode || '').slice(0, 2);
-          // Google prohíbe alterar este texto, así que tampoco se puede
-          // traducir: si no llega en español, se baja de nivel.
-          if (!txt || (idi && idi !== 'es')) { una(null); return; }
-          una({ texto: txt, fuente: 'google' });
+      return p.fetchFields({ fields: Component.PLACE_CAMPOS })
+        .then((res) => fin((res && res.place) || p))
+        .catch((e) => {
+          // Si UN nombre de campo no le gusta, fetchFields tira la
+          // llamada ENTERA y nos quedariamos tambien sin el "Acerca de",
+          // que llevaba meses funcionando. Asi que se reintenta con los
+          // dos campos de siempre y los consejos se caen al siguiente
+          // nivel, en vez de llevarse por delante una funcion que ya iba.
+          console.warn('[plan] atributos no disponibles, reintento sin ellos:', e && e.message);
+          return p.fetchFields({ fields: ['editorialSummary', 'editorialSummaryLanguageCode'] })
+            .then((res) => fin((res && res.place) || p))
+            .catch(() => fin(null));
         });
     }).catch((e) => {
-      // Lo más probable: falta habilitar "Places API (New)" en Cloud.
-      console.warn('[plan] editorialSummary no disponible:', e && e.message);
-      una(null);
+      // Lo mas probable: falta habilitar "Places API (New)" en Cloud.
+      console.warn('[plan] Places (New) no disponible:', e && e.message);
+      fin(null);
     });
+  }
+
+  // ── Nivel 1 del "Acerca de": editorialSummary ──
+  _acercaGoogle(pid, cb) {
+    this._placeNuevo(pid, (q) => {
+      if (!q) { cb(null); return; }
+      const txt = q.editorialSummary ? String(q.editorialSummary).trim() : '';
+      const idi = String(q.editorialSummaryLanguageCode || '').slice(0, 2);
+      // Google prohibe alterar este texto, asi que tampoco se puede
+      // traducir: si no llega en español, se baja de nivel.
+      if (!txt || (idi && idi !== 'es')) { cb(null); return; }
+      cb({ texto: txt, fuente: 'google' });
+    });
+  }
+
+  // ── Consejos sacados de los ATRIBUTOS del propio negocio ──
+  //
+  // Esto es lo unico de toda la seccion que habla del sitio CONCRETO, y
+  // ademas es lo mas fiable: son datos de Places convertidos a frases,
+  // sin IA por medio. Nada que inventar.
+  //
+  // Y esquiva el problema de los terminos por donde no duele: lo que
+  // prohiben es usar contenido de Maps para ENTRENAR modelos. Aqui no
+  // hay modelo ninguno. Enseñar datos de Places dentro de la aplicacion
+  // es exactamente para lo que sirve la licencia.
+  //
+  // ⚠ LOS NOMBRES NO SON LOS DE LA DOCUMENTACION REST. La clase Place
+  // de JavaScript les pone prefijo: donde la doc dice `reservable`,
+  // `outdoorSeating` o `freeParkingLot`, aqui hay que escribir
+  // `isReservable`, `hasOutdoorSeating` y `hasFreeParkingLot`. Con el
+  // nombre de la doc, fetchFields tira la llamada ENTERA con "Unknown
+  // fields requested"; y en los objetos anidados no falla, simplemente
+  // devuelve undefined y el consejo no sale nunca. Comprobado contra la
+  // API con los sitios reales del plan.
+  //
+  // Ojo tambien con Object.keys() sobre paymentOptions y compania: da
+  // los nombres MINIFICADOS (qh, sh, rh). Los documentados funcionan
+  // igual porque son getters del prototipo; solo no se ven al listar.
+  //
+  // ⚠ SIN DATO NO SE DICE NADA. Los booleanos de Places son opcionales:
+  // que no venga `reservable` NO significa que no acepte reservas,
+  // significa que Google no lo sabe. Por eso todo se compara con === true
+  // o === false y nunca con un simple if: escribir "no acepta reservas"
+  // porque el campo no vino seria mentir con cara de dato.
+  _tipsAtributos(q) {
+    if (!q) return [];
+    const L = [];
+    const si = (v) => v === true, no = (v) => v === false;
+    const pa = q.paymentOptions || {}, pk = q.parkingOptions || {}, ac = q.accessibilityOptions || {};
+
+    // 1) Lo que te obliga a hacer algo ANTES de salir de casa.
+    if (si(pa.acceptsCashOnly)) L.push('Sólo aceptan efectivo: pasa por un cajero antes de ir.');
+    else if (no(pa.acceptsCreditCards)) L.push('No aceptan tarjeta de crédito: lleva efectivo.');
+    else if (si(pa.acceptsCreditCards)) L.push('Aceptan tarjeta, así que no hace falta que lleves efectivo.');
+
+    if (si(q.isReservable)) L.push('Acepta reservas: si vais en grupo, reserva antes.');
+    else if (no(q.isReservable)) L.push('No acepta reservas: llega pronto si quieres sitio.');
+
+    if (si(pk.hasFreeParkingLot)) L.push('Tiene estacionamiento propio y gratuito.');
+    else if (si(pk.hasPaidParkingLot) || si(pk.hasPaidGarageParking)) L.push('El estacionamiento es de pago; calcula ese gasto aparte.');
+    else if (si(pk.hasValetParking)) L.push('Hay servicio de valet parking.');
+    else if (si(pk.hasFreeStreetParking)) L.push('Se puede estacionar gratis en la calle.');
+
+    // 2) Accesibilidad. Va arriba a propósito: para quien la necesita no
+    //    es un detalle simpático, es lo que decide si puede ir o no.
+    if (si(ac.hasWheelchairAccessibleEntrance)) L.push('La entrada es accesible en silla de ruedas.');
+    else if (no(ac.hasWheelchairAccessibleEntrance)) L.push('La entrada NO es accesible en silla de ruedas.');
+
+    // 3) Con quién vas.
+    if (si(q.isGoodForChildren) || si(q.hasMenuForChildren)) {
+      L.push(si(q.hasMenuForChildren) ? 'Buen sitio para ir con niños: tienen menú infantil.' : 'Es un sitio adecuado para ir con niños.');
+    }
+    if (si(q.isGoodForGroups)) L.push('Admite grupos grandes sin problema.');
+    if (si(q.allowsDogs)) L.push('Se puede entrar con perro.');
+
+    // 4) Cómo es el sitio.
+    if (si(q.hasOutdoorSeating)) L.push('Tiene mesas al aire libre, además del comedor de dentro.');
+    if (si(q.servesVegetarianFood)) L.push('Hay opciones vegetarianas en la carta.');
+    if (si(q.hasLiveMusic)) L.push('A veces hay música en vivo; puede haber más ruido de lo normal.');
+    if (si(q.servesBreakfast) || si(q.servesBrunch)) L.push('Sirven desayuno, así que también funciona para empezar el día.');
+    if (si(q.hasTakeout) || si(q.hasDelivery)) L.push('Se puede pedir para llevar si no te cuadra la hora.');
+    if (no(q.hasRestroom)) L.push('No tiene baños para clientes.');
+
+    return L;
   }
 
   // ── Nivel 2: Wikipedia, sólo para lugares que suelen tener artículo ──
@@ -4700,9 +4849,17 @@ class Component extends DCLogic {
       // La procedencia se dice SIEMPRE que la escriba una IA, igual que
       // ya se hace con el "Acerca de". El frame no lo contemplaba, pero
       // el usuario tiene derecho a saber que esto no lo escribio nadie.
-      V.tipsNota = (tp && tp.fuente === 'ia')
-        ? 'Consejos generales del destino, redactados con IA. Confirma horarios y precios antes de ir.'
-        : 'Consejos generales; confirma horarios y precios antes de ir.';
+      // El aviso dice la verdad sobre lo MENOS fiable que se enseña.
+      // 'atributos' son datos de Google sobre el propio sitio y no
+      // llevan aviso de IA; en cuanto una sola linea la escriba un
+      // modelo, hay que decirlo aunque las demas sean datos.
+      const NOTAS = {
+        atributos: 'Datos del sitio según Google. Confirma horarios y precios antes de ir.',
+        mixto:     'Los primeros son datos del sitio según Google; el resto, consejos del destino redactados con IA.',
+        ia:        'Consejos generales del destino, redactados con IA. Confirma horarios y precios antes de ir.',
+        plantilla: 'Consejos generales; confirma horarios y precios antes de ir.'
+      };
+      V.tipsNota = (tp && NOTAS[tp.fuente]) || NOTAS.plantilla;
 
       // ── "Acerca de" y de dónde salió ──
       // El demo trae su texto escrito a mano; los lugares reales lo resuelven
