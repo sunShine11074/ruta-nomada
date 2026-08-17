@@ -1961,39 +1961,44 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
              escribíamos nosotros. El frame nuevo lo convierte en un
              panel que agrupa destinatarios, mensaje y envío.
 
-             MEDIDO CONTRA screens_ref/Invita a compañeros de viaje 2.png,
-             que está a escala 1,3333: el modal ocupa 600 px y son 450 de
-             CSS. La escala se sacó del frame viejo, cuyo modal se sabe
-             que mide 450, y los dos comparten lienzo de 1917x1078.
+             MEDIDO CONTRA screens_ref/Invitar a compañeros de viaje (window).png,
+             que es la ventana entera y aislada; escala 1,3333 (el modal
+             ocupa 600 px y son 450 de CSS).
 
-               panel     390 de ancho, o sea todo el contenido
-               ficha     34,5 de alto, radio 17,25, borde #E1E4E8
-               botón +   34,5, mismo borde, 8 de hueco tras la ficha
-               enviar    184 x 37,5, radio 18,75, azul #5767E6
+             LOS HUECOS DE AQUÍ NO SON REDONDOS A PROPÓSITO. Salen de
+             cuadrar la TINTA de cada texto con la del frame, y la tinta
+             cae donde la deja la caja de línea de cada tipografía, que
+             no es un número entero. Comprobado en plan.php: campo,
+             «Enviando a», ficha, «Mensaje» y la primera línea del
+             mensaje caen todos dentro de 0,6 px del frame.
 
-             LA FICHA Y EL BOTÓN REDONDO NO SON BLANCOS. Su interior mide
-             #F6F6F6, el mismo gris del panel: son transparentes con sólo
-             el borde. Con fondo blanco se ven como pastillas pegadas
-             encima en vez de recortadas dentro.
+               panel      390 de ancho, sin relleno arriba
+               campo      52,5 de alto (el subrayado va justo ahí)
+               Enviando a 11,25 tras el campo
+               fichas     4,85 tras la etiqueta
+               Mensaje    9,15 tras la ficha
+               botón      24,9 tras el mensaje, 184 x 37,5, azul #3F52E3
+                          y a 9 del borde derecho y 10 del inferior
 
-             EL AZUL DE ENVIAR NO ES EL DE COPIAR: #5767E6 frente a
-             #3F52E3. Son dos azules distintos en el mismo frame, no un
-             despiste al copiar el valor.
+             EL PANEL NO LLEVA RELLENO ARRIBA, y no es un olvido: en el
+             frame el campo del correo empieza en el borde mismo del
+             gris. Con los 14 que tenía antes, el texto del campo caía
+             7 px más bajo que en el diseño.
 
-             Y EL ALTO DE ENVIAR SALE DEL BOTÓN DE COPIAR, NO DEL FRAME.
-             Aquí los dos azules miden 34, o sea que el diseño los quiere
-             IGUALES; pero el de copiar lleva 37,5 desde que se midió
-             contra SU frame y ese ya estaba aprobado. Se respeta la
-             relación que manda el diseño -que sean iguales- con el
-             número que ya estaba, en vez de dejar a distinta altura dos
-             botones que el frame dibuja del mismo tamaño. -->
-        <div style="margin-top:15px;padding:14px 12px 16px;border-radius:6px;background:#F6F6F6">
+             ⚠ EL BOTÓN SÍ QUEDA 25 MÁS ABAJO QUE EN EL FRAME, y es a
+             sabiendas: el interlineado del mensaje se subió a 23 px por
+             petición del diseño, y el frame está dibujado con 18. Esos
+             25 son los 5 renglones por los 5 px de diferencia. Si algún
+             día se quiere que el panel case con el frame en 308,2, hay
+             que volver el textarea a line-height 18 y el botón cae solo
+             en 267. -->
+        <div style="margin-top:15px;padding:0 12px 16px;border-radius:6px;background:#F6F6F6">
 
           <!-- El campo de escribir. Subrayado en vez de caja porque en
                el frame se ve una línea bajo el texto, no un
                rectángulo: es el mismo hueco de antes, abierto por
                abajo para que las fichas cuelguen de él. -->
-          <div style="display:flex;align-items:center;height:38px;box-sizing:border-box;border-bottom:1px solid #DEE2E6">
+          <div style="display:flex;align-items:center;height:52.5px;box-sizing:border-box;border-bottom:1px solid #DEE2E6">
             <svg width="19" height="19" viewBox="0 0 512 512" fill="#6C757D" style="flex-shrink:0;display:block"><path d="M61.4 64C27.5 64 0 91.5 0 125.4 0 126.3 0 127.1 .1 128L0 128 0 384c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-256-.1 0c0-.9 .1-1.7 .1-2.6 0-33.9-27.5-61.4-61.4-61.4L61.4 64zM464 192.3L464 384c0 8.8-7.2 16-16 16L64 400c-8.8 0-16-7.2-16-16l0-191.7 154.8 117.4c31.4 23.9 74.9 23.9 106.4 0L464 192.3zM48 125.4C48 118 54 112 61.4 112l389.2 0c7.4 0 13.4 6 13.4 13.4 0 4.2-2 8.2-5.3 10.7L280.2 271.5c-14.3 10.8-34.1 10.8-48.4 0L53.3 136.1c-3.3-2.5-5.3-6.5-5.3-10.7z"></path></svg>
             <input value="{{ invEmail }}" onChange="{{ invEmailCambia }}" onKeyDown="{{ invEmailTecla }}" type="email" placeholder="Invita a tus amigos por email" aria-label="Invita a tus amigos por email. Pulsa Intro para añadirlo a la lista" style="flex:1;min-width:0;margin-left:10px;border:none;outline:none;background:none;font-family:inherit;font-size:13.5px;color:#212529">
           </div>
@@ -2002,10 +2007,10 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                mientras no haya nadie: en el frame no hay hueco vacío
                reservado, la fila nace con la primera ficha. -->
           <sc-if value="{{ invHayDest }}" hint-placeholder-val="{{ true }}">
-            <p style="margin:14px 0 0;font-size:12.5px;font-weight:700;color:#212529;font-family:Poppins,sans-serif">Enviando a</p>
+            <p style="margin:11.25px 0 0;font-size:12.5px;font-weight:700;color:#212529;font-family:Poppins,sans-serif">Enviando a</p>
           </sc-if>
 
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4.85px">
             <sc-for list="{{ invDestVM }}" as="d" hint-placeholder-count="1">
               <!-- Borde y tinta se ponen rojos cuando esa dirección
                    falló en el último envío. EL COLOR NO ES EL ÚNICO
@@ -2066,7 +2071,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                eso se veía apretado.
 
                Si algún día se quiere el 1,20 de Docs son 24 px. -->
-          <div style="display:flex;align-items:center;gap:7px;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:7px;margin-top:9.15px">
             <span style="font-size:12.5px;font-weight:700;color:#212529;font-family:Poppins,sans-serif">Mensaje</span>
             <button onClick="{{ invMsgFoco }}" aria-label="Escribir el mensaje" tabindex="-1" style="width:20px;height:20px;border:none;border-radius:5px;background:none;color:#212529;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease" style-hover="background:#E9ECEF !important">
               <svg width="15" height="15" viewBox="64 64 512 512" fill="currentColor" style="display:block"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg>
@@ -2107,7 +2112,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                #5767E6 leyendo un solo píxel, que cayó en el antialias;
                contando el frame entero salen 9192 píxeles de #3F52E3
                frente a 94 del otro. -->
-          <div style="display:flex;justify-content:flex-end;margin:24px -3px -6px 0">
+          <div style="display:flex;justify-content:flex-end;margin:24.9px -3px -6px 0">
             <button onClick="{{ invEnviar }}" style="padding:0 22px;min-width:184px;height:37.5px;border:none;border-radius:18.75px;background:{{ invEnviarBg }};color:#ffffff;font-family:Poppins,sans-serif;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:{{ invEnviarCursor }};transition:background .15s ease" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">{{ invEnviarTxt }}</button>
           </div>
         </div>
