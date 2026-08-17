@@ -193,6 +193,8 @@ class Component extends DCLogic {
       invModal: false, invPant: 'invitar', invLink: '', invLinkErr: '',
       invCopiado: false, invEmail: '', invAviso: '', invAvisoMal: false,
       invEnviando: false, invDest: [], invMsg: '', invRes: [],
+      // Concepto del gasto SUELTO (el que no cuelga de un sitio)
+      gConcepto: '',
       // El latido (fase 3 de PLAN_colaboracion.md).
       //   pulsoCaido    tres pulsos seguidos fallaron; se apago solo
       pulsoCaido: false, presentes: [],
@@ -2869,6 +2871,35 @@ class Component extends DCLogic {
       gMonOpen: false, gCatOpen: false, gModoOpen: false, gDonaOpen: true, gColorUid: null
     });
   }
+  // ── Un gasto que NO cuelga de ningun sitio ──────────────────
+  //
+  // La misma ventana que se abre desde la tarjeta de un lugar, pero
+  // desde el boton «+ Añadir gasto» de Presupuesto. Antes ese boton
+  // desplegaba un formulario en linea aparte —concepto, monto y una
+  // categoria de siete— que no era el que queria el diseño.
+  //
+  // La diferencia esta en donde acaba el dato:
+  //    con sitio  -> plan_items + plan_item_gasto
+  //    suelto     -> plan_gastos + plan_gasto_reparto
+  //
+  // Y en que el suelto pide CONCEPTO. Con sitio, el nombre del gasto es
+  // el del lugar; sin sitio no hay nada que ponerle, y
+  // plan_gastos.concepto es NOT NULL. Por eso la ventana enseña un
+  // campo mas, y solo en este caso.
+  _gastoSueltoAbrir(g) {
+    const rep = {};
+    ((g && g.reparto) || []).forEach(r => { rep[r.uid] = { monto: r.monto, color: r.color || '' }; });
+    this.setState({
+      gastoMenu: { suelto: true, id: (g && g.id) || null },
+      gConcepto: (g && g.c) || '',
+      gMonto: (g && g.m > 0) ? String(g.m) : '',
+      gMoneda: (g && g.moneda) || 'MXN',
+      gCat: (g && g.cat) || '', gDesc: (g && g.desc) || '',
+      gModo: (g && g.modo) || 'no', gRep: rep,
+      gMonOpen: false, gCatOpen: false, gModoOpen: false, gDonaOpen: true, gColorUid: null
+    });
+  }
+
   _gastoCerrar() { this.setState({ gastoMenu: null, gMonOpen: false, gCatOpen: false, gModoOpen: false, gColorUid: null }); }
   _gastoNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; }
   // Reparte a partes iguales dejando el sobrante en el primero: 100
@@ -2916,9 +2947,48 @@ class Component extends DCLogic {
     const m = this.state.gastoMenu;
     if (!m) return;
     const s = this.state;
-    const ref = this._itemPorUid(m.uid);
     const total = this._gastoNum(s.gMonto);
     const reparto = Object.keys(s.gRep).map(u => ({ usuario_id: Number(u), monto: s.gRep[u].monto, color: s.gRep[u].color }));
+
+    // ── Gasto SUELTO: va al libro, no a un sitio ──────────────
+    if (m.suelto) {
+      // El concepto es obligatorio en la base. Si no lo escribieron, se
+      // usa el nombre de la categoria antes que rechazar el guardado:
+      // el usuario ya puso importe y reparto, tirarle el trabajo por un
+      // titulo seria peor que ponerle uno razonable.
+      const cat = this._gcats().find(c => c.k === s.gCat);
+      const concepto = (s.gConcepto || '').trim() || (cat ? cat.t : 'Gasto');
+      if (total <= 0) { this._gastoCerrar(); return; }
+      const g = {
+        id: m.id || ('tmp' + Date.now()), c: concepto, m: total, cat: s.gCat || 'otro',
+        moneda: s.gMoneda, desc: s.gDesc, modo: s.gModo,
+        reparto: reparto.map(r => ({ uid: r.usuario_id, monto: r.monto, color: r.color })),
+        fecha: (new Date()).toISOString().slice(0, 10)
+      };
+      const nuevo = m.id
+        ? (this.state.gastos || []).map(x => x.id === m.id ? { ...x, ...g } : x)
+        : [...(this.state.gastos || []), g];
+      this.setState({ gastos: nuevo });
+      // _sync lleva CALLBACK, no promesa. Es el mismo patron que usaba
+      // el formulario en linea al que esto reemplaza (ver el historial
+      // de plan_gastos.php): el id de verdad sustituye al provisional
+      // cuando contesta el servidor.
+      this._sync('plan_gastos.php', {
+        action: m.id ? 'update' : 'add', id: m.id || undefined,
+        concepto: concepto, monto: total, categoria: s.gCat || 'otro',
+        moneda: s.gMoneda, descripcion: s.gDesc, modo: s.gModo,
+        reparto: reparto, fecha: g.fecha
+      }, (j) => {
+        if (j && j.id && !m.id) {
+          this.setState({ gastos: this.state.gastos.map(x => x.id === g.id ? { ...x, id: Number(j.id) } : x) });
+        }
+      });
+      this._gastoCerrar();
+      return;
+    }
+
+    // ── Gasto de un SITIO: como siempre ───────────────────────
+    const ref = this._itemPorUid(m.uid);
     this._parcheaItem(m.uid, {
       costo: total, moneda: s.gMoneda, gastoCat: s.gCat, gastoDesc: s.gDesc, gastoModo: s.gModo,
       reparto: reparto.map(r => ({ uid: r.usuario_id, monto: r.monto, color: r.color }))
@@ -3314,6 +3384,12 @@ class Component extends DCLogic {
 
     // ── Gasto del lugar ──
     V.gastoOn = !!s.gastoMenu;
+    // El gasto SUELTO enseña un campo mas -«Concepto»- porque sin sitio
+    // no hay de donde sacarle nombre, y plan_gastos.concepto es NOT NULL.
+    V.gastoEsSuelto = !!(s.gastoMenu && s.gastoMenu.suelto);
+    V.gastoConcepto = s.gConcepto || '';
+    V.gastoConceptoChange = (e) => this.setState({ gConcepto: e.target.value });
+    V.gastoSueltoAbrir = () => this._gastoSueltoAbrir(null);
     V.gastoClose = () => this._gastoCerrar();
     const mon = Component.MONEDAS.find(m => m.c === s.gMoneda) || Component.MONEDAS[0];
     V.gastoMonSim = mon.s;
@@ -4398,9 +4474,19 @@ class Component extends DCLogic {
       Compras: 'M256 144C256 108.7 284.7 80 320 80C355.3 80 384 108.7 384 144L384 192L256 192L256 144zM208 192L144 192C117.5 192 96 213.5 96 240L96 448C96 501 139 544 192 544L448 544C501 544 544 501 544 448L544 240C544 213.5 522.5 192 496 192L432 192L432 144C432 82.1 381.9 32 320 32C258.1 32 208 82.1 208 144L208 192zM232 240C245.3 240 256 250.7 256 264C256 277.3 245.3 288 232 288C218.7 288 208 277.3 208 264C208 250.7 218.7 240 232 240zM384 264C384 250.7 394.7 240 408 240C421.3 240 432 250.7 432 264C432 277.3 421.3 288 408 288C394.7 288 384 277.3 384 264z',
       Otro: 'M296 88C296 74.7 306.7 64 320 64C333.3 64 344 74.7 344 88L344 128L400 128C417.7 128 432 142.3 432 160C432 177.7 417.7 192 400 192L285.1 192C260.2 192 240 212.2 240 237.1C240 259.6 256.5 278.6 278.7 281.8L370.3 294.9C424.1 302.6 464 348.6 464 402.9C464 463.2 415.1 512 354.9 512L344 512L344 552C344 565.3 333.3 576 320 576C306.7 576 296 565.3 296 552L296 512L224 512C206.3 512 192 497.7 192 480C192 462.3 206.3 448 224 448L354.9 448C379.8 448 400 427.8 400 402.9C400 380.4 383.5 361.4 361.3 358.2L269.7 345.1C215.9 337.5 176 291.4 176 237.1C176 176.9 224.9 128 285.1 128L296 128L296 88z'
     };
-    const moneyMXN = (v, dec) => v.toLocaleString('es-MX', { minimumFractionDigits: dec === undefined ? 2 : dec, maximumFractionDigits: dec === undefined ? 2 : dec }) + ' MXN';
+    const soloNum = (v, dec) => v.toLocaleString('es-MX', { minimumFractionDigits: dec === undefined ? 2 : dec, maximumFractionDigits: dec === undefined ? 2 : dec });
+    const moneyMXN = (v, dec) => soloNum(v, dec) + ' MXN';
     let total = 0; const catSum = {};
     for (const g of s.gastos) { total += g.m; catSum[g.cat] = (catSum[g.cat] || 0) + g.m; }
+    // LOS DIGITOS VAN APARTE DEL CODIGO DE MONEDA. Google Sans Code es
+    // monoespaciada —se eligio justo por eso, para que una columna de
+    // importes quede alineada por la coma— pero eso mismo hace que un
+    // «MXN» dentro de la fuente ocupe tres anchos de digito y se despegue
+    // del numero. La plantilla pone la clase rn-cifra solo en el numero.
+    V.budTotalNum = soloNum(total);
+    V.budLimitNum = soloNum(s.budget, 0);
+    V.budMon = 'MXN';
+    // Los de siempre se quedan: los usa el resumen para imprimir.
     V.budTotal = moneyMXN(total);
     V.budLimit = moneyMXN(s.budget, 0);
     V.budPct = Math.min(100, (total / s.budget) * 100).toFixed(1) + '%';
@@ -4545,7 +4631,13 @@ class Component extends DCLogic {
       }
     };
     V.gastoRows = [...s.gastos].sort(gastoCmp).map(g => ({
-      c: g.c, sub: (g.fecha || '31 jul.') + ' • ' + g.cat, iconD: CATI[g.cat] || CATI.Otro,
+      // La categoria se guarda en minuscula -es el vocabulario unico que
+      // comparten plan_items y plan_gastos desde la migracion- y se
+      // capitaliza AQUI, al enseñarla. Guardar 'Comida' y 'comida' segun
+      // la tabla es lo que tenia la grafica con barras a cero.
+      c: g.c, sub: (g.fecha || '31 jul.') + ' • ' + (g.cat ? g.cat.charAt(0).toUpperCase() + g.cat.slice(1) : 'Otro'),
+      iconD: CATI[g.cat] || CATI.Otro,
+      amtNum: g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), amtMon: 'MXN',
       amt: 'MXN ' + g.m.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       remove: () => { this.setState({ gastos: this.state.gastos.filter(x => x.id !== g.id) }); if (typeof g.id === 'number') this._sync('plan_gastos.php', { action: 'del', id: g.id }); }
     }));

@@ -4,6 +4,29 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+/* GOOGLE SANS CODE — sólo para las CIFRAS.
+   Autoalojada, como Mona Sans y por el mismo motivo: Poppins viene del
+   CDN de Google y ya nos costó una medición que dependiera de si la
+   fuente había cargado a tiempo. Ésta se sirve desde aquí y punto.
+
+   Es la variable (300-800) en un solo archivo de 34 KB. Licencia SIL
+   Open Font License 1.1, la misma que Mona Sans; el texto está en
+   fonts/GoogleSansCode-OFL.txt.
+
+   Se usa en importes y sólo en importes. Es una fuente MONOESPACIADA
+   pensada para código: cada dígito ocupa lo mismo, así que una columna
+   de cantidades queda alineada por la coma sin trucos, y un número que
+   cambia de 999 a 1000 no descoloca lo que tiene al lado. Para texto
+   corrido sería mala elección; para dinero es justo lo que hace falta. */
+@font-face {
+  font-family: 'Google Sans Code';
+  src: url('fonts/GoogleSansCode.woff2') format('woff2-variations'),
+       url('fonts/GoogleSansCode.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+.rn-cifra{font-family:'Google Sans Code',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
 html,body{margin:0;padding:0;background:#ffffff;font-family:'Poppins',system-ui,sans-serif;overflow:hidden;}
 *{box-sizing:border-box;}
 ::selection{background:#F5B93F;color:#0E2A33;}
@@ -814,16 +837,16 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
     <div id="secPresupuesto" style="padding:28px 64px 90px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
         <h2 style="margin:0;font-size:28px;font-weight:700;color:#0D1F27">Presupuesto</h2>
-        <button onClick="{{ expFormToggle }}" style="display:flex;align-items:center;gap:8px;border:none;border-radius:20px;padding:9px 18px;background:#F5B93F;color:#0E2A33;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(245,185,63,.4);transition:background .15s,transform .12s" style-hover="background:#e8a72b !important;transform:translateY(-1px) !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">
+        <button onClick="{{ gastoSueltoAbrir }}" style="display:flex;align-items:center;gap:8px;border:none;border-radius:20px;padding:9px 18px;background:#F5B93F;color:#0E2A33;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(245,185,63,.4);transition:background .15s,transform .12s" style-hover="background:#e8a72b !important;transform:translateY(-1px) !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0E2A33" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
           Añade gasto
         </button>
       </div>
       <div style="background:#EEF2F5;border-radius:12px;padding:20px 22px;margin:28px 0 0;display:flex;gap:28px;flex-wrap:wrap">
         <div style="flex:1;min-width:230px">
-          <p style="margin:0;font-size:34px;font-weight:700;color:#0D1F27;font-variant-numeric:tabular-nums;letter-spacing:.02em;white-space:nowrap">{{ budTotal }}</p>
-          <p style="margin:3px 0 0;font-size:12.8px;color:#4a5b64;font-variant-numeric:tabular-nums">de {{ budLimit }} presupuestado</p>
-          <span style="display:block;height:8px;border-radius:8px;background:#dbe3e9;margin-top:12px;overflow:hidden;max-width:330px"><span style="display:block;height:100%;width:{{ budPct }};background:{{ budBar }};border-radius:8px;transition:width .3s"></span></span>
+          <p style="margin:0;font-size:34px;font-weight:700;color:#0D1F27;white-space:nowrap"><span class="rn-cifra" style="letter-spacing:-.02em">{{ budTotalNum }}</span> <span style="font-size:27px">{{ budMon }}</span></p>
+          <p style="margin:4px 0 0;font-size:12.8px;color:#4a5b64">de <span class="rn-cifra">{{ budLimitNum }}</span> {{ budMon }} presupuestado</p>
+          <span style="display:block;height:13px;border-radius:7px;background:#dbe3e9;margin-top:15px;overflow:hidden;max-width:330px"><span style="display:block;height:100%;width:{{ budPct }};background:{{ budBar }};border-radius:7px;transition:width .3s"></span></span>
           <sc-if value="{{ budEditOff }}" hint-placeholder-val="{{ true }}">
             <button onClick="{{ budEditStart }}" style="display:flex;align-items:center;gap:8px;border:1px solid #c9d5dd;background:#ffffff;border-radius:16px;padding:8px 14px;font-size:12.5px;font-weight:600;color:#0D1F27;cursor:pointer;margin-top:14px;transition:border-color .15s" style-hover="border-color:#0E2A33 !important" style-focus="outline:2px solid #0E2A33 !important;outline-offset:2px !important">
               <svg width="13" height="13" viewBox="0 0 640 640"><path fill="#0D1F27" d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"></path></svg>
@@ -905,7 +928,7 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
                 <p style="margin:2px 0 0;font-size:12px;color:#5b6b74">{{ g.sub }}</p>
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-                <span style="font-size:13.8px;font-weight:700;color:#0D1F27;font-variant-numeric:tabular-nums">{{ g.amt }}</span>
+                <span style="font-size:13.8px;font-weight:700;color:#0D1F27">{{ g.amtMon }} <span class="rn-cifra">{{ g.amtNum }}</span></span>
                 <span style="width:16px;height:16px;border-radius:50%;background:#F5B93F;color:#0E2A33;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;overflow:hidden"><sc-if value="{{ userHasFoto }}" hint-placeholder-val="{{ false }}"><img src="{{ userFoto }}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if><sc-if value="{{ userNoFoto }}" hint-placeholder-val="{{ true }}">{{ userInitial }}</sc-if></span>
               </div>
               <button onClick="{{ g.remove }}" aria-label="Eliminar gasto" title="Eliminar gasto" class="rn-blocktrash" style="position:absolute;right:-34px;top:50%;margin-top:-15px;width:30px;height:30px;border:none;background:none;cursor:pointer;color:#6C757D;border-radius:7px;display:flex;align-items:center;justify-content:center">
@@ -1553,6 +1576,15 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
       <button onClick="{{ gastoClose }}" aria-label="Cerrar" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;background:#E9ECEF;color:#495057;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center" style-hover="background:#DEE2E6 !important">✕</button>
       <h3 style="margin:2px 0 18px;text-align:center;font-size:21px;font-weight:700;color:#0D1F27">Añadir gasto</h3>
 
+      <!-- CONCEPTO — sólo en el gasto que no cuelga de un sitio.
+           Con sitio, el nombre del gasto es el del lugar; sin sitio no
+           hay de dónde sacarlo, y plan_gastos.concepto es NOT NULL. Si
+           se deja vacío se usa el nombre de la categoría antes que
+           rechazar el guardado: quien ya puso importe y reparto no
+           merece perderlo por un título. -->
+      <sc-if value="{{ gastoEsSuelto }}" hint-placeholder-val="{{ false }}">
+        <input value="{{ gastoConcepto }}" onChange="{{ gastoConceptoChange }}" placeholder="¿En qué fue el gasto?" aria-label="Concepto del gasto" style="width:100%;box-sizing:border-box;border:1px solid #DEE2E6;border-radius:12px;padding:14px 16px;margin-bottom:10px;font-family:inherit;font-size:15px;color:#212529;outline:none;background:#ffffff" style-focus="border-color:#2266ED !important">
+      </sc-if>
       <!-- Importe y divisa -->
       <div style="display:flex;align-items:center;gap:6px;border:1px solid #DEE2E6;border-radius:12px;padding:14px 16px" style-focus-within="border-color:#2266ED">
         <div style="position:relative;flex-shrink:0">
