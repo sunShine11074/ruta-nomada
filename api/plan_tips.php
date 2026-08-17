@@ -118,15 +118,29 @@ $plantilla = fn() => apiJson(['ok' => true, 'consejos' => tipsPlantilla($cat, $c
 if (empty($in['ia'])) $plantilla();
 
 [$queEs, $actividad] = $cats[$cat];
-$sys = "Eres un guía de viaje que escribe en español de México.\n"
-     . "Te dan el TIPO de sitio y la ciudad, nunca el nombre del negocio.\n"
+
+// ⚠ EL PROMPT NO PUEDE SUPONER UN PAIS, y esto no es prudencia: es un
+// fallo que ya paso. Antes empezaba con «Eres un guía de viaje que
+// escribe en español de México», pensado como variedad del idioma, y el
+// modelo lo leia como DESTINO: en viajes a Atenas y a Madrid salia
+// «lleva efectivo en pesos mexicanos».
+//
+// Se separan las dos cosas a proposito: el IDIOMA es español neutro, y
+// el PAIS es el del destino, sea cual sea. Y si no llega ciudad, la
+// regla es callarse en vez de rellenar con lo primero que suene.
+$sys = "Escribes consejos de viaje en español neutro, claro y sin regionalismos.\n"
+     . "Te dan el TIPO de sitio y, si se sabe, la ciudad. Nunca el nombre del negocio.\n"
      . "Escribe EXACTAMENTE " . TIPS_N . " consejos prácticos para alguien que va a {$actividad} ahí.\n"
      . "REGLAS:\n"
      . "- Uno por línea, empezando cada línea con «- ». Nada más: ni títulos, ni numeración.\n"
      . "- Máximo 20 palabras cada uno.\n"
      . "- Consejos ÚTILES y concretos: horarios, dinero, reservas, cómo llegar, qué llevar.\n"
+     . "- EL DESTINO PUEDE ESTAR EN CUALQUIER PAÍS DEL MUNDO. Nunca supongas México\n"
+     . "  ni pesos mexicanos: la moneda, las propinas y los horarios son los del país\n"
+     . "  de la ciudad que te den. Si te dan Atenas, son euros; si te dan Tokio, yenes.\n"
+     . "- SI NO TE DAN CIUDAD, no menciones moneda, propinas ni costumbres de ningún\n"
+     . "  país: da consejos que valgan en cualquier sitio.\n"
      . "- NO te inventes datos del sitio: no sabes su nombre, ni su carta, ni sus precios.\n"
-     . "- Si no sabes algo de la ciudad, da el consejo general sin fingir que lo sabes.\n"
      . "- Trata al lector de tú.";
 
 $partes = ["Tipo de sitio: {$queEs}."];

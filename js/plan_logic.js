@@ -2339,7 +2339,19 @@ class Component extends DCLogic {
       // Si Google solo sabe dos cosas del sitio, se enseñan esas dos y
       // se rellena hasta cuatro con consejos del destino. Asi la seccion
       // siempre tiene el mismo tamaño y lo especifico va arriba.
-      const dest = String((this.BOOT && this.BOOT.plan && this.BOOT.plan.destino) || '');
+      // this.META.destino y NO window.PLAN_BOOT: el destino se puede
+      // cambiar despues de cargar la pagina, y META es el que se pone al
+      // dia con el cambio (ver donde se rehace META al fusionar). Es el
+      // mismo motivo por el que el asistente tuvo que aprender a tirar su
+      // historial cuando cambia el destino.
+      //
+      // ⚠ AQUI PONIA this.BOOT.plan.destino, QUE NO EXISTE. La clase
+      // nunca guardo el boot en this.BOOT: lo lee de window.PLAN_BOOT y
+      // reparte en META, DAYS y compania. Asi que la ciudad viajaba
+      // SIEMPRE vacia, y sin ciudad el modelo se inventaba el pais: en
+      // planes de Atenas y de Madrid salia «lleva efectivo en pesos
+      // mexicanos». No dio error en ningun sitio, solo consejos malos.
+      const dest = String((this.META && this.META.destino) || '');
       fetch('api/plan_tips.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF': this.CSRF },
