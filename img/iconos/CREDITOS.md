@@ -39,13 +39,4 @@ Si no se atribuye, el uso deja de estar cubierto por la licencia gratuita.
 
 | Archivo | Qué es | Autor | Fuente | Dónde se usa |
 |---|---|---|---|---|
-| `idea.png` | bombilla con cerebro | *(pendiente: ver nota)* | [Flaticon](https://www.flaticon.com/) | «Saber antes de ir», en la ficha del sitio |
-
-> ⚠️ **Falta el nombre del autor de `idea.png`.** Se descargó de Flaticon pero no
-> se guardó la URL de la ficha, y el nombre del autor no se puede deducir del
-> archivo. **Hay que rellenarlo antes de publicar el proyecto**: búscalo en tu
-> historial de descargas de Flaticon, abre la ficha del icono y copia el «Icon
-> made by …» junto con el enlace.
->
-> Mientras esté sin rellenar, la atribución está incompleta y el uso no cumple la
-> licencia gratuita.
+| `idea.png` | bombilla con cerebro | Magnific | [Flaticon](https://www.flaticon.com/) | «Saber antes de ir», en la ficha del sitio |
