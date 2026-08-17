@@ -1,3 +1,36 @@
+// ════ EL PORTAL DE LOS PINES ═══════════════════════════════════
+//
+// Los pines TIENEN que vivir dentro de un panel del mapa, no al lado
+// de el. Es toda la diferencia entre que se queden clavados al hacer
+// zoom y que peguen el tiron que se veia antes:
+//
+//   · Al ARRASTRAR, Maps aplica un transform al div que contiene los
+//     paneles. Lo que este dentro viaja con las teselas en el
+//     compositor, sin layout y sin JavaScript.
+//   · Al hacer ZOOM no hay transform, pero Maps llama a draw() UNA VEZ
+//     POR FOTOGRAMA y getProjection() devuelve una proyeccion
+//     INTERPOLADA, con zoom fraccionario. La sincronia la regala la API.
+//
+// Antes los pines eran HERMANOS de #rnGmap, o sea que estaban fuera de
+// .gm-style y ninguna de las dos cosas les alcanzaba. Se colocaban con
+// Mercator a mano leyendo getZoom(), que ya devuelve el zoom FINAL en
+// el primer fotograma: el pin llegaba a su destino en 30 ms y el suelo
+// bajo el tardaba 250 mas.
+//
+// El runtime dc no trae createPortal, pero monta React 18 de fabrica y
+// window.ReactDOM esta disponible, asi que se usa el de React.
+//
+// EL CONTENEDOR ES NUESTRO, hecho con createElement, y no un nodo que
+// pinte la plantilla. Importa: el sc-if de mapVisible desmonta el panel
+// del mapa, y si el nodo fuera de React intentaria borrarlo de un padre
+// que ya no es el suyo -NotFoundError- y el error boundary del runtime
+// cambiaria el subarbol por un hueco roto. Siendo nuestro, React solo
+// toca sus hijos.
+window.RNPinPortal = function (props) {
+  if (!props || !props.pane || !window.ReactDOM) return null;
+  return window.ReactDOM.createPortal(props.children, props.pane);
+};
+
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -643,9 +676,9 @@ class Component extends DCLogic {
       if (!this.state.avisoRecarga) this.setState({ avisoTxt: '' });
     }, 4500);
 
-    // Los pines son un overlay propio calculado con MERC(), asi que
-    // recolocarlos es todo lo que hace falta para que el mapa quede al
-    // dia. Nada de Google Maps se toca.
+    // Los pines viven en un panel del mapa; aqui solo hay que pedir que
+    // se recoloquen, porque el CONJUNTO acaba de cambiar. Nada de Google
+    // Maps se toca.
     this._reproject();
   }
 
@@ -1302,20 +1335,43 @@ class Component extends DCLogic {
     window.__plMap = this._map;                          // handle de depuración
     window.__plDiag = { init: Date.now(), reproj: 0, proj: null, pins: 0 };
     const comp = this;
-    // El OverlayView solo sirve de disparador extra de redibujo; la
-    // proyección se calcula con Mercator puro (no depende de que Maps
-    // complete su primer ciclo de pintado)
+    // El OverlayView ya NO es un disparador de redibujo: es quien aloja
+    // los pines y quien los coloca. Ver el comentario de RNPinPortal,
+    // arriba del todo, para el porqué.
     class Proyector extends google.maps.OverlayView {
-      onAdd() {} onRemove() {}
-      draw() { comp._reproject(); }
+      onAdd() {
+        // overlayMouseTarget es el único panel documentado que recibe
+        // eventos del DOM (panel 3). Los pines llevan onClick, onMouseEnter
+        // y onMouseLeave, así que tiene que ser ése y no markerLayer.
+        //
+        // El contenedor se reutiliza entre montajes: _ensureMap() rehace
+        // el mapa al volver a la pantalla y aquí sólo hay que recolgarlo.
+        if (!comp._pinPane) {
+          const d = document.createElement('div');
+          // Los paneles miden 0 de alto y 100% de ancho, así que todo lo
+          // que cuelgue de ellos ha de ir en posición absoluta.
+          d.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0';
+          comp._pinPane = d;
+        }
+        this.getPanes().overlayMouseTarget.appendChild(comp._pinPane);
+        // Sin esto, un clic en un pin dispara TAMBIÉN el clic del mapa.
+        google.maps.OverlayView.preventMapHitsFrom(comp._pinPane);
+        // Ahora que el destino existe, que React monte el portal.
+        comp.setState({ _pinTick: (comp.state._pinTick || 0) + 1 });
+      }
+      onRemove() {
+        const d = comp._pinPane;
+        if (d && d.parentNode) d.parentNode.removeChild(d);
+      }
+      // Maps llama aquí una vez por fotograma durante el zoom. La
+      // documentación avisa de no hacer trabajo caro en este método, así
+      // que _colocarPines() sólo lee la proyección y escribe transform:
+      // ni setState, ni reconstruir listas, ni tocar el layout.
+      draw() { comp._colocarPines(this.getProjection()); }
     }
     this._proy = new Proyector();
     this._proy.setMap(this._map);
-    this._map.addListener('bounds_changed', () => this._reproject());
-    this._map.addListener('center_changed', () => this._reproject());
-    this._map.addListener('zoom_changed', () => this._reproject());
-    this._map.addListener('drag', () => this._reproject());
-    setTimeout(() => this._reproject(), 400);
+    window.__plProy = this._proy;   // handle de depuracion, como window.__plMap
     if (!prev && !hasLL && B.plan && B.plan.destino) {
       new google.maps.Geocoder().geocode({ address: B.plan.destino }, (res, st) => {
         if (st === 'OK' && res[0]) {
@@ -1489,43 +1545,68 @@ class Component extends DCLogic {
     });
     return out;
   }
+  // Coloca cada pin leyendo la proyección VIVA del mapa. Corre una vez
+  // por fotograma mientras dura el zoom, así que no puede hacer nada
+  // caro: ni setState, ni recorrer listas de estado, ni leer geometría
+  // que fuerce al navegador a recalcular el layout.
+  //
+  // Escribe `transform` y no `left`/`top` a propósito: transform lo
+  // resuelve el compositor, mientras que left y top son propiedades de
+  // layout y obligarían a rehacerlo 60 veces por segundo.
+  //
+  // Las coordenadas salen de fromLatLngToDivPixel(), que las devuelve en
+  // el sistema del PANEL —no del contenedor del mapa—. Es justo lo que
+  // hace falta: mientras se arrastra, ese sistema se mueve con las
+  // teselas y el valor no cambia, así que no hay nada que recalcular.
+  _colocarPines(proj) {
+    const pane = this._pinPane;
+    if (!pane || !proj) return;
+    const nodos = pane.querySelectorAll('[data-pin]');
+    if (!nodos.length) return;
+    // Pines EXACTAMENTE en la misma coordenada: se abren en abanico para
+    // que no se tapen. Antes la comparación era por píxel redondeado, lo
+    // que a 60 fotogramas por segundo hacía que un pin saltara 8 px de
+    // lado en cuanto el zoom lo juntaba o lo separaba de otro. Con la
+    // coordenada como clave el abanico es estable a cualquier zoom.
+    const vistos = {};
+    for (let i = 0; i < nodos.length; i++) {
+      const n = nodos[i];
+      const lat = +n.getAttribute('data-lat');
+      const lng = +n.getAttribute('data-lng');
+      if (!isFinite(lat) || !isFinite(lng)) continue;
+      const p = proj.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+      if (!p) continue;
+      const k = lat + ',' + lng;
+      let dx = 0;
+      if (vistos[k]) { dx = 8 * vistos[k]; vistos[k]++; } else vistos[k] = 1;
+      // El translate(-50%,-100%) del final es el ancla del pin: la punta
+      // abajo y centrada. Antes estaba en el style de la plantilla; ahora
+      // va aquí porque esta línea escribe el transform entero.
+      n.style.transform = 'translate(' + (p.x + dx) + 'px,' + p.y + 'px) translate(-50%,-100%)';
+    }
+    if (window.__plDiag) { window.__plDiag.reproj++; window.__plDiag.pins = nodos.length; window.__plDiag.proj = true; }
+  }
+
+  // Recolocar a mano. Maps sólo llama a draw() cuando el mapa se mueve,
+  // así que un pin RECIÉN AÑADIDO —al meter un lugar, encender una capa
+  // o buscar en el mapa— nace sin transform y se quedaría en la esquina
+  // superior izquierda hasta que alguien arrastrara. De ahí que los
+  // nueve sitios que cambian el CONJUNTO de pines sigan llamando aquí.
+  //
+  // Conserva el nombre de antes a propósito: esos nueve puntos no tienen
+  // por qué enterarse de que la proyección cambió de manos. Lo que ya no
+  // hace es calcular posiciones ni tocar el estado.
+  //
+  // Va dentro de un requestAnimationFrame porque quien llama suele venir
+  // de un setState y los nodos nuevos todavía no están en el DOM.
   _reproject() {
     if (this._rafPend) return;
     this._rafPend = true;
-    const run = () => {
-      if (!this._rafPend) return;   // ya corrió (rAF o timeout, el primero gana)
+    requestAnimationFrame(() => {
       this._rafPend = false;
-      if (!this._map || !this._mapNode) return;
-      // Mercator puro: px = (mundo(punto) − mundo(centro)) · 2^zoom + centroDelDiv
-      const MERC = (lat, lng) => {
-        const siny = Math.min(Math.max(Math.sin(lat * Math.PI / 180), -0.9999), 0.9999);
-        return { x: 256 * (0.5 + lng / 360), y: 256 * (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) };
-      };
-      const c = this._map.getCenter();
-      if (!c) return;
-      const scale = Math.pow(2, this._map.getZoom());
-      const cw = this._mapNode.offsetWidth / 2, ch = this._mapNode.offsetHeight / 2;
-      if (!cw || !ch) return;
-      const wc = MERC(c.lat(), c.lng());
-      if (window.__plDiag) { window.__plDiag.reproj++; window.__plDiag.proj = true; window.__plDiag.pins = this._pinList().length; }
-      const px = {}; const seen = {};
-      for (const p of this._pinList()) {
-        const wp = MERC(p.lat, p.lng);
-        let x = Math.round((wp.x - wc.x) * scale + cw);
-        let y = Math.round((wp.y - wc.y) * scale + ch);
-        if (x < -60 || y < -60 || x > cw * 2 + 60 || y > ch * 2 + 60) continue;   // fuera de vista
-        const key = x + ',' + y;                          // pines en la misma coordenada
-        if (seen[key]) { x += 8 * seen[key]; seen[key]++; } else seen[key] = 1;
-        px[p.id] = { left: x, top: y };
-      }
-      const prev = this._pinPx || {};
-      const kn = Object.keys(px), kp = Object.keys(prev);
-      const same = kn.length === kp.length && kn.every(k => prev[k] && prev[k].left === px[k].left && prev[k].top === px[k].top);
-      this._pinPx = px;
-      if (!same) this.setState({ _pinTick: (this.state._pinTick || 0) + 1 });
-    };
-    requestAnimationFrame(run);
-    setTimeout(run, 120);   // respaldo: pestañas en 2º plano o paneles sin composición
+      if (!this._proy || !this._proy.getProjection) return;
+      this._colocarPines(this._proy.getProjection());
+    });
   }
   // ════ Rutas del itinerario ════════════════════════════════════
   //  Una polilínea por TRAMO (par de lugares consecutivos), no una por
@@ -1533,13 +1614,20 @@ class Component extends DCLogic {
   //  reordenar, los tramos que no cambiaron conserven su geometría en
   //  vez de recalcularse enteros.
   //
-  //  Se usa google.maps.Polyline y no un SVG propio a pesar de que los
-  //  pines van con proyección casera: la Polyline no depende de
-  //  getProjection() (que es lo que fallaba con los pines), y además
-  //  vive por debajo de ellos, así que nunca tapa un número.
-  //  ⚠ Esto se sostiene mientras el mapa siga siendo ráster. Si algún
-  //  día se le pone un mapId, pasa a vectorial con inclinación y giro,
-  //  y MERC() —que no conoce el ángulo de cámara— dejaría de cuadrar.
+  //  Se usa google.maps.Polyline y no un SVG propio. Desde que los pines
+  //  se mudaron a un panel del mapa, ambos cuelgan del MISMO contenedor
+  //  que Google transforma, asi que van sincronizados por construcción.
+  //  Antes no: las rutas iban pegadas a las teselas y los pines no, y al
+  //  hacer zoom los números se despegaban de sus propias líneas.
+  //
+  //  ⚠ AVISO CORREGIDO. Aqui ponia que anadir un mapId pasaria el mapa a
+  //  vectorial con inclinación y giro. Es falso, y se comprobó: mapId y
+  //  renderingType son ejes independientes, y con mapId y sin
+  //  renderingType el mapa sigue siendo ráster con tilt 0. El único
+  //  efecto real de un mapId es que se apaga la propiedad `styles`, que
+  //  este proyecto no usa. Lo que SÍ hay que saber: AdvancedMarkerElement
+  //  exige mapId, y google.maps.Marker (js/mis_planes.js) está deprecado
+  //  desde febrero de 2024. Esa migración es otra conversación.
 
   _rutaEstilo(color, firme) {
     // Firme = geometría real o recta conocida. No firme = provisional o
@@ -4330,13 +4418,17 @@ class Component extends DCLogic {
     V.mapPois = [];
     const layerOn = (k) => s.layerChecks[k] !== false;
     // Pines del itinerario proyectados (lat/lng → px del contenedor)
-    const pinPx = this._pinPx || {};
+    // Los pines ya NO llevan pixeles: llevan su coordenada, y quien los
+    // coloca es _colocarPines() leyendo la proyeccion viva del mapa. Asi
+    // un zoom no obliga a repintar React ni una sola vez.
+    V.pinPane = this._pinPane || null;
     V.mapPins = [];
     (s.dayItems || []).forEach((arr, di) => {
       if (!layerOn('d' + di)) return;
       arr.forEach((it, i) => {
-        const p = pinPx[it.uid];
-        if (!p) return;
+        // Sin coordenada no hay pin: antes lo descartaba el filtro por
+        // pixeles, que ya no existe. Sin esto se quedaria en la esquina.
+        if (it.lat == null || it.lng == null) return;
         // También se resalta el pin del lugar que enseña la ficha, no
         // sólo el que está bajo el ratón: al pasar de un sitio a otro
         // con las flechas hay que ver a cuál corresponde la ficha.
@@ -4345,7 +4437,7 @@ class Component extends DCLogic {
           // el número sigue al orden del día en el Itinerario (se
           // recalcula solo al arrastrar y soltar una tarjeta)
           num: String(i + 1), name: it.name,
-          left: p.left + 'px', top: p.top + 'px',
+          lat: it.lat, lng: it.lng,
           fill: this.DAYS[di] ? this.DAYS[di].color : this.PIN.sav,
           hover: hot, z: hot ? 55 : 40,
           recent: false,
@@ -4365,19 +4457,16 @@ class Component extends DCLogic {
     // fuera un lugar, su pin también se va: de lo contrario quedarían dos
     // pines con el mismo número y ninguno correspondería a la lista.
     (this.PLACES || []).forEach(p => {
-      // También aquí, y no sólo en _pinList: componentDidUpdate no
-      // reproyecta, así que _pinPx conserva las posiciones viejas hasta el
-      // siguiente movimiento del mapa. Sin esta línea los pines seguirían
-      // a la vista después de cerrar Explorar, hasta que se moviera el mapa.
+      // También aquí, y no sólo en _pinList: sin esta línea los pines de
+      // Explorar seguirían dibujados después de cerrar la sección.
       if (!this._exPinVive(p)) return;
+      if (p.lat == null || p.lng == null) return;
       const n = exNum[p.id] || (exq ? 0 : (p.num || 0));
       if (!n) return;
-      const pp = pinPx[p.id];
-      if (!pp) return;
       const hot = s.hoverPlace === p.id || s.detail === p.id;
       V.mapPins.push({
         num: String(n), name: p.name,
-        left: pp.left + 'px', top: pp.top + 'px',
+        lat: p.lat, lng: p.lng,
         fill: this.PIN[p.cat],
         hover: hot, z: hot ? 55 : 40,
         recent: !!p.recent,
@@ -4389,12 +4478,11 @@ class Component extends DCLogic {
     // Pines teal de los resultados del buscador del mapa (M4)
     (this.SEARCH || []).forEach(p => {
       if ((this.PLACES || []).some(x => x.id === p.id)) return;
-      const pp = pinPx[p.id];
-      if (!pp) return;
+      if (p.lat == null || p.lng == null) return;
       const hot = s.hoverPlace === p.id || s.detail === p.id;
       V.mapPins.push({
         num: String(p.num), name: p.name,
-        left: pp.left + 'px', top: pp.top + 'px',
+        lat: p.lat, lng: p.lng,
         fill: this.PIN.sav,
         hover: hot, z: hot ? 55 : 42,
         recent: false,
