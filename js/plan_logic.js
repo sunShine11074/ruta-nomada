@@ -75,6 +75,13 @@ class Component extends DCLogic {
       added: { mercado: true }, addMenu: null, justAdded: null,
       hoverPlace: null, detail: null, detailFrom: null, detailTab: 'about', detailLoading: false,
       layersOpen: false, mapSearchOpen: false, mapSearchQ: '',
+      // Qué búsqueda del mapa está puesta ahora mismo. `buscandoTxt` es lo
+      // que se lee en la pastilla —el nombre de la categoría, o lo que se
+      // tecleó— y `buscandoQ` la consulta real que se le manda a Places,
+      // que no es la misma: la categoría «Gasolinera» busca «gasolineras».
+      // Se guarda para que «Buscar en esta área» pueda repetirla sobre el
+      // encuadre nuevo sin que el usuario vuelva a elegir.
+      buscandoTxt: '', buscandoQ: '',
       // routeLines arranca encendido: si hay que descubrir un enlace escondido
       // en el menú de capas para ver las rutas, para el usuario no existen.
       // rutaSolo aísla la ruta de UN día sin ocultar los pines de los demás
@@ -1485,7 +1492,9 @@ class Component extends DCLogic {
     this._reproject();
   }
   // ════ M4: buscador del mapa ("Buscar en esta zona" + categorías) ════
-  _mapSearch(query) {
+  // `etiqueta` es lo que se enseña en la pastilla; si no la dan, se enseña
+  // la propia consulta, que es el caso del buscador de texto libre.
+  _mapSearch(query, etiqueta) {
     if (!this._map || !window.google || !google.maps.places) return;
     const q = (query || '').trim();
     if (!q) return;
@@ -1511,9 +1520,31 @@ class Component extends DCLogic {
           recent: false
         };
       });
-      this.setState({ mapSearchOpen: false });
+      this.setState({ mapSearchOpen: false, buscandoTxt: etiqueta || q, buscandoQ: q });
       this._reproject();
     });
+  }
+
+  // ⚠ LOS PINES DE UNA BÚSQUEDA NO SE IBAN NUNCA. this.SEARCH es un campo
+  // de instancia, no estado, y no había nada que lo vaciara: se llenaba al
+  // buscar y se quedaba así hasta recargar la página. Elegir «Gasolineras»
+  // y luego «Comida» iba apilando, y no había forma de volver a ver sólo
+  // el itinerario.
+  //
+  // Esta es la ✕ de la pastilla: tira los resultados y repinta.
+  _buscarLimpiar() {
+    this.SEARCH = [];
+    // Si la ficha abierta era de un resultado de la búsqueda, se cierra:
+    // dejarla sería enseñar un sitio que ya no está en el mapa. Se mira
+    // ANTES de vaciar... pero como ya se vació, se comprueba que el id
+    // abierto siga existiendo en alguna de las otras fuentes.
+    const abierto = this.state.detail;
+    const sigueVivo = abierto ? !!this.place(abierto) : false;
+    this.setState({
+      buscandoTxt: '', buscandoQ: '',
+      detail: abierto && !sigueVivo ? null : abierto
+    });
+    this._reproject();
   }
   // pines proyectables: itinerario + lugares de Explorar cargados
   // ¿Sigue pintándose en el mapa este lugar de Explorar?
@@ -5168,7 +5199,15 @@ const anchaLab = tab !== 'dia';
       'Carga de vehículos eléctricos': 'estaciones de carga para vehículos eléctricos',
       'Paradas de descanso': 'paradas de descanso'
     };
-    V.mapSearchCats = V.mapSearchCats.map(c => ({ ...c, pick: () => this._mapSearch(CATQ[c.t] || c.t) }));
+    V.mapSearchCats = V.mapSearchCats.map(c => ({ ...c, pick: () => this._mapSearch(CATQ[c.t] || c.t, c.t) }));
+
+    // ── La pastilla de estado y el «Buscar en esta area» ──
+    V.buscandoOn = !!s.buscandoTxt;
+    V.buscandoTxt = s.buscandoTxt;
+    V.buscandoLimpiar = () => this._buscarLimpiar();
+    // Repite la MISMA consulta con el encuadre de ahora: _mapSearch lee
+    // getBounds() en cada llamada, asi que basta con volver a llamarla.
+    V.buscarAreaGo = () => this._mapSearch(s.buscandoQ, s.buscandoTxt);
     V.layersOpen = s.layersOpen;
     V.layersToggle = () => this.setState({ layersOpen: !s.layersOpen, mapSearchOpen: false });
     const setLayer = (k, v) => this.setState({ layerChecks: { ...this.state.layerChecks, [k]: v } });

@@ -1129,6 +1129,26 @@ a{color:#1A73C8;}a:hover{color:#12588f;}
   </sc-for>
   </x-import>
 
+  <!-- ══ QUÉ SE ESTÁ BUSCANDO EN EL MAPA ═══════════════════════
+       Medido sobre screens_ref/Buscando y buscar en área.png: la
+       pastilla de estado mide 40 de alto con #000000 al 40 %, la de
+       «Buscar en esta área» 35 con #212529 sólido, y entre las dos hay
+       15 px. Las dos centradas, y la primera a 20 del borde superior.
+
+       La ✕ no es decoración: era LO QUE FALTABA. Sin ella los pines de
+       una búsqueda se quedaban hasta recargar la página. -->
+  <sc-if value="{{ buscandoOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:61;display:flex;flex-direction:column;align-items:center;gap:15px;pointer-events:none">
+      <div style="display:flex;align-items:center;gap:18px;height:40px;padding:0 20px 0 22px;border-radius:20px;background:rgba(0,0,0,.4);pointer-events:auto;backdrop-filter:blur(2px)">
+        <span style="font-size:14px;color:#ffffff;white-space:nowrap"><b style="font-weight:700">Buscando:</b> {{ buscandoTxt }}</span>
+        <button onClick="{{ buscandoLimpiar }}" aria-label="Dejar de buscar y quitar los pines" title="Dejar de buscar y quitar los pines" style="border:none;background:none;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:#ffffff" style-hover="opacity:.7 !important">
+          <svg width="13" height="13" viewBox="0 0 640 640" fill="currentColor" style="display:block"><path d="M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z"></path></svg>
+        </button>
+      </div>
+      <button onClick="{{ buscarAreaGo }}" style="height:35px;padding:0 24px;border:none;border-radius:18px;background:#212529;color:#ffffff;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;pointer-events:auto" style-hover="background:#0D1F27 !important">Buscar en esta área</button>
+    </div>
+  </sc-if>
+
   <!-- Controles arriba derecha -->
   <div style="position:absolute;top:14px;right:14px;z-index:60;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
     <sc-if value="{{ mapSearchClosed }}" hint-placeholder-val="{{ true }}">
