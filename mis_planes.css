@@ -223,7 +223,25 @@ body.dashboard-page { background: #FAFDFF; }
 /* Todo lo de aquí sale de medir screens_ref/mis_planes (Card view).png
    píxel a píxel: la tarjeta es 180x225 y entran CINCO por fila en los 984
    que quedan entre el margen izquierdo y el panel (5x180 + 4x21). */
-.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); column-gap: 25px; row-gap: 25px; }
+/* ⚠ EL SUELO ES 250 Y NO 270, Y ES POR LA ESCALA DE WINDOWS.
+   El navegador no trabaja en píxeles físicos sino CSS, y la conversión la
+   fija la escala del sistema: ancho CSS = resolución ÷ escala. Dos
+   portátiles con el MISMO panel de 1920x1080 dan anchos distintos si uno
+   está al 100 % (1920 px CSS) y otro al 125 % (1536).
+
+   Con el suelo en 270 y 25 de hueco, a 1536 px se quedaba a SÓLO 64 px de
+   que cupiera una cuarta columna: caía a tres y las tarjetas se estiraban
+   de 272 a 342 px. Como además el 125 % las dibuja a 1.25x, la misma
+   tarjeta ocupaba 427 px físicos frente a 272 en la otra máquina: un 57 %
+   más ancha sobre la misma pantalla. Eso es lo que se veía «enorme».
+
+   Medido el 17/08/2026 a los dos anchos:
+     suelo 270 -> 1536: 3 columnas de 342 | 1920: 5 de 272
+     suelo 250 -> 1536: 4 columnas de 250 | 1920: 5 de 272
+   O sea que arregla el caso de 1536 y NO toca el de 1920, que es el que
+   corresponde al frame. Los valores intermedios -260, 254- no bastan: el
+   salto de columna es discreto y hay que bajar de 254. */
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); column-gap: 25px; row-gap: 25px; }
 .mp-card {
   position: relative; overflow: hidden; border-radius: 6px; padding: 18px;
   min-height: 340px; cursor: pointer; border: 1px solid transparent;
