@@ -65,35 +65,27 @@ function mpFechaGuion(?string $f): string { return $f ? date('d-m-Y', strtotime(
 function mpDinero($n): string { return number_format((float)$n, 0, '.', ',') . ' MXN'; }
 
 /**
- * Portada del plan. Ninguno tiene portada_url todavía, así que se cae a
- * la foto del primer lugar añadido; si tampoco la hay, a un degradado
- * con la inicial del destino. No se usa la API de mapas estáticos a
- * propósito: se cobra por petición y aquí serían tantas como planes.
+ * Portada del plan: la suya propia, y si no tiene, un degradado con la
+ * inicial del destino. No se usa la API de mapas estáticos a propósito:
+ * se cobra por petición y aquí serían tantas como planes.
+ *
+ * ⚠ AQUÍ HABÍA UN ESCALÓN INTERMEDIO —la foto del primer lugar del
+ * itinerario, sacada de plan_items.imagen_url— y estaba PODRIDO. Esa
+ * columna guarda URL de fotos de Google Places, que van firmadas y
+ * caducan; cuando expiran, Google sirve un cuadrado gris de 100x100 en
+ * vez de dar error. Así que las tarjetas de los planes con algún tiempo
+ * enseñaban un rectángulo gris donde debía ir la portada.
+ *
+ * Se quita el escalón entero, junto con la consulta que lo alimentaba.
+ * Un plan sin portada_url cae ahora al degradado, que es honesto y no se
+ * rompe nunca. Los planes nuevos ya nacen con una portada de Pexels, y
+ * esas URL no caducan.
  */
 function mpPortada(array $p): array
 {
     if (!empty($p['portada_url'])) return ['img', $p['portada_url']];
-    if (!empty($p['_foto_item']))  return ['img', $p['_foto_item']];
     $d = trim((string)($p['destino'] ?: $p['nombre']));
     return ['grad', mb_strtoupper(mb_substr($d, 0, 1) ?: 'R')];
-}
-
-// Foto del primer lugar de cada plan, para las portadas que faltan.
-if ($planes) {
-    $ids = array_column($planes, 'id');
-    $ph  = implode(',', array_fill(0, count($ids), '?'));
-    $st  = $db->prepare(
-        "SELECT plan_id, imagen_url FROM plan_items
-          WHERE plan_id IN ($ph) AND imagen_url IS NOT NULL AND imagen_url <> ''
-          ORDER BY plan_id, dia, orden, id"
-    );
-    $st->execute($ids);
-    $fotos = [];
-    foreach ($st->fetchAll() as $f) {
-        if (!isset($fotos[$f['plan_id']])) $fotos[$f['plan_id']] = $f['imagen_url'];
-    }
-    foreach ($planes as &$p) $p['_foto_item'] = $fotos[$p['id']] ?? null;
-    unset($p);
 }
 
 /** Avatares apilados, con un «+N» cuando no caben. */

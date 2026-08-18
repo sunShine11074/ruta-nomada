@@ -1231,8 +1231,10 @@ class Component extends DCLogic {
       categoria: extra.gpid ? 'hacer' : 'custom',
       place_id: extra.gpid || '',
       lat: (extra.lat === undefined || extra.lat === null) ? '' : extra.lat,
-      lng: (extra.lng === undefined || extra.lng === null) ? '' : extra.lng,
-      imagen_url: extra.foto || ''
+      lng: (extra.lng === undefined || extra.lng === null) ? '' : extra.lng
+      // Aqui iba imagen_url. Ya no se manda: la URL de una foto de
+      // Places caduca, y guardarla solo servia para enseñar un cuadrado
+      // gris semanas despues. Con el place_id se vuelve a pedir.
     }, (j) => {
       const arr = this.state.dayItems.map(x => x.map(y => ({ ...y })));
       const it = arr[di] && arr[di].find(y => y.uid === tmpUid);
@@ -3323,7 +3325,9 @@ class Component extends DCLogic {
         action: 'add', dia: dia, nombre: p.name,
         categoria: catMap[p.cat] || 'custom',
         place_id: p.gpid || '', lat: p.lat !== undefined && p.lat !== null ? p.lat : '', lng: p.lng !== undefined && p.lng !== null ? p.lng : '',
-        imagen_url: (p.foto && p.foto.indexOf('picsum') < 0) ? p.foto : ''
+        // Aqui iba imagen_url, con un filtro para no guardar los
+        // marcadores de picsum. Ya no se manda ninguna: ver el
+        // comentario de V.detFoto.
       }, (j) => {
         this._addedSid = this._addedSid || {};
         this._addedSid[id] = j.id;
@@ -5266,7 +5270,36 @@ const anchaLab = tab !== 'dia';
         ? exNum[det.id] : det.num);
       V.detPin = det.pinColor || this.PIN[det.cat];
       V.detSeed = det.seed;
-      V.detFoto = det.foto || ('https://picsum.photos/seed/' + det.seed + '/280/200');
+      // ── Datos reales de getDetails (M3); el demo se conserva sin
+      //    servidor. Se resuelven AQUI, antes de la foto, porque la foto
+      //    tiene que salir de ellos.
+      const dd = (this.PLAN_ID && det.gpid && this._detCache) ? this._detCache[det.gpid] : null;
+      const esReal = !!this.PLAN_ID;
+      // ⚠ LA FOTO SE RESUELVE AL PINTAR, NO SE LEE DE LA BASE.
+      //
+      // Las URL de foto de Places van FIRMADAS Y CADUCAN. Cuando expira,
+      // Google no devuelve un 404: sirve un cuadrado gris de 100x100 que,
+      // estirado a los 110x78 del hueco, parece que la imagen «no carga».
+      // Eso es lo que pasaba con casi todos los sitios, porque la URL se
+      // guardaba en plan_items.imagen_url al añadirlos y se reusaba para
+      // siempre: los recien añadidos se veian y los de hace semanas no.
+      //
+      // Medido sobre «Mariscos la Doña»: la URL guardada devolvia 100x100
+      // y una pedida en ese momento, 400x300. Y Google TIENE fotos para
+      // los 10 sitios del plan, de 4 a 10 cada uno; nunca fue falta de
+      // dato.
+      //
+      // Ademas los terminos de Maps solo permiten cachear el place_id,
+      // nunca la URL de la foto, asi que guardarla tampoco estaba
+      // permitido.
+      //
+      // El orden importa: primero la de getDetails, que se acaba de
+      // pedir; si aun no ha llegado, la que traiga el lugar en memoria
+      // -que SI es valida cuando viene de Explorar o del buscador de esta
+      // misma sesion-; y de ultimo el marcador.
+      V.detFoto = (dd && dd.fotos && dd.fotos[0])
+        || det.foto
+        || ('https://picsum.photos/seed/' + det.seed + '/280/200');
       V.detChips = det.chips;
       V.detRating = (Number(det.rating) || 0).toFixed(1); V.detRev = (Number(det.rev) || 0).toLocaleString('es-MX');
       const isAdded = !!s.added[det.id];
@@ -5282,9 +5315,6 @@ const anchaLab = tab !== 'dia';
       const openChatFromDet = () => this.openChatFull();
       V.detAskAI = openChatFromDet;
       V.detAiChips = ['Guía turística', '¿Cuál es el rango de precios?', 'Necesito una reservación'].map(t => ({ t, pick: () => { openChatFromDet(); setTimeout(() => this.sendChat(t + ' — ' + det.name), 350); } }));
-      // ── Datos reales de getDetails (M3); el demo se conserva sin servidor ──
-      const dd = (this.PLAN_ID && det.gpid && this._detCache) ? this._detCache[det.gpid] : null;
-      const esReal = !!this.PLAN_ID;
 
       // ── "Saber antes de ir" ──
       // Se pide al abrir la ficha, igual que el "Acerca de". Mientras no
