@@ -118,7 +118,18 @@ END $$
 
 -- ------------------------------------------------------------
 -- fn_total_gastos(plan_id) → DECIMAL(12,2)
---   Suma de plan_gastos del plan; 0 si no tiene ninguno.
+--   Suma de LOS DOS SITIOS donde vive el dinero de un viaje: los gastos
+--   sueltos del libro (plan_gastos) y el precio puesto a un lugar del
+--   itinerario (plan_items.precio). 0 si no hay ninguno.
+--
+--   ⚠ ANTES SOLO MIRABA plan_gastos, y por eso «Mis planes» decia «Sin
+--   gastos registrados» en seis planes que si tenian dinero puesto -uno
+--   con 9.000 MXN-. Es el mismo hueco que ya se tapo dentro de plan.php
+--   (_gastosDelPlan), pero esta funcion se quedo atras y seguia contando
+--   solo la mitad del sistema.
+--
+--   El filtro precio > 0 descarta los NULL de los lugares a los que
+--   nadie ha puesto precio, que son la mayoria.
 -- ------------------------------------------------------------
 DROP FUNCTION IF EXISTS fn_total_gastos $$
 CREATE FUNCTION fn_total_gastos(p_plan_id INT)
@@ -128,7 +139,10 @@ READS SQL DATA
 BEGIN
     RETURN (SELECT COALESCE(SUM(monto), 0)
               FROM plan_gastos
-             WHERE plan_id = p_plan_id);
+             WHERE plan_id = p_plan_id)
+         + (SELECT COALESCE(SUM(precio), 0)
+              FROM plan_items
+             WHERE plan_id = p_plan_id AND precio > 0);
 END $$
 
 -- ------------------------------------------------------------
@@ -328,8 +342,14 @@ BEGIN
            p.creado_en, p.updated_at, m.rol,
            fn_estado_plan(p.fecha_inicio, p.fecha_fin) AS est_clave,
            fn_sitios_plan(p.id)                        AS lugares,
-           (SELECT COUNT(*) FROM plan_gastos g
-             WHERE g.plan_id = p.id)                   AS n_gastos,
+           -- Las dos fuentes, igual que fn_total_gastos: si el total
+           -- suma el precio de los lugares, el numero tiene que
+           -- contarlos, o la ficha diria «0 gastos» junto a un total
+           -- que no es cero.
+           ((SELECT COUNT(*) FROM plan_gastos g
+              WHERE g.plan_id = p.id)
+          + (SELECT COUNT(*) FROM plan_items i
+              WHERE i.plan_id = p.id AND i.precio > 0)) AS n_gastos,
            fn_total_gastos(p.id)                       AS total_gastos
       FROM planes p
       JOIN plan_miembros m

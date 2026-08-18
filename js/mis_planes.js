@@ -220,7 +220,7 @@
           (p.presup ? '<b>' + esc(p.presup) + '</b> <small>Presupuesto asignado</small>'
                     : '<span class="mp-vacio">Sin presupuesto asignado</span>') + '</span>' +
         '<span class="mp-dato">' + (ICO.recibo || '') +
-          (p.nGastos ? '<b>' + p.nGastos + ' gastos</b> <small>Gastos definidos</small>'
+          (p.nGastos ? '<b>' + p.nGastos + (p.nGastos === 1 ? ' gasto' : ' gastos') + '</b> <small>Gastos definidos</small>'
                      : '<span class="mp-vacio">Sin gastos registrados</span>') + '</span>' +
         (p.nGastos ? '<span class="mp-dato">' + (ICO.transferir || '') +
           '<b>' + esc(p.totGastos) + '</b> <small>Total de gastos</small></span>' : '') +
