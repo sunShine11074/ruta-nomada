@@ -72,14 +72,75 @@
         var planData = j.plan || {};
         var items = Array.isArray(j.items) ? j.items : [];
         var gastos = Array.isArray(j.gastos) ? j.gastos : [];
+        var miembros = Array.isArray(j.miembros) ? j.miembros.map(function (m) {
+            return {
+              uid: Number(m.usuario_id),
+              nombre: ((m.nombre || '') + ' ' + (m.apellidos || '')).trim()
+            };
+        }) : [];
+
         var presupuesto = Number(planData.presupuesto) || 0;
-        var costeItinerario = items.reduce(function (sum, item) {
-          return sum + (Number(item && item.precio) || 0);
-        }, 0);
-        var gastoTotal = gastos.reduce(function (sum, g) {
-          return sum + (Number(g && g.monto) || 0);
-        }, 0);
+
+        var todosLosGastos = [];
+        items.forEach(function(it) {
+            var monto = Number(it.precio) || 0;
+            if (monto > 0) {
+                todosLosGastos.push({
+                    c: it.nombre,
+                    m: monto,
+                    reparto: Array.isArray(it.reparto) ? it.reparto.map(function(r) { return { uid: Number(r.uid), monto: Number(r.monto) || 0 }; }) : []
+                });
+            }
+        });
+        gastos.forEach(function(g) {
+            var monto = Number(g.monto) || 0;
+            if (monto > 0) {
+                todosLosGastos.push({
+                    c: g.concepto,
+                    m: monto,
+                    reparto: Array.isArray(g.reparto) ? g.reparto.map(function(r) { return { uid: Number(r.uid), monto: Number(r.monto) || 0 }; }) : []
+                });
+            }
+        });
+
+        var gastoTotal = todosLosGastos.reduce(function (sum, g) { return sum + g.m; }, 0);
+        var costeItinerario = items.reduce(function (sum, item) { return sum + (Number(item && item.precio) || 0); }, 0);
         var restante = presupuesto - gastoTotal;
+
+        var gastosPorMiembro = {};
+        miembros.forEach(function(m) { gastosPorMiembro[m.uid] = 0; });
+        var sinRepartir = 0;
+
+        todosLosGastos.forEach(function(g) {
+            var rep = (g.reparto || []).filter(function(r) { return r.monto > 0; });
+            if (rep.length === 0) {
+                sinRepartir += g.m;
+                return;
+            }
+            var cubierto = 0;
+            rep.forEach(function(r) {
+                if (gastosPorMiembro.hasOwnProperty(r.uid)) {
+                    gastosPorMiembro[r.uid] += r.monto;
+                }
+                cubierto += r.monto;
+            });
+            if (g.m > cubierto) {
+                sinRepartir += g.m - cubierto;
+            }
+        });
+
+        var miembrosHtml = miembros.map(function(m) {
+            return '<div class="row"><span>' + esc(m.nombre) + '</span><strong>' + moneyFmt(gastosPorMiembro[m.uid] || 0) + '</strong></div>';
+        }).join('');
+        if (sinRepartir > 0) {
+            miembrosHtml += '<div class="row"><span>Sin repartir</span><strong>' + moneyFmt(sinRepartir) + '</strong></div>';
+        }
+
+        var otrosGastosHtml = gastos.map(function(g) {
+            var fecha = g.fecha ? new Date(g.fecha.replace(/-/g, '/')).toLocaleDateString('es-MX', {day:'numeric', month:'short'}) : '';
+            return '<div class="row"><div><strong>' + esc(g.concepto) + '</strong><div class="mini">' + esc(g.categoria || 'Otro') + (fecha ? ' · ' + fecha : '') + '</div></div><div class="amt">' + moneyFmt(g.monto) + '</div></div>';
+        }).join('');
+
         var head = planData.nombre || plan.nombre || 'Plan de viaje';
         var destino = planData.destino || plan.destino || 'Destino no definido';
         var fechas = (planData.fecha_inicio || planData.fecha_fin)
@@ -96,31 +157,76 @@
         var dayHtml = Object.keys(dayMap).sort(function (a, b) { return Number(a) - Number(b); }).map(function (dia) {
           var arr = dayMap[dia].slice().sort(function (a, b) { return Number(a.orden || 0) - Number(b.orden || 0); });
           var rows = arr.map(function (item) {
-            var horario = item.hora || item.hora_fin ? ((item.hora || '') + (item.hora_fin ? ' - ' + item.hora_fin : '')) : 'Sin horario';
+            var horario = item.hora || item.hora_fin ? ((item.hora || '').slice(0,5) + (item.hora_fin ? ' - ' + item.hora_fin.slice(0,5) : '')) : 'Sin horario';
             var precio = Number(item.precio) || 0;
             return '<div class="row"><div><strong>' + esc(item.nombre || 'Lugar') + '</strong><div class="mini">' + esc(horario) + '</div></div><div class="amt">' + moneyFmt(precio) + '</div></div>';
           }).join('');
-          return '<section class="day"><h3>Día ' + esc(dia) + '</h3>' + rows + '</section>';
+          return '<section class="day"><h3>Día ' + esc(dia) + '</h3>' + (rows || '<div class="empty">Sin actividades en este día.</div>') + '</section>';
         }).join('');
 
-        var html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><title>' + esc(head) + '</title>' +
-          '<style>body{font-family:Arial,sans-serif;color:#12252d;margin:28px;background:#fff}h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:18px 0 10px}p{margin:6px 0}.meta{color:#4a606a;font-size:13px}.grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px;margin:20px 0 26px}.card{background:#f6f9fb;border:1px solid #dfe7eb;border-radius:10px;padding:12px 14px}.label{font-size:11px;color:#5d7881;text-transform:uppercase;letter-spacing:.08em}.value{margin-top:8px;font-size:20px;font-weight:700}.line{border-top:1px solid #e9eef1;padding-top:12px;margin-top:12px}.row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:9px 0;border-bottom:1px solid #eef2f4}.mini{font-size:12px;color:#56717d;margin-top:4px}.amt{font-weight:700;white-space:nowrap}.day{page-break-inside:avoid;margin-bottom:22px}.day h3{margin:0 0 8px}.@media print{body{margin:0}}</style></head><body>' +
-          '<h1>' + esc(head) + '</h1>' +
-          '<div class="meta">' + esc(destino) + ' · ' + esc(fechas) + '</div>' +
-          '<div class="grid">' +
-          '<div class="card"><div class="label">Presupuesto</div><div class="value">' + moneyFmt(presupuesto) + '</div></div>' +
-          '<div class="card"><div class="label">Gastos</div><div class="value">' + moneyFmt(gastoTotal) + '</div></div>' +
-          '<div class="card"><div class="label">Itinerario</div><div class="value">' + moneyFmt(costeItinerario) + '</div></div>' +
-          '<div class="card"><div class="label">Restante</div><div class="value">' + moneyFmt(restante) + '</div></div>' +
-          '</div>' +
-          '<div class="line"><h2>Resumen del viaje</h2>' +
-          '<div class="row"><span>Destino</span><strong>' + esc(destino) + '</strong></div>' +
-          '<div class="row"><span>Fechas</span><strong>' + esc(fechas) + '</strong></div>' +
-          '<div class="row"><span>Presupuesto</span><strong>' + moneyFmt(presupuesto) + '</strong></div>' +
-          '<div class="row"><span>Gastos definidos</span><strong>' + moneyFmt(gastoTotal) + '</strong></div>' +
-          '<div class="row"><span>Saldo restante</span><strong>' + moneyFmt(restante) + '</strong></div>' +
-          '</div>' +
-          '<div class="line"><h2>Itinerario</h2>' + (dayHtml || '<p>No hay actividades registradas.</p>') + '</div></body></html>';
+        var html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${esc(head)}</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 24px; color: #12252d; background: #fff; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #dfe7eb; padding-bottom: 18px; margin-bottom: 20px; }
+  .header-info {}
+  .header-logo { max-height: 40px; }
+  h1 { font-size: 30px; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 24px 0 12px; border-bottom: 1px solid #e9eef1; padding-bottom: 8px; }
+  .meta { font-size: 14px; color: #4a606a; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 20px 0 26px; }
+  .card { background: #f6f9fb; border: 1px solid #dfe7eb; border-radius: 12px; padding: 12px 14px; }
+  .label { font-size: 11px; color: #5d7881; text-transform: uppercase; letter-spacing: .08em; }
+  .value { margin-top: 8px; font-size: 22px; font-weight: 700; }
+  .day { page-break-inside: avoid; margin-bottom: 24px; }
+  .day h3 { margin: 0 0 12px; font-size: 20px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eef2f4; }
+  .row div:first-child strong { font-weight: 600; }
+  .mini { font-size: 12px; color: #56717d; font-weight: 400; margin-top: 4px; }
+  .amt { text-align: right; font-weight: 700; white-space: nowrap; }
+  .empty { color: #6a7d86; padding: 8px 0; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-info">
+      <h1>${esc(head)}</h1>
+      <div class="meta">${esc(destino)} · ${esc(fechas)}</div>
+    </div>
+    <img src="img/logo.png" alt="Ruta Nómada" class="header-logo">
+  </div>
+  <div class="summary">
+    <div class="card"><div class="label">Presupuesto</div><div class="value">${moneyFmt(presupuesto)}</div></div>
+    <div class="card"><div class="label">Gasto Total</div><div class="value">${moneyFmt(gastoTotal)}</div></div>
+    <div class="card"><div class="label">Itinerario</div><div class="value">${items.length} lugares</div></div>
+    <div class="card"><div class="label">Restante</div><div class="value">${moneyFmt(restante)}</div></div>
+  </div>
+  
+  <h2>Resumen del Viaje</h2>
+  <div class="row"><span>Destino</span><strong>${esc(destino)}</strong></div>
+  <div class="row"><span>Fechas</span><strong>${esc(fechas)}</strong></div>
+  <div class="row"><span>Presupuesto</span><strong>${moneyFmt(presupuesto)}</strong></div>
+  <div class="row"><span>Gastos definidos</span><strong>${moneyFmt(gastoTotal)}</strong></div>
+  <div class="row"><span>Saldo restante</span><strong>${moneyFmt(restante)}</strong></div>
+
+  ${miembros.length > 0 ? `
+  <h2>Gastos por Miembro</h2>
+  ${miembrosHtml}
+  ` : ''}
+
+  <h2>Itinerario</h2>
+  ${dayHtml || '<div class="empty">No hay actividades guardadas en este viaje.</div>'}
+
+  ${gastos.length > 0 ? `
+  <h2>Otros Gastos</h2>
+  ${otrosGastosHtml}
+  ` : ''}
+</body>
+</html>`;
 
         var win = window.open('', '_blank', 'width=1100,height=900');
         if (!win) return;
@@ -130,8 +236,9 @@
         win.focus();
         setTimeout(function () { try { win.print(); } catch (e) {} }, 300);
       })
-      .catch(function () {
-        alert('No se pudo cargar el plan desde la base de datos para imprimir.');
+      .catch(function (err) {
+        console.error(err);
+        alert('No se pudo cargar el plan desde la base de datos para imprimir. ' + err.message);
       });
   }
 
