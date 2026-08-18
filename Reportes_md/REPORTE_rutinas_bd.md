@@ -129,9 +129,17 @@ BEGIN
 END
 ```
 
-**Qué hace.** Devuelve el total gastado en un plan. El `COALESCE`
-garantiza `0` —no `NULL`— cuando el plan no tiene ningún gasto, que es
-el caso mayoritario de un viaje recién creado.
+> ⚠ **DESFASADO desde el 17/08/2026.** El cuerpo de arriba es el
+> original y ya no es el que está instalado: sumaba sólo `plan_gastos` e
+> ignoraba el dinero puesto a un lugar del itinerario, así que «Mis
+> planes» decía «Sin gastos registrados» en seis de los once planes. La
+> función suma ahora las dos fuentes. Ver
+> [`REPORTE_uso_de_rutinas.md`](REPORTE_uso_de_rutinas.md), sección 6.
+
+**Qué hace.** Devuelve el total gastado en un plan, sumando los gastos
+sueltos del libro y el precio puesto a los sitios del itinerario. El
+`COALESCE` garantiza `0` —no `NULL`— cuando el plan no tiene ningún
+gasto, que es el caso mayoritario de un viaje recién creado.
 
 **Dónde se usa.** En `sp_planes_usuario`, columna `total_gastos`. Se
 muestra en el panel derecho de `mis_planes.php` como «Total de gastos».
