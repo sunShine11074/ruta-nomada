@@ -30,8 +30,8 @@ $q_attr = htmlspecialchars($q, ENT_QUOTES, 'UTF-8');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="topbar.css">
+    <link rel="stylesheet" href="style.css?v=<?= @filemtime(__DIR__ . '/style.css') ?: 1 ?>">
+    <link rel="stylesheet" href="topbar.css?v=<?= @filemtime(__DIR__ . '/topbar.css') ?: 1 ?>">
     <link rel="stylesheet" href="resultados.css">
 </head>
 <body class="dashboard-page rz-results" data-user-id="<?= (int) $user['id'] ?>">

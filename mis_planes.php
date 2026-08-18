@@ -115,8 +115,8 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?= h($tituloPagina) ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="topbar.css">
+  <link rel="stylesheet" href="style.css?v=<?= @filemtime(__DIR__ . '/style.css') ?: 1 ?>">
+  <link rel="stylesheet" href="topbar.css?v=<?= @filemtime(__DIR__ . '/topbar.css') ?: 1 ?>">
   <!-- ?v= con la fecha del archivo: al cambiar el CSS o el JS, el
        navegador se baja la versión nueva en vez de servir la vieja de su
        caché. Sin esto, tras un git pull se ven estilos antiguos y parece

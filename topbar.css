@@ -9,6 +9,27 @@
 body.sidebar-collapsed .main-content { padding-left: 2rem !important; }
 .sidebar, .sidebar-fab, .sidebar-scrim { display: none !important; }
 
+/* ⚠ EL HUECO DE LA BARRA VIVE AQUÍ, Y NO EN style.css.
+   .topbar es `position: fixed`, así que sale del flujo y se come los
+   primeros 56 px de la página. Eso lo compensaba `body { padding-top:
+   56px }` en style.css... pero style.css la cargan TAMBIÉN login,
+   register, forgot-password y reset-password, que NO llevan barra, y
+   allí esos 56 px eran un hueco muerto encima del formulario.
+
+   Al arreglar eso se puso el padding a 0 para todos (74a5517), y
+   entonces las cinco páginas que SÍ llevan barra se quedaron con el
+   título metido debajo. En «Mis planes» desaparecía el encabezado
+   entero.
+
+   La regla se muda a topbar.css porque ESTA HOJA ES EL DISCRIMINANTE
+   EXACTO: la cargan las cinco páginas con barra y no la carga ninguna
+   de las de sesión. plan.php tampoco, que monta la suya aparte. Y va
+   después de style.css en las cinco, así que gana en la cascada.
+
+   Si algún día la barra cambia de alto, este 56 y el --mp-topbar de
+   mis_planes.css tienen que moverse juntos. */
+body { padding-top: 56px; }
+
 /* ── Barra ─────────────────────────────────────────────────── */
 .topbar.tb {
     display: grid;

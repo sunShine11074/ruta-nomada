@@ -95,7 +95,7 @@ if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invitación — Ruta Nómada</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=<?= @filemtime(__DIR__ . '/style.css') ?: 1 ?>">
 </head>
 <body class="dashboard-page" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
     <div style="background:var(--white);border-radius:14px;box-shadow:0 10px 30px rgba(14,42,51,.15);padding:2.5rem 2.2rem;max-width:430px;text-align:center;">

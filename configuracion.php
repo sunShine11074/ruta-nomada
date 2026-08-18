@@ -13,8 +13,8 @@ require_once __DIR__ . '/includes/user_topbar.php';
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Configuración — Ruta Nómada</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="topbar.css">
+  <link rel="stylesheet" href="style.css?v=<?= @filemtime(__DIR__ . '/style.css') ?: 1 ?>">
+    <link rel="stylesheet" href="topbar.css?v=<?= @filemtime(__DIR__ . '/topbar.css') ?: 1 ?>">
 </head>
 <body class="dashboard-page">
 <?php $topbar_active = null; include __DIR__ . '/includes/topbar.php'; ?>

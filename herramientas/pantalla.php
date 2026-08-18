@@ -26,7 +26,7 @@
 <title>Qué dice tu pantalla — Ruta Nómada</title>
 <!-- A PROPÓSITO: sin esta hoja la raíz medida sería la del navegador y
      no la del proyecto, que es justo el error que se quiere evitar. -->
-<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../style.css?v=<?= @filemtime(__DIR__ . '/../style.css') ?: 1 ?>">
 <style>
   .pt-caja { max-width: 760px; margin: 40px auto; padding: 0 22px; font-family: system-ui, sans-serif; }
   .pt-caja h1 { font-size: 26px; margin: 0 0 6px; }
