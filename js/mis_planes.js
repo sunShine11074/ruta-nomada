@@ -242,44 +242,6 @@
       });
   }
 
-  function cerrarMenuPlan() {
-    document.querySelectorAll('.mp-card-menu').forEach(function (menu) { menu.remove(); });
-  }
-
-  function abrirMenuPlan(btn) {
-    if (!btn) return;
-    cerrarMenuPlan();
-    var card = btn.closest('.mp-card');
-    var idx = card ? Number(card.getAttribute('data-idx')) : -1;
-    var plan = P[idx];
-    if (!plan) return;
-
-    var menu = document.createElement('div');
-    menu.className = 'mp-card-menu';
-    menu.style.position = 'absolute';
-    menu.style.top = (btn.getBoundingClientRect().top + 8) + 'px';
-    menu.style.left = (btn.getBoundingClientRect().left - 120) + 'px';
-    menu.style.zIndex = '1000';
-    menu.style.width = '170px';
-    menu.style.background = '#ffffff';
-    menu.style.border = '1px solid #dfe7eb';
-    menu.style.borderRadius = '12px';
-    menu.style.boxShadow = '0 18px 36px rgba(14,42,51,.15)';
-    menu.style.padding = '8px';
-    menu.innerHTML = '<button type="button" class="mp-menuitem" data-print-plan="' + idx + '" style="display:block;width:100%;border:none;background:none;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:#0D1F27;">Imprimir plan</button>';
-    document.body.appendChild(menu);
-
-    var action = menu.querySelector('[data-print-plan]');
-    if (action) {
-      action.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        imprimirPlan(P[Number(action.getAttribute('data-print-plan'))]);
-        cerrarMenuPlan();
-      });
-    }
-  }
-
   function pintarFicha() {
     var p = P[sel];
     var host = $('mpFicha');
@@ -621,16 +583,6 @@
   document.addEventListener('click', function (e) {
     var v = e.target.closest ? e.target.closest('.mp-views__btn') : null;
     if (v) { cambiarVista(v.getAttribute('data-vista'), v); return; }
-    var menuBtn = e.target.closest ? e.target.closest('.mp-card__menu') : null;
-    if (menuBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      abrirMenuPlan(menuBtn);
-      return;
-    }
-    if (document.querySelector('.mp-card-menu') && (!e.target.closest || !e.target.closest('.mp-card-menu'))) {
-      cerrarMenuPlan();
-    }
     var fila = e.target.closest ? e.target.closest('[data-idx]') : null;
     if (fila) seleccionar(Number(fila.getAttribute('data-idx')), 'lista');
   });

@@ -213,7 +213,6 @@ $tituloPagina = 'Mis planes — Ruta Nómada';
           <article class="mp-card" data-idx="<?= $i ?>" tabindex="0" aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"
                    style="background:<?= h($c['bg']) ?>">
             <span class="mp-card__deco" style="background:<?= h($c['deco']) ?>"></span>
-            <button type="button" class="mp-card__menu" aria-label="Más opciones de <?= h($p['nombre']) ?>"><?= icoAlto('puntos', 12) ?></button>
             <h3 class="mp-card__t" title="<?= h($p['nombre']) ?>"><?= h($p['nombre']) ?></h3>
             <!-- Alturas de dibujo medidas del frame: calendario 11, cerdito
                  y lápiz 13, pin 10, corona 7. -->
